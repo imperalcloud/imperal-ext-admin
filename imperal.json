@@ -1,0 +1,3071 @@
+{
+  "manifest_schema_version": 3,
+  "app_id": "admin",
+  "version": "5.1.0",
+  "name": "Admin",
+  "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
+  "icon": "icon.svg",
+  "actions_explicit": true,
+  "capabilities": [
+    "admin:users:read",
+    "admin:users:write",
+    "admin:users:delete",
+    "admin:roles:read",
+    "admin:roles:write",
+    "admin:scopes:read",
+    "admin:scopes:write",
+    "admin:extensions:read",
+    "admin:extensions:write",
+    "admin:billing:read",
+    "admin:billing:write",
+    "admin:system:read",
+    "admin:system:write",
+    "admin:audit:read",
+    "admin:llm:read",
+    "admin:llm:write",
+    "admin:payment:read",
+    "admin:payment:write",
+    "admin:developer:review",
+    "admin:*",
+    "config:read",
+    "config:write",
+    "store:read",
+    "store:write",
+    "ai:complete",
+    "users:read",
+    "users:manage",
+    "users:admin"
+  ],
+  "tools": [
+    {
+      "name": "tool_admin_chat",
+      "description": "Admin assistant — manage users, roles, extensions and system health. RBAC scopes, effective permissions, compare roles, bulk assign, audit log, extension access policies, deny/allow extensions",
+      "scopes": [],
+      "parameters": {
+        "message": {
+          "type": "string",
+          "required": false
+        },
+        "kwargs": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "synthetic": false
+    },
+    {
+      "name": "skeleton_refresh_admin_stats",
+      "description": "Background refresh for admin dashboard.",
+      "scopes": [],
+      "parameters": {
+        "kwargs": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "synthetic": false
+    },
+    {
+      "name": "skeleton_alert_admin_stats",
+      "description": "Alert on admin dashboard changes.",
+      "scopes": [],
+      "parameters": {
+        "kwargs": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "synthetic": false
+    },
+    {
+      "name": "__panel__sidebar",
+      "description": "Panel: Administration",
+      "scopes": [],
+      "parameters": {
+        "params": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "synthetic": true
+    },
+    {
+      "name": "__panel__tools",
+      "description": "Panel: Dashboard",
+      "scopes": [],
+      "parameters": {
+        "params": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "synthetic": true
+    },
+    {
+      "name": "list_users",
+      "description": "List all users with roles, scopes, status.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "create_user",
+      "description": "Create a new user.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Create a new platform user.",
+        "properties": {
+          "email": {
+            "description": "User email",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "description": "User password",
+            "title": "Password",
+            "type": "string"
+          },
+          "role": {
+            "default": "user",
+            "description": "Role name",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "CreateUserParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_created",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "update_user",
+      "description": "Update user role, scopes, attributes, or status.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Update user properties.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "New role",
+            "title": "Role",
+            "type": "string"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Active status",
+            "title": "Is Active"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Custom scopes",
+            "title": "Scopes"
+          },
+          "attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User attributes",
+            "title": "Attributes"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UpdateUserParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "deactivate_user",
+      "description": "Deactivate user (can reactivate later).",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific user.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UserIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_deactivated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "hard_delete_user",
+      "description": "PERMANENT delete. Cannot be undone.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific user.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UserIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "update_user_limits",
+      "description": "Update individual limit overrides for a user.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Update individual limit overrides for a user.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "monthly_action_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Monthly actions (empty = inherit)",
+            "title": "Monthly Action Limit"
+          },
+          "max_concurrent_tasks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Concurrent tasks (empty = inherit)",
+            "title": "Max Concurrent Tasks"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "History window (empty = inherit)",
+            "title": "Context Window"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UpdateUserLimitsParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_user_attribute",
+      "description": "Set a single attribute key-value on a user.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Set a single attribute key-value on a user.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "attr_key": {
+            "description": "Attribute key",
+            "title": "Attr Key",
+            "type": "string"
+          },
+          "attr_value": {
+            "default": "",
+            "description": "Attribute value",
+            "title": "Attr Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "attr_key"
+        ],
+        "title": "SetUserAttributeParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "remove_user_attribute",
+      "description": "Remove an attribute key from a user.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Remove a single attribute key from a user.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "attr_key": {
+            "description": "Attribute key to remove",
+            "title": "Attr Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "attr_key"
+        ],
+        "title": "RemoveUserAttributeParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_roles",
+      "description": "List all roles with default scopes.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "create_role",
+      "description": "Create a new role.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Create a new role.",
+        "properties": {
+          "name": {
+            "description": "Role name",
+            "title": "Name",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "description": "Human-readable name",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "default_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default scopes",
+            "title": "Default Scopes"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateRoleParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "role_created",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "delete_role",
+      "description": "Delete a role by ID or name.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Delete a role by ID or name.",
+        "properties": {
+          "role_id": {
+            "default": "",
+            "description": "Role ID",
+            "title": "Role Id",
+            "type": "string"
+          },
+          "role_name": {
+            "default": "",
+            "description": "Role name (resolved automatically)",
+            "title": "Role Name",
+            "type": "string"
+          }
+        },
+        "title": "DeleteRoleParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "role_deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "update_role",
+      "description": "Update role scopes, limits, or display name. Can cascade.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Update a role's properties including limits.",
+        "properties": {
+          "role_id": {
+            "default": "",
+            "description": "Role ID",
+            "title": "Role Id",
+            "type": "string"
+          },
+          "role_name": {
+            "default": "",
+            "description": "Role name (resolved to ID)",
+            "title": "Role Name",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "description": "New display name",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "default_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New default scopes",
+            "title": "Default Scopes"
+          },
+          "cascade": {
+            "default": false,
+            "description": "Update all users with this role",
+            "title": "Cascade",
+            "type": "boolean"
+          },
+          "monthly_action_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Monthly action limit (0=unlimited)",
+            "title": "Monthly Action Limit"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "History window in messages (5-200)",
+            "title": "Context Window"
+          }
+        },
+        "title": "UpdateRoleParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "role_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_scopes",
+      "description": "List all defined scopes.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Filter scopes.",
+        "properties": {
+          "resource": {
+            "default": "",
+            "description": "Filter by resource",
+            "title": "Resource",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "description": "Filter by source",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "ListScopesParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "create_scope",
+      "description": "Create a scope in resource:action format.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Create a scope in resource:action format.",
+        "properties": {
+          "resource": {
+            "description": "Resource name (e.g. 'billing')",
+            "title": "Resource",
+            "type": "string"
+          },
+          "action": {
+            "description": "Action name (e.g. 'read')",
+            "title": "Action",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "description": "Human-readable name",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "What this scope grants",
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource",
+          "action"
+        ],
+        "title": "CreateScopeParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "scope_created",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "delete_scope",
+      "description": "Delete a scope by name or ID.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Delete a scope.",
+        "properties": {
+          "scope_name": {
+            "default": "",
+            "description": "Scope in resource:action format",
+            "title": "Scope Name",
+            "type": "string"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scope ID",
+            "title": "Scope Id"
+          }
+        },
+        "title": "DeleteScopeParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "scope_deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "effective_scopes",
+      "description": "Show all effective scopes for a user with sources.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Identify a user by ID or email.",
+        "properties": {
+          "user_id": {
+            "default": "",
+            "description": "User imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "description": "User email (resolved automatically)",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "title": "UserRefParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "check_permission",
+      "description": "Check if user has a specific scope. YES/NO.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Check a specific permission.",
+        "properties": {
+          "user_id": {
+            "default": "",
+            "description": "User imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "description": "User email",
+            "title": "Email",
+            "type": "string"
+          },
+          "scope": {
+            "description": "Scope in resource:action format",
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "CheckPermissionParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "compare_roles",
+      "description": "Compare two roles — common and unique scopes.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Compare two roles.",
+        "properties": {
+          "role1": {
+            "description": "First role name",
+            "title": "Role1",
+            "type": "string"
+          },
+          "role2": {
+            "description": "Second role name",
+            "title": "Role2",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role1",
+          "role2"
+        ],
+        "title": "CompareRolesParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "bulk_assign_role",
+      "description": "Assign a role to multiple users. Max 100.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Assign a role to multiple users.",
+        "properties": {
+          "role": {
+            "description": "Target role name",
+            "title": "Role",
+            "type": "string"
+          },
+          "user_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Explicit list of imperal_ids",
+            "title": "User Ids"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter (e.g. {current_role: 'user'})",
+            "title": "Filter"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "BulkAssignRoleParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "roles_assigned",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "audit_log",
+      "description": "View audit log. Default last 24h, max 50 entries.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Query audit log.",
+        "properties": {
+          "actor": {
+            "default": "",
+            "description": "Filter by actor",
+            "title": "Actor",
+            "type": "string"
+          },
+          "target": {
+            "default": "",
+            "description": "Filter by target",
+            "title": "Target",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "description": "Filter by action type",
+            "title": "Action",
+            "type": "string"
+          },
+          "hours": {
+            "default": 24,
+            "description": "How many hours back",
+            "title": "Hours",
+            "type": "integer"
+          }
+        },
+        "title": "AuditLogParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_extensions",
+      "description": "List all active extensions.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_extension_config",
+      "description": "Get full extension config.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific extension.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id from ACTIVE EXTENSIONS list",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "AppIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "update_extension_config",
+      "description": "Update extension config.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Update extension config.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "description": "Config sections to update",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "app_id",
+          "config"
+        ],
+        "title": "UpdateExtConfigParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "update_skeleton_ttl",
+      "description": "Update skeleton refresh TTL.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Update skeleton refresh interval.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "ttl": {
+            "default": 60,
+            "description": "Refresh interval in seconds",
+            "title": "Ttl",
+            "type": "integer"
+          },
+          "section_name": {
+            "default": "",
+            "description": "Specific section. Omit for all.",
+            "title": "Section Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "UpdateSkeletonTtlParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "skeleton_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "suspend_extension",
+      "description": "Suspend an extension.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific extension.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id from ACTIVE EXTENSIONS list",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "AppIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_suspended",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "activate_extension",
+      "description": "Activate a suspended extension.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific extension.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id from ACTIVE EXTENSIONS list",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "AppIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_activated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_user_extensions",
+      "description": "List extensions a user can access.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Identify a user for extension access.",
+        "properties": {
+          "user_id": {
+            "default": "",
+            "description": "User imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "description": "User email",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "title": "UserExtParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_access_policy",
+      "description": "Set extension access policy.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Set extension access policy.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "mode": {
+            "default": "",
+            "description": "public or restricted",
+            "title": "Mode",
+            "type": "string"
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scopes for restricted mode",
+            "title": "Required Scopes"
+          },
+          "denied_roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Roles to deny",
+            "title": "Denied Roles"
+          },
+          "denied_users": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User IDs to deny",
+            "title": "Denied Users"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SetAccessPolicyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "access_policy_set",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_access_policy",
+      "description": "Show access policy with per-role resolution.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific extension.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id from ACTIVE EXTENSIONS list",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "AppIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_extension_users",
+      "description": "List users who can access an extension.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific extension.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id from ACTIVE EXTENSIONS list",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "AppIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "deny_extension",
+      "description": "Add role/user to denied list.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Deny or allow access for a role/user.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "Role name",
+            "title": "Role",
+            "type": "string"
+          },
+          "user": {
+            "default": "",
+            "description": "User email or imperal_id",
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "DenyAllowParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_denied",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "allow_extension",
+      "description": "Remove role/user from denied list.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Deny or allow access for a role/user.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "Role name",
+            "title": "Role",
+            "type": "string"
+          },
+          "user": {
+            "default": "",
+            "description": "User email or imperal_id",
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "DenyAllowParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_allowed",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_general",
+      "description": "Save extension general settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "description": "Display name",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "status": {
+            "default": "active",
+            "description": "active or suspended",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveGeneralParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_models",
+      "description": "Save extension AI model settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "primary_model": {
+            "default": "",
+            "description": "Primary model",
+            "title": "Primary Model",
+            "type": "string"
+          },
+          "intake_model": {
+            "default": "",
+            "description": "Intake model",
+            "title": "Intake Model",
+            "type": "string"
+          },
+          "analysis_model": {
+            "default": "",
+            "description": "Analysis model",
+            "title": "Analysis Model",
+            "type": "string"
+          },
+          "router_model": {
+            "default": "",
+            "description": "Router model",
+            "title": "Router Model",
+            "type": "string"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 2,
+            "minimum": 0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "max_tokens": {
+            "default": 2048,
+            "maximum": 8192,
+            "minimum": 256,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "thinking_mode": {
+            "default": "auto",
+            "description": "auto, off, or on",
+            "title": "Thinking Mode",
+            "type": "string"
+          },
+          "top_p": {
+            "default": "",
+            "description": "Top P 0.0-1.0; blank = inherit",
+            "title": "Top P",
+            "type": "string"
+          },
+          "presence_penalty": {
+            "default": "",
+            "description": "Presence penalty -2.0..2.0; blank = inherit",
+            "title": "Presence Penalty",
+            "type": "string"
+          },
+          "frequency_penalty": {
+            "default": "",
+            "description": "Frequency penalty -2.0..2.0; blank = inherit",
+            "title": "Frequency Penalty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveModelsParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_persona",
+      "description": "Save extension persona settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "system_prompt_intake": {
+            "default": "",
+            "title": "System Prompt Intake",
+            "type": "string"
+          },
+          "system_prompt_intelligence": {
+            "default": "",
+            "title": "System Prompt Intelligence",
+            "type": "string"
+          },
+          "language": {
+            "default": "auto",
+            "title": "Language",
+            "type": "string"
+          },
+          "tone": {
+            "default": "formal",
+            "title": "Tone",
+            "type": "string"
+          },
+          "use_emojis": {
+            "default": "false",
+            "description": "'true' or 'false'",
+            "title": "Use Emojis",
+            "type": "string"
+          },
+          "cite_sources": {
+            "default": "true",
+            "description": "'true' or 'false'",
+            "title": "Cite Sources",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SavePersonaParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_alerts",
+      "description": "Save extension alert settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "enabled": {
+            "default": "true",
+            "description": "'true' or 'false'",
+            "title": "Enabled",
+            "type": "string"
+          },
+          "cooldown_seconds": {
+            "default": 60,
+            "minimum": 10,
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "max_per_hour": {
+            "default": 10,
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Max Per Hour",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveAlertsParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_router",
+      "description": "Save extension router settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "enabled": {
+            "default": "true",
+            "description": "'true' or 'false'",
+            "title": "Enabled",
+            "type": "string"
+          },
+          "timeout_ms": {
+            "default": 3000,
+            "maximum": 10000,
+            "minimum": 500,
+            "title": "Timeout Ms",
+            "type": "integer"
+          },
+          "fallback": {
+            "default": "first_tool",
+            "title": "Fallback",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveRouterParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_session",
+      "description": "Save extension session settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "timeout_hours": {
+            "default": 24,
+            "minimum": 1,
+            "title": "Timeout Hours",
+            "type": "integer"
+          },
+          "max_history": {
+            "default": 40,
+            "minimum": 10,
+            "title": "Max History",
+            "type": "integer"
+          },
+          "compress_at": {
+            "default": 30,
+            "minimum": 5,
+            "title": "Compress At",
+            "type": "integer"
+          },
+          "history_ttl_days": {
+            "default": 7,
+            "maximum": 90,
+            "minimum": 1,
+            "title": "History Ttl Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveSessionParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_context",
+      "description": "Save extension context settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "max_tool_rounds": {
+            "default": "",
+            "description": "Empty = inherit platform default",
+            "title": "Max Tool Rounds",
+            "type": "string"
+          },
+          "max_result_tokens": {
+            "default": "",
+            "description": "Empty = inherit platform default",
+            "title": "Max Result Tokens",
+            "type": "string"
+          },
+          "keep_recent_verbatim": {
+            "default": "",
+            "description": "Empty = inherit platform default",
+            "title": "Keep Recent Verbatim",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveContextParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "extension_configured",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_ext_skeleton",
+      "description": "Save extension skeleton section settings.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "app_id": {
+            "description": "Extension app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "sections_json": {
+            "default": "[]",
+            "description": "JSON array of section configs",
+            "title": "Sections Json",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "SaveSkeletonParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "skeleton_updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "system_health",
+      "description": "Check platform health.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_rules",
+      "description": "List all automation rules.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "create_rule",
+      "description": "Create automation from natural language.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Create automation from natural language.",
+        "properties": {
+          "prompt": {
+            "description": "Rule description in natural language",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "cooldown_seconds": {
+            "default": 300,
+            "description": "Min seconds between triggers",
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "max_per_hour": {
+            "default": 10,
+            "description": "Max triggers per hour",
+            "title": "Max Per Hour",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "RulePromptParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "rule_created",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "delete_rule",
+      "description": "Delete an automation rule.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific rule.",
+        "properties": {
+          "rule_id": {
+            "description": "Rule ID",
+            "title": "Rule Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_id"
+        ],
+        "title": "RuleIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "rule_deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "pause_rule",
+      "description": "Pause an automation rule.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific rule.",
+        "properties": {
+          "rule_id": {
+            "description": "Rule ID",
+            "title": "Rule Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_id"
+        ],
+        "title": "RuleIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "rule_paused",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "resume_rule",
+      "description": "Resume a paused rule. Resets trigger_count.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific rule.",
+        "properties": {
+          "rule_id": {
+            "description": "Rule ID",
+            "title": "Rule Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_id"
+        ],
+        "title": "RuleIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "rule_resumed",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_confirmation_policy",
+      "description": "Set confirmation policy for a role.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Set confirmation policy for a role.",
+        "properties": {
+          "role_name": {
+            "description": "Role name",
+            "title": "Role Name",
+            "type": "string"
+          },
+          "policy": {
+            "description": "enforced / default_on / default_off / disabled",
+            "title": "Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_name",
+          "policy"
+        ],
+        "title": "ConfirmationPolicyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "confirmation_set",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_confirmation_policy",
+      "description": "Get confirmation policy for a role.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a role by name.",
+        "properties": {
+          "role_name": {
+            "description": "Role name",
+            "title": "Role Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_name"
+        ],
+        "title": "RoleNameParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_user_confirmation",
+      "description": "Set confirmation for a user.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Set user confirmation settings.",
+        "properties": {
+          "user_id": {
+            "description": "User imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enable or disable",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "skip_read": {
+            "default": false,
+            "description": "Skip for read-only actions",
+            "title": "Skip Read",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id",
+          "enabled"
+        ],
+        "title": "UserConfirmationParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "confirmation_set",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_user_confirmation",
+      "description": "Get user confirmation settings.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific user.",
+        "properties": {
+          "user_id": {
+            "description": "User imperal_id",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UserIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_task_limit",
+      "description": "Set max concurrent tasks for a role (1-50).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Set task limit for a role.",
+        "properties": {
+          "role_name": {
+            "description": "Role name",
+            "title": "Role Name",
+            "type": "string"
+          },
+          "max_tasks": {
+            "default": 3,
+            "description": "Max concurrent tasks (1-50)",
+            "title": "Max Tasks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "role_name"
+        ],
+        "title": "TaskLimitParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "task_limit_set",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_task_limit",
+      "description": "Get max concurrent tasks for a role.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a role by name.",
+        "properties": {
+          "role_name": {
+            "description": "Role name",
+            "title": "Role Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_name"
+        ],
+        "title": "RoleNameParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_context_defaults",
+      "description": "Save platform-wide context window defaults via Auth GW.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Platform-wide context window defaults.",
+        "properties": {
+          "quality_ceiling_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Quality ceiling tokens",
+            "title": "Quality Ceiling Tokens"
+          },
+          "default_context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default history window",
+            "title": "Default Context Window"
+          },
+          "default_max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max tool rounds",
+            "title": "Default Max Tool Rounds"
+          },
+          "default_max_result_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max result size tokens",
+            "title": "Default Max Result Tokens"
+          },
+          "default_keep_recent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keep recent verbatim",
+            "title": "Default Keep Recent"
+          },
+          "list_truncate_items": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List truncate items",
+            "title": "List Truncate Items"
+          },
+          "string_truncate_chars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "String truncate chars",
+            "title": "String Truncate Chars"
+          },
+          "max_history_stored": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max messages stored",
+            "title": "Max History Stored"
+          },
+          "history_ttl_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "History TTL days",
+            "title": "History Ttl Days"
+          }
+        },
+        "title": "ContextDefaultsParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_panel_data",
+      "description": "Get panel Declarative UI data for admin extension.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "reset_context_defaults",
+      "description": "Reset platform context defaults to built-in values.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_llm_config",
+      "description": "Save LLM provider/model config to Redis Config Store.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Save LLM provider/model configuration.",
+        "properties": {
+          "provider": {
+            "default": "",
+            "description": "LLM provider",
+            "title": "Provider",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "description": "Default model",
+            "title": "Model",
+            "type": "string"
+          },
+          "api_key": {
+            "default": "",
+            "description": "API key (write-only, leave blank to keep)",
+            "title": "Api Key",
+            "type": "string"
+          },
+          "base_url": {
+            "default": "",
+            "description": "Custom base URL for OpenAI-compatible providers",
+            "title": "Base Url",
+            "type": "string"
+          },
+          "routing_model": {
+            "default": "",
+            "description": "Routing model override",
+            "title": "Routing Model",
+            "type": "string"
+          },
+          "routing_provider": {
+            "default": "",
+            "description": "Routing provider override",
+            "title": "Routing Provider",
+            "type": "string"
+          },
+          "execution_model": {
+            "default": "",
+            "description": "Execution model override",
+            "title": "Execution Model",
+            "type": "string"
+          },
+          "execution_provider": {
+            "default": "",
+            "description": "Execution provider override",
+            "title": "Execution Provider",
+            "type": "string"
+          },
+          "navigate_model": {
+            "default": "",
+            "description": "Navigate model override",
+            "title": "Navigate Model",
+            "type": "string"
+          },
+          "navigate_provider": {
+            "default": "",
+            "description": "Navigate provider override",
+            "title": "Navigate Provider",
+            "type": "string"
+          },
+          "chain_narrative_model": {
+            "default": "",
+            "description": "Chain narrator model override (Sprint 2)",
+            "title": "Chain Narrative Model",
+            "type": "string"
+          },
+          "chain_narrative_provider": {
+            "default": "",
+            "description": "Chain narrator provider override (Sprint 2)",
+            "title": "Chain Narrative Provider",
+            "type": "string"
+          },
+          "judge_model": {
+            "default": "",
+            "description": "Judge model override (Sprint 2)",
+            "title": "Judge Model",
+            "type": "string"
+          },
+          "judge_provider": {
+            "default": "",
+            "description": "Judge provider override (Sprint 2)",
+            "title": "Judge Provider",
+            "type": "string"
+          },
+          "failover_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Enable failover",
+            "title": "Failover Enabled"
+          },
+          "failover_provider": {
+            "default": "",
+            "description": "Failover provider",
+            "title": "Failover Provider",
+            "type": "string"
+          },
+          "failover_model": {
+            "default": "",
+            "description": "Failover model",
+            "title": "Failover Model",
+            "type": "string"
+          },
+          "failover_api_key": {
+            "default": "",
+            "description": "Failover API key (write-only)",
+            "title": "Failover Api Key",
+            "type": "string"
+          },
+          "set_extension_override": {
+            "default": "",
+            "description": "Extension ID to set override for",
+            "title": "Set Extension Override",
+            "type": "string"
+          },
+          "override_model": {
+            "default": "",
+            "description": "Model for extension override",
+            "title": "Override Model",
+            "type": "string"
+          },
+          "override_provider": {
+            "default": "",
+            "description": "Provider for extension override",
+            "title": "Override Provider",
+            "type": "string"
+          },
+          "reset_extension_override": {
+            "default": "",
+            "description": "Extension ID to remove override for",
+            "title": "Reset Extension Override",
+            "type": "string"
+          },
+          "narration_history_limit": {
+            "anyOf": [
+              {
+                "maximum": 50,
+                "minimum": 4,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "History turns fed to narration",
+            "title": "Narration History Limit"
+          },
+          "confirmation_card_tokens": {
+            "anyOf": [
+              {
+                "maximum": 1024,
+                "minimum": 200,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Confirmation card max_tokens",
+            "title": "Confirmation Card Tokens"
+          },
+          "judge_digest_chars": {
+            "anyOf": [
+              {
+                "maximum": 32000,
+                "minimum": 2000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Audit-judge digest cap (chars)",
+            "title": "Judge Digest Chars"
+          },
+          "planner_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 2048,
+                "minimum": 200,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Chain-step planner max_tokens",
+            "title": "Planner Max Tokens"
+          },
+          "chain_prior_step_max_chars": {
+            "anyOf": [
+              {
+                "maximum": 32000,
+                "minimum": 500,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Chain prior-step truncation cap (chars)",
+            "title": "Chain Prior Step Max Chars"
+          },
+          "chain_prior_total_max_chars": {
+            "anyOf": [
+              {
+                "maximum": 200000,
+                "minimum": 3000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Chain prior-summary total cap (chars) fed to next step",
+            "title": "Chain Prior Total Max Chars"
+          },
+          "structured_gen_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 32000,
+                "minimum": 1024,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Structured-output generator default max_tokens (responses/structured_gen.py)",
+            "title": "Structured Gen Max Tokens"
+          },
+          "automation_main_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 16000,
+                "minimum": 256,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Automation plan-parser max_tokens (activities/automation.py:358)",
+            "title": "Automation Main Max Tokens"
+          },
+          "automation_condition_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 1024,
+                "minimum": 10,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Automation condition-eval max_tokens (activities/automation.py:448)",
+            "title": "Automation Condition Max Tokens"
+          },
+          "intent_classifier_planner_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 16000,
+                "minimum": 256,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Intent classifier max_tokens (hub/intent_classifier.py:881)",
+            "title": "Intent Classifier Planner Max Tokens"
+          },
+          "prose_judge_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 16000,
+                "minimum": 256,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Prose-judge Gate 6 max_tokens (narration/prose_judge.py:234)",
+            "title": "Prose Judge Max Tokens"
+          },
+          "system_handlers_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 16000,
+                "minimum": 256,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "system_chat handler max_tokens (pipeline/system_handlers.py:300)",
+            "title": "System Handlers Max Tokens"
+          },
+          "responses_judge_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 16000,
+                "minimum": 256,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Audit-judge max_tokens (responses/judge.py:163)",
+            "title": "Responses Judge Max Tokens"
+          },
+          "rule_engine_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 512,
+                "minimum": 10,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Rule-engine eval max_tokens (services/rule_engine.py:182)",
+            "title": "Rule Engine Max Tokens"
+          },
+          "default_max_response_tokens": {
+            "anyOf": [
+              {
+                "maximum": 4096,
+                "minimum": 256,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default narration max_tokens for new users",
+            "title": "Default Max Response Tokens"
+          },
+          "default_max_tool_rounds": {
+            "anyOf": [
+              {
+                "maximum": 30,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default tool-call rounds cap",
+            "title": "Default Max Tool Rounds"
+          },
+          "default_routing_context": {
+            "anyOf": [
+              {
+                "maximum": 50,
+                "minimum": 4,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default classifier history limit",
+            "title": "Default Routing Context"
+          },
+          "default_kav_max_retries": {
+            "anyOf": [
+              {
+                "maximum": 10,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default KAV retry cap",
+            "title": "Default Kav Max Retries"
+          },
+          "default_confirmation_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default confirmation_enabled for new users",
+            "title": "Default Confirmation Enabled"
+          },
+          "purpose_routing_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for routing (blank = inherit)",
+            "title": "Purpose Routing Temperature",
+            "type": "string"
+          },
+          "purpose_routing_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for routing",
+            "title": "Purpose Routing Top P",
+            "type": "string"
+          },
+          "purpose_routing_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for routing",
+            "title": "Purpose Routing Presence Penalty",
+            "type": "string"
+          },
+          "purpose_routing_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for routing",
+            "title": "Purpose Routing Frequency Penalty",
+            "type": "string"
+          },
+          "purpose_execution_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for execution",
+            "title": "Purpose Execution Temperature",
+            "type": "string"
+          },
+          "purpose_execution_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for execution",
+            "title": "Purpose Execution Top P",
+            "type": "string"
+          },
+          "purpose_execution_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for execution",
+            "title": "Purpose Execution Presence Penalty",
+            "type": "string"
+          },
+          "purpose_execution_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for execution",
+            "title": "Purpose Execution Frequency Penalty",
+            "type": "string"
+          },
+          "purpose_navigate_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for navigate",
+            "title": "Purpose Navigate Temperature",
+            "type": "string"
+          },
+          "purpose_navigate_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for navigate",
+            "title": "Purpose Navigate Top P",
+            "type": "string"
+          },
+          "purpose_navigate_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for navigate",
+            "title": "Purpose Navigate Presence Penalty",
+            "type": "string"
+          },
+          "purpose_navigate_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for navigate",
+            "title": "Purpose Navigate Frequency Penalty",
+            "type": "string"
+          },
+          "purpose_chain_narrative_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for chain_narrative",
+            "title": "Purpose Chain Narrative Temperature",
+            "type": "string"
+          },
+          "purpose_chain_narrative_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for chain_narrative",
+            "title": "Purpose Chain Narrative Top P",
+            "type": "string"
+          },
+          "purpose_chain_narrative_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for chain_narrative",
+            "title": "Purpose Chain Narrative Presence Penalty",
+            "type": "string"
+          },
+          "purpose_chain_narrative_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for chain_narrative",
+            "title": "Purpose Chain Narrative Frequency Penalty",
+            "type": "string"
+          },
+          "purpose_judge_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for judge",
+            "title": "Purpose Judge Temperature",
+            "type": "string"
+          },
+          "purpose_judge_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for judge",
+            "title": "Purpose Judge Top P",
+            "type": "string"
+          },
+          "purpose_judge_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for judge",
+            "title": "Purpose Judge Presence Penalty",
+            "type": "string"
+          },
+          "purpose_judge_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for judge",
+            "title": "Purpose Judge Frequency Penalty",
+            "type": "string"
+          }
+        },
+        "title": "SaveLlmConfigParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "llm_config_saved",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "test_llm_connection",
+      "description": "Test connection to LLM provider.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Test LLM connection.",
+        "properties": {
+          "provider": {
+            "default": "",
+            "description": "Provider to test (default: current)",
+            "title": "Provider",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "description": "Model to test (default: current)",
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "title": "TestLlmParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_llm_model_rate",
+      "description": "Save (upsert) an LLM model rate row in llm_model_rates.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Save (upsert) a single LLM model rate row.",
+        "properties": {
+          "model_id": {
+            "description": "Model identifier (e.g. claude-sonnet-4-20250514)",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          },
+          "tier": {
+            "description": "economy | standard | premium",
+            "title": "Tier",
+            "type": "string"
+          },
+          "input_cost_per_1k": {
+            "description": "Input cost per 1k tokens, USD",
+            "maximum": 1000,
+            "minimum": 0,
+            "title": "Input Cost Per 1K",
+            "type": "number"
+          },
+          "output_cost_per_1k": {
+            "description": "Output cost per 1k tokens, USD",
+            "maximum": 1000,
+            "minimum": 0,
+            "title": "Output Cost Per 1K",
+            "type": "number"
+          },
+          "platform_fee_default": {
+            "default": 1,
+            "description": "Default platform fee tokens for this tier",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Platform Fee Default",
+            "type": "integer"
+          },
+          "is_available": {
+            "default": true,
+            "title": "Is Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model_id",
+          "tier",
+          "input_cost_per_1k",
+          "output_cost_per_1k"
+        ],
+        "title": "SaveLlmModelRateParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "llm_model_rate_saved",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "delete_llm_model_rate",
+      "description": "Soft-delete (mark unavailable) an LLM model rate row.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Soft-delete (set is_available=false) a model rate row.",
+        "properties": {
+          "model_id": {
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "DeleteLlmModelRateParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "llm_model_rate_deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "billing_overview",
+      "description": "Show billing plans, pricing tiers, and platform summary.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_user_balances",
+      "description": "List all user wallet balances with totals.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_user_balance",
+      "description": "Get token balance for a specific user including active holds.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Look up a specific user's token balance.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id of the user",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UserBalanceParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "adjust_balance",
+      "description": "Credit or deduct tokens. Positive=credit, negative=deduct.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "description": "Credit or deduct tokens from a user wallet.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id of the user",
+            "title": "User Id",
+            "type": "string"
+          },
+          "amount": {
+            "description": "Token amount (positive=credit, negative=deduct)",
+            "title": "Amount",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "admin_adjustment",
+            "description": "Reason for adjustment",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "amount"
+        ],
+        "title": "AdjustBalanceParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "billing_adjusted",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "billing_health",
+      "description": "Check billing system health: stream, consumers, pending lag.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {},
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "payment_config_get",
+      "description": "Get current payment provider configuration.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "payment_test_connection",
+      "description": "Test Stripe API connection with current keys.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "review_app",
+      "description": "Approve or reject a developer app submission",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "App to review",
+            "title": "App Id",
+            "type": "string"
+          },
+          "action": {
+            "description": "approve or reject",
+            "title": "Action",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "description": "Rejection reason (required for reject)",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id",
+          "action"
+        ],
+        "title": "AppReviewParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "review_payout",
+      "description": "Approve or reject a developer payout request",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "params_schema": {
+        "properties": {
+          "payout_id": {
+            "description": "Payout request ID",
+            "title": "Payout Id",
+            "type": "integer"
+          },
+          "action": {
+            "description": "approve or reject",
+            "title": "Action",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "description": "Admin note",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payout_id",
+          "action"
+        ],
+        "title": "PayoutReviewParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    }
+  ],
+  "signals": [],
+  "schedules": [],
+  "required_scopes": [],
+  "icon_size_bytes": 335,
+  "lifecycle": {
+    "on_install": true,
+    "health_check": {
+      "interval_sec": 60
+    }
+  },
+  "lifecycle_hooks": {
+    "on_install": {
+      "signature": "(ctx)"
+    }
+  }
+}
