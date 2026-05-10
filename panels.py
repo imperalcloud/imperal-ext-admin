@@ -1,8 +1,21 @@
 """Admin · Panel declarations (sidebar + tools).
 
-Two panels reproducing the full React admin UI:
-- sidebar (left): 8-section navigation with active state
-- tools (right): dynamic content based on selected section
+Three-panel layout per federal v4.1.8 contract:
+- sidebar (slot="left"): section navigation list with selected-highlight
+- tools   (slot="center", center_overlay=True): dynamic content per active section
+- chat is auto-collapsed to a 380px right rail by the panel host
+
+Click flow:
+  user clicks Users in sidebar
+  → on_click=ui.Call("__panel__tools", active="management")
+  → host fetches __panel__tools with {active}, sets center overlay
+  → host passes the `active` param through to sidebar (panel-host
+    contract); sidebar re-renders with selected=True on the matching item
+
+Refresh flow (after a write action):
+  handler returns ActionResult(refresh_panels=["sidebar", "tools"])
+  → host re-fetches both panels with their last params; updated user
+    lists / role tables / etc. appear without a manual reload.
 """
 from __future__ import annotations
 
@@ -27,7 +40,7 @@ from panels_ext_users import build_ext_users
 from panels_payment import build_payment
 from panels_developer import build_app_review
 from panels_payouts import build_payouts
-from panels_pricing import build_pricing  # Sprint 4
+from panels_pricing import build_pricing
 
 log = logging.getLogger("admin")
 
@@ -35,30 +48,36 @@ log = logging.getLogger("admin")
 # ── Sidebar Panel (left) ─────────────────────────────────────────────
 
 _SECTIONS = [
-    {"id": "dashboard",  "label": "Dashboard",  "icon": "LayoutDashboard"},
+    {"id": "dashboard",  "label": "Dashboard",   "icon": "LayoutDashboard"},
     {"id": "management", "label": "Users",       "icon": "Users"},
     {"id": "extensions", "label": "Extensions",  "icon": "Puzzle"},
     {"id": "roles",      "label": "Roles",       "icon": "Shield"},
     {"id": "scopes",     "label": "Scopes",      "icon": "Key"},
     {"id": "audit",      "label": "Audit Log",   "icon": "FileText"},
-    {"id": "system",     "label": "System",       "icon": "Settings"},
+    {"id": "system",     "label": "System",      "icon": "Settings"},
     {"id": "llm",        "label": "LLM Config",  "icon": "Brain"},
     {"id": "pricing",    "label": "LLM Pricing", "icon": "Tag"},
     {"id": "app_review", "label": "App Review",  "icon": "ClipboardCheck"},
-    {"id": "payouts",    "label": "Payouts",      "icon": "Banknote"},
-    {"id": "payment",  "label": "Payment",  "icon": "CreditCard"},
+    {"id": "payouts",    "label": "Payouts",     "icon": "Banknote"},
+    {"id": "payment",    "label": "Payment",     "icon": "CreditCard"},
 ]
 
 
 def _sidebar_item(section: dict, active: str) -> UINode:
-    """Build a ListItem UINode with icon support."""
+    """Sidebar list-item that opens its section in the center panel.
+
+    `on_click=__panel__tools` triggers the host's center-overlay routing:
+    the center re-renders for the new section, and the host's center→left
+    param-passthrough forwards `active` back to the sidebar so the next
+    sidebar render shows `selected=True` on this item.
+    """
     props = {
         "id": section["id"],
         "title": section["label"],
         "icon": section.get("icon", ""),
         "on_click": {
             "action": "call",
-            "function": "__panel__sidebar",
+            "function": "__panel__tools",
             "params": {"active": section["id"]},
         },
     }
@@ -69,16 +88,15 @@ def _sidebar_item(section: dict, active: str) -> UINode:
 
 @ext.panel("sidebar", slot="left", title="Administration", icon="Shield")
 async def admin_sidebar(ctx, active: str = "dashboard", **kwargs):
-    """Left sidebar: 8-section navigation list."""
+    """Left sidebar — section navigation."""
     items = [_sidebar_item(s, active) for s in _SECTIONS]
-    # Auto-trigger center overlay (admin tools dashboard) on first sidebar mount.
-    # federal v4.1.8 declarative center_overlay → chat shifts to 380px right rail.
     root = ui.List(items=items)
-    root.props["auto_action"] = ui.Call("__panel__tools")
+    # Auto-open center on first mount so the user lands on a populated workspace.
+    root.props["auto_action"] = ui.Call("__panel__tools", active=active)
     return root
 
 
-# ── Tools Panel (right) ──────────────────────────────────────────────
+# ── Tools Panel (center, overlay) ────────────────────────────────────
 
 _BUILDERS = {
     "management":        build_management,
@@ -100,22 +118,26 @@ _BUILDERS = {
 
 
 @ext.panel("tools", slot="center", title="Dashboard", icon="LayoutDashboard",
-           center_overlay=True)  # federal v4.1.8 — chat shifts to 380px right rail
-async def admin_tools(ctx, section: str = "dashboard", **kwargs):
-    """Right panel: content switches based on selected section.
+           center_overlay=True)
+async def admin_tools(ctx, active: str = "dashboard", section: str = "",
+                       **kwargs):
+    """Center panel — content switches by `active` section.
 
-    kwargs passes through filter params (resource, source, hours, role_filter,
-    status_filter, user_id, app_id, tab, etc.) to each section builder.
+    Accepts both `active` (canonical, sent by sidebar items) and `section`
+    (legacy alias). kwargs carries downstream filter params (resource,
+    source, hours, role_filter, status_filter, user_id, app_id, tab, etc.)
+    to each section builder.
     """
+    current = active or section or "dashboard"
     try:
-        builder = _BUILDERS.get(section)
+        builder = _BUILDERS.get(current)
         if builder:
             return await builder(ctx, **kwargs)
         return await build_dashboard(ctx)
     except Exception as e:
-        log.error("Panel tools error for section=%s: %s", section, e)
+        log.error("Panel tools error for active=%s: %s", current, e)
         return ui.Alert(
-            title=f"Error loading {section}",
+            title=f"Error loading {current}",
             message=str(e),
             type="error",
         )

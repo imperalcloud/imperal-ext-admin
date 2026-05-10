@@ -137,7 +137,8 @@ async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult
             errors.append({"user": u.get("email"), "error": str(e)})
     return ActionResult.success(
         data={"target_role": target_role["name"], "total": len(targets), "success": success, "errors": errors[:10]},
-        summary=f"Assigned '{params.role}' to {success}/{len(targets)}" + (f" ({len(errors)} errors)" if errors else ""))
+        summary=f"Assigned '{params.role}' to {success}/{len(targets)}" + (f" ({len(errors)} errors)" if errors else ""),
+        refresh_panels=["tools"])
 
 
 @chat.function("audit_log", action_type="read", description="View audit log. Default last 24h, max 50 entries.")

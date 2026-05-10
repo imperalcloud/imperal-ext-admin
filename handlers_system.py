@@ -97,20 +97,20 @@ async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
         r = await c.post(f"{AUTH_GW}/v1/automations", json={"prompt": params.prompt, "cooldown_seconds": params.cooldown_seconds, "max_per_hour": params.max_per_hour},
                          headers={"X-Service-Token": AUTH_SERVICE_TOKEN, "Content-Type": "application/json"})
         if r.status_code in (200, 201):
-            return ActionResult.success(data={"rule": r.json()}, summary="Automation rule created")
+            return ActionResult.success(data={"rule": r.json()}, summary="Automation rule created", refresh_panels=["tools"])
         return ActionResult.error(f"Failed: {r.text}")
 
 @chat.function("delete_rule", action_type="destructive", event="rule_deleted", description="Delete an automation rule.")
 async def fn_delete_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         await c.delete(f"{AUTH_GW}/v1/automations/{params.rule_id}", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
-    return ActionResult.success(data={"deleted": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} deleted")
+    return ActionResult.success(data={"deleted": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} deleted", refresh_panels=["tools"])
 
 @chat.function("pause_rule", action_type="write", event="rule_paused", description="Pause an automation rule.")
 async def fn_pause_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         await c.post(f"{AUTH_GW}/v1/automations/{params.rule_id}/pause", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
-    return ActionResult.success(data={"paused": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} paused")
+    return ActionResult.success(data={"paused": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} paused", refresh_panels=["tools"])
 
 @chat.function("resume_rule", action_type="write", event="rule_resumed", description="Resume a paused rule. Resets trigger_count.")
 async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
@@ -118,7 +118,7 @@ async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
         h = {"X-Service-Token": AUTH_SERVICE_TOKEN, "Content-Type": "application/json"}
         await c.patch(f"{AUTH_GW}/v1/automations/internal/{params.rule_id}", json={"status": "active"}, headers=h)
         await c.patch(f"{AUTH_GW}/v1/automations/internal/{params.rule_id}", json={"trigger_count": 0}, headers=h)
-    return ActionResult.success(data={"resumed": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} resumed")
+    return ActionResult.success(data={"resumed": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} resumed", refresh_panels=["tools"])
 
 # ─── Confirmation Policy ──────────────────────────────────────────────── #
 
@@ -133,7 +133,7 @@ async def fn_set_confirmation_policy(ctx, params: ConfirmationPolicyParams) -> A
     result = await _gw_request("PATCH", f"/v1/roles/{role['id']}", {"confirmation_policy": params.policy})
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
-    return ActionResult.success(data={"role": params.role_name, "policy": params.policy}, summary=f"'{params.role_name}' confirmation: {params.policy}")
+    return ActionResult.success(data={"role": params.role_name, "policy": params.policy}, summary=f"'{params.role_name}' confirmation: {params.policy}", refresh_panels=["tools"])
 
 @chat.function("get_confirmation_policy", action_type="read", description="Get confirmation policy for a role.")
 async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResult:
@@ -150,7 +150,7 @@ async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> Actio
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"user_id": params.user_id, "enabled": params.enabled},
-                                summary=f"User {params.user_id} confirmation {'enabled' if params.enabled else 'disabled'}")
+                                summary=f"User {params.user_id} confirmation {'enabled' if params.enabled else 'disabled'}", refresh_panels=["tools"])
 
 @chat.function("get_user_confirmation", action_type="read", description="Get user confirmation settings.")
 async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
@@ -215,6 +215,7 @@ async def fn_save_context_defaults(ctx, params: ContextDefaultsParams) -> Action
         return ActionResult.success(
             data={"saved": updates, "full_config": current_defaults},
             summary=f"Saved {len(updates)} context defaults",
+        refresh_panels=["tools"],
         )
     except Exception as e:
         log.error("save_context_defaults failed: %s", e)

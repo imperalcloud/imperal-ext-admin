@@ -102,6 +102,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             return ActionResult.success(
                 data={"reset": ext_id},
                 summary=f"Reset LLM override for {ext_id}",
+            refresh_panels=["tools"],
             )
         if params.set_extension_override and params.override_model:
             ext_id = params.set_extension_override

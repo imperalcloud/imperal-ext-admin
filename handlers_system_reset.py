@@ -36,6 +36,7 @@ async def fn_reset_context_defaults(ctx, params: EmptyParams) -> ActionResult:
         return ActionResult.success(
             data={"reset": True, "defaults": _BUILTIN_DEFAULTS},
             summary="Context defaults reset to platform built-in values",
+        refresh_panels=["tools"],
         )
     except Exception as e:
         log.error("reset_context_defaults failed: %s", e)

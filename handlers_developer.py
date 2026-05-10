@@ -39,7 +39,7 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
         if not params.reason:
             return ActionResult.error("reason is required when rejecting an app", retryable=False)
         result = await _gw_request("POST", f"/v1/admin/apps/{app_id}/reject", {"reason": params.reason})
-        return ActionResult.success(result, summary=f"App {app_id} rejected: {params.reason}")
+        return ActionResult.success(result, summary=f"App {app_id} rejected: {params.reason}", refresh_panels=["tools"])
 
     # approve
     result = await _gw_request("POST", f"/v1/admin/apps/{app_id}/approve")
@@ -82,4 +82,4 @@ async def review_payout(ctx, params: PayoutReviewParams) -> ActionResult:
         f"/v1/admin/payouts/{payout_id}/{action}",
         {"note": params.note},
     )
-    return ActionResult.success(result, summary=f"Payout {payout_id} {action}d")
+    return ActionResult.success(result, summary=f"Payout {payout_id} {action}d", refresh_panels=["tools"])

@@ -183,6 +183,7 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
             data={"user_id": params.user_id, "adjustment": params.amount,
                   "new_balance": int(new_bal), "reason": params.reason},
             summary=f"{verb} {abs(params.amount)} tokens -> balance: {new_bal}",
+        refresh_panels=["tools"],
         )
     except Exception as e:
         log.error("adjust_balance failed: %s", e)

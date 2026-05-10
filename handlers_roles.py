@@ -76,7 +76,7 @@ async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"role": result},
-                                summary=f"Role '{params.name}' created")
+                                summary=f"Role '{params.name}' created", refresh_panels=["tools"])
 
 
 @chat.function("delete_role", action_type="destructive", event="role_deleted",
@@ -99,6 +99,7 @@ async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
     return ActionResult.success(
         data={"deleted": True, "role_id": role_id},
         summary=f"Role {params.role_name or role_id} deleted",
+    refresh_panels=["tools"],
     )
 
 
@@ -134,6 +135,7 @@ async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
     return ActionResult.success(
         data={"role": result, "cascaded_count": cascaded},
         summary=f"Role updated" + (f", cascaded to {cascaded} users" if cascaded else ""),
+    refresh_panels=["tools"],
     )
 
 
@@ -163,7 +165,7 @@ async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"scope": result, "name": name},
-                                summary=f"Scope '{name}' created")
+                                summary=f"Scope '{name}' created", refresh_panels=["tools"])
 
 
 @chat.function("delete_scope", action_type="destructive", event="scope_deleted",
@@ -188,4 +190,4 @@ async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"deleted": True},
-                                summary=f"Scope '{params.scope_name or params.scope_id}' deleted")
+                                summary=f"Scope '{params.scope_name or params.scope_id}' deleted", refresh_panels=["tools"])

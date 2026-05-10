@@ -78,6 +78,7 @@ async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
     return ActionResult.success(
         data={"user": result},
         summary=f"User {params.email} created with role {params.role}",
+    refresh_panels=["tools"],
     )
 
 
@@ -95,6 +96,7 @@ async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
     return ActionResult.success(
         data={"user": result},
         summary=f"User {params.user_id} updated",
+    refresh_panels=["tools"],
     )
 
 
@@ -119,6 +121,7 @@ async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
     return ActionResult.success(
         data={"deleted": result},
         summary=f"User {params.user_id} permanently deleted",
+    refresh_panels=["tools"],
     )
 
 
@@ -156,6 +159,7 @@ async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionRe
     return ActionResult.success(
         data={"user_id": params.user_id, "limits": updates},
         summary=f"Limits updated for {params.user_id}",
+    refresh_panels=["tools"],
     )
 
 
@@ -178,6 +182,7 @@ async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionRe
     return ActionResult.success(
         data={"user_id": params.user_id, "key": params.attr_key, "value": params.attr_value},
         summary=f"Attribute '{params.attr_key}' set on {params.user_id}",
+    refresh_panels=["tools"],
     )
 
 
@@ -198,4 +203,5 @@ async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> Ac
     return ActionResult.success(
         data={"user_id": params.user_id, "removed": params.attr_key},
         summary=f"Attribute '{params.attr_key}' removed from {params.user_id}",
+    refresh_panels=["tools"],
     )

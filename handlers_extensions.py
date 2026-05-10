@@ -85,7 +85,7 @@ async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> Acti
         return ActionResult.error("No config provided")
     r = await _registry_put(f"/v1/apps/{aid}/settings", params.config)
     if r.status_code == 200:
-        return ActionResult.success(data={"app_id": aid, "updated": True}, summary=f"Config updated for {aid}")
+        return ActionResult.success(data={"app_id": aid, "updated": True}, summary=f"Config updated for {aid}", refresh_panels=["tools"])
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
@@ -96,7 +96,7 @@ async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> Action
     payload = {"skeleton": {"sections": [{"section_name": params.section_name, "ttl": params.ttl}]}} if params.section_name else {"skeleton": {"ttl": params.ttl}}
     r = await _registry_put(f"/v1/apps/{aid}/settings", payload)
     if r.status_code == 200:
-        return ActionResult.success(data={"app_id": aid, "ttl": params.ttl}, summary=f"Skeleton TTL {params.ttl}s for {aid}")
+        return ActionResult.success(data={"app_id": aid, "ttl": params.ttl}, summary=f"Skeleton TTL {params.ttl}s for {aid}", refresh_panels=["tools"])
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
@@ -109,7 +109,7 @@ async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
     v = await _registry_get(f"/v1/apps/{aid}")
     if v.status_code == 200 and v.json().get("status") == "suspended":
         await _invalidate_extension_caches()
-        return ActionResult.success(data={"app_id": aid, "status": "suspended", "verified": True}, summary=f"{aid} suspended")
+        return ActionResult.success(data={"app_id": aid, "status": "suspended", "verified": True}, summary=f"{aid} suspended", refresh_panels=["tools"])
     return ActionResult.success(data={"app_id": aid}, summary=f"{aid} suspend sent (unverified)")
 
 
@@ -121,7 +121,7 @@ async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
         return ActionResult.error(f"'{aid}' not found. Must be registered first.")
     cur = r.json().get("status", "unknown")
     if cur == "active":
-        return ActionResult.success(data={"app_id": aid, "status": "active"}, summary=f"{aid} already active")
+        return ActionResult.success(data={"app_id": aid, "status": "active"}, summary=f"{aid} already active", refresh_panels=["tools"])
     if cur == "deleted":
         return ActionResult.error(f"'{aid}' was deleted. Must be re-registered.")
     r = await _registry_patch(f"/v1/apps/{aid}", {"status": "active"})
@@ -160,7 +160,7 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
     if params.denied_users is not None: exceptions["denied_users"] = params.denied_users
     if exceptions: policy["exceptions"] = exceptions
     if not policy:
-        return ActionResult.success(data={"app_id": aid}, summary="No changes needed")
+        return ActionResult.success(data={"app_id": aid}, summary="No changes needed", refresh_panels=["tools"])
     cur = await _gw_request("GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
     cur_policy = (cur or {}).get("config", {}).get("access_policy", {"mode": "public"})
     merged = {**cur_policy, **policy}
@@ -233,7 +233,7 @@ async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
     policy["exceptions"] = exc
     await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": policy}})
     await _invalidate_extension_caches(user_id=uid if params.user else None)
-    return ActionResult.success(data={"app_id": aid, "denied": added}, summary=f"Denied {', '.join(added)} from {aid}")
+    return ActionResult.success(data={"app_id": aid, "denied": added}, summary=f"Denied {', '.join(added)} from {aid}", refresh_panels=["tools"])
 
 
 @chat.function("allow_extension", action_type="write", event="extension_allowed", description="Remove role/user from denied list.")
@@ -261,4 +261,4 @@ async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
     await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": policy}})
     await _invalidate_extension_caches(user_id=uid if params.user else None)
     if uid and params.user: await _signal_session_refresh(uid)
-    return ActionResult.success(data={"app_id": aid, "removed": removed}, summary=f"Allowed {', '.join(removed)} for {aid}")
+    return ActionResult.success(data={"app_id": aid, "removed": removed}, summary=f"Allowed {', '.join(removed)} for {aid}", refresh_panels=["tools"])
