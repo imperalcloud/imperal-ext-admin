@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from app import chat, ActionResult, _gw_request
+from app import chat, ActionResult, _gw_request, EmptyParams
 
 log = logging.getLogger("admin")
 
@@ -23,7 +23,7 @@ _BUILTIN_DEFAULTS = {
 
 @chat.function("reset_context_defaults", action_type="destructive",
                description="Reset platform context defaults to built-in values.")
-async def fn_reset_context_defaults(ctx) -> ActionResult:
+async def fn_reset_context_defaults(ctx, params: EmptyParams) -> ActionResult:
     """Reset context defaults via Auth GW platform config (same as React)."""
     try:
         raw = await _gw_request("GET", "/v1/internal/config/platform/platform")

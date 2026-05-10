@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import (
+from app import (EmptyParams,
     chat, ActionResult, _gw_request, _registry_get, _registry_put, _registry_patch,
     _resolve_app_id, _resolve_user_by_email, _invalidate_extension_caches, _signal_session_refresh,
     _tenant_id,
@@ -57,7 +57,7 @@ class DenyAllowParams(BaseModel):
 # ─── Extension Management ─────────────────────────────────────────────── #
 
 @chat.function("list_extensions", action_type="read", description="List all active extensions.")
-async def fn_list_extensions(ctx) -> ActionResult:
+async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
     r = await _registry_get("/v1/apps?status=active")
     if r.status_code != 200:
         return ActionResult.error(f"Failed: HTTP {r.status_code}")

@@ -15,7 +15,7 @@ import httpx
 import redis.asyncio as aioredis
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, AUTH_GW
+from app import chat, ActionResult, AUTH_GW, EmptyParams
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -60,7 +60,7 @@ class AdjustBalanceParams(BaseModel):
 
 @chat.function("billing_overview", action_type="read",
                description="Show billing plans, pricing tiers, and platform summary.")
-async def fn_billing_overview(ctx) -> ActionResult:
+async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
     try:
         async with httpx.AsyncClient(timeout=5) as c:
             resp = await c.get(f"{AUTH_GW}/v1/billing/plans")
@@ -93,7 +93,7 @@ async def fn_billing_overview(ctx) -> ActionResult:
 
 @chat.function("list_user_balances", action_type="read",
                description="List all user wallet balances with totals.")
-async def fn_list_user_balances(ctx) -> ActionResult:
+async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await _redis()
         try:
@@ -191,7 +191,7 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
 
 @chat.function("billing_health", action_type="read",
                description="Check billing system health: stream, consumers, pending lag.")
-async def fn_billing_health(ctx) -> ActionResult:
+async def fn_billing_health(ctx, params: EmptyParams) -> ActionResult:
     try:
         r = await _redis()
         try:

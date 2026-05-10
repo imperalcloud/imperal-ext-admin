@@ -9,7 +9,7 @@ import httpx
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, REGISTRY_URL, _gw_request, _resolve_role_by_name, _tenant_id
+from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, REGISTRY_URL, _gw_request, _resolve_role_by_name, _tenant_id, EmptyParams
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -65,7 +65,7 @@ class ContextDefaultsParams(BaseModel):
 # ─── System Health ────────────────────────────────────────────────────── #
 
 @chat.function("system_health", action_type="read", description="Check platform health.")
-async def fn_system_health(ctx) -> ActionResult:
+async def fn_system_health(ctx, params: EmptyParams) -> ActionResult:
     results = {}
     for name, url in [("auth_gateway", f"{AUTH_GW}/healthz"), ("registry", f"{REGISTRY_URL}/health")]:
         try:
@@ -79,7 +79,7 @@ async def fn_system_health(ctx) -> ActionResult:
 # ─── Automation Rules ─────────────────────────────────────────────────── #
 
 @chat.function("list_rules", action_type="read", description="List all automation rules.")
-async def fn_list_rules(ctx) -> ActionResult:
+async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         r = await c.get(f"{AUTH_GW}/v1/automations/internal/all", params={"tenant_id": _tenant_id(ctx)},
                         headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
@@ -226,7 +226,7 @@ from imperal_sdk import ui
 
 @chat.function("get_panel_data", action_type="read",
                description="Get panel Declarative UI data for admin extension.")
-async def fn_get_panel_data(ctx) -> ActionResult:
+async def fn_get_panel_data(ctx, params: EmptyParams) -> ActionResult:
     """Build admin dashboard UI from skeleton cache."""
     cached = ctx.skeleton_data.get("admin_stats", {}) if hasattr(ctx, "skeleton_data") else {}
     stats = cached if isinstance(cached, dict) else {}

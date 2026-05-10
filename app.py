@@ -1,5 +1,5 @@
 """
-Admin v5.2.1 — shared state.
+Admin v5.2.2 — shared state.
 
 Platform administration via Auth Gateway + Registry APIs.
 """
@@ -10,6 +10,18 @@ import httpx
 
 from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension, ActionResult
+from pydantic import BaseModel
+
+
+class EmptyParams(BaseModel):
+    """Federal V17 placeholder for handlers that take no parameters.
+
+    `@chat.function` MUST declare a Pydantic params model — this is the
+    canonical empty model reused by read-only handlers (list_*, get_*,
+    *_health) that don't need any input.
+    """
+    pass
+
 
 log = logging.getLogger("admin")
 
@@ -149,7 +161,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.2.1",
+    version="5.2.2",
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
         "admin:users:read", "admin:users:write", "admin:users:delete",

@@ -5,13 +5,13 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _gw_request, _resolve_role_by_name
+from app import chat, ActionResult, _gw_request, _resolve_role_by_name, EmptyParams
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
 
 class CreateRoleParams(BaseModel):
-    """Create a new role."""
+    """Create a new role with name and default scopes."""
     name: str                          = Field(description="Role name")
     display_name: str                  = Field(default="", description="Human-readable name")
     default_scopes: Optional[list[str]] = Field(default=None, description="Default scopes")
@@ -57,7 +57,7 @@ class DeleteScopeParams(BaseModel):
 # ─── Role Handlers ────────────────────────────────────────────────────── #
 
 @chat.function("list_roles", action_type="read", description="List all roles with default scopes.")
-async def fn_list_roles(ctx) -> ActionResult:
+async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
     roles = await _gw_request("GET", "/v1/roles")
     if not isinstance(roles, list):
         return ActionResult.error("Failed to fetch roles")
@@ -66,7 +66,7 @@ async def fn_list_roles(ctx) -> ActionResult:
 
 
 @chat.function("create_role", action_type="write", event="role_created",
-               description="Create a new role.")
+               description="Create a new role with name and default scopes.")
 async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
     result = await _gw_request("POST", "/v1/roles", {
         "name": params.name,

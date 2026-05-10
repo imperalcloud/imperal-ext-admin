@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _gw_request
+from app import chat, ActionResult, _gw_request, EmptyParams
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -56,7 +56,7 @@ class RemoveUserAttributeParams(BaseModel):
 
 @chat.function("list_users", action_type="read",
                description="List all users with roles, scopes, status.")
-async def fn_list_users(ctx) -> ActionResult:
+async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
     raw = await _gw_request("GET", "/v1/users?include_inactive=true")
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
@@ -68,7 +68,7 @@ async def fn_list_users(ctx) -> ActionResult:
 
 
 @chat.function("create_user", action_type="write", event="user_created",
-               description="Create a new user.")
+               description="Create a new user with email, password, and role.")
 async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
     result = await _gw_request("POST", "/v1/users", {
         "email": params.email, "password": params.password, "role": params.role,
