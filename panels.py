@@ -71,7 +71,11 @@ def _sidebar_item(section: dict, active: str) -> UINode:
 async def admin_sidebar(ctx, active: str = "dashboard", **kwargs):
     """Left sidebar: 8-section navigation list."""
     items = [_sidebar_item(s, active) for s in _SECTIONS]
-    return ui.List(items=items)
+    # Auto-trigger center overlay (admin tools dashboard) on first sidebar mount.
+    # federal v4.1.8 declarative center_overlay → chat shifts to 380px right rail.
+    root = ui.List(items=items)
+    root.props["auto_action"] = ui.Call("__panel__tools")
+    return root
 
 
 # ── Tools Panel (right) ──────────────────────────────────────────────
@@ -95,7 +99,8 @@ _BUILDERS = {
 }
 
 
-@ext.panel("tools", slot="right", title="Dashboard", icon="LayoutDashboard")
+@ext.panel("tools", slot="center", title="Dashboard", icon="LayoutDashboard",
+           center_overlay=True)  # federal v4.1.8 — chat shifts to 380px right rail
 async def admin_tools(ctx, section: str = "dashboard", **kwargs):
     """Right panel: content switches based on selected section.
 
