@@ -1,5 +1,5 @@
 """
-Admin v5.1.0 — shared state.
+Admin v5.2.1 — shared state.
 
 Platform administration via Auth Gateway + Registry APIs.
 """
@@ -149,7 +149,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.2.0",
+    version="5.2.1",
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
         "admin:users:read", "admin:users:write", "admin:users:delete",
