@@ -136,11 +136,34 @@ async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
 
 # ─── Access Policy Handlers ───────────────────────────────────────────── #
 
-@chat.function("list_user_extensions", action_type="read", description="List extensions a user can access.")
+@chat.function(
+    "list_user_extensions",
+    action_type="read",
+    description=(
+        "List the calling user's installed extensions when called with no "
+        "user_id/email (self-service mode — used by 'what extensions do I "
+        "have' chat intent); list another user's extensions when user_id "
+        "or email is specified (admin mode — requires admin scope at the "
+        "gateway). B-3 self-service path added 2026-05-11."
+    ),
+)
 async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
-    ref = params.user_id or (await _resolve_user_by_email(params.email) if params.email else None)
+    # B-3 (2026-05-11): when both user_id and email are empty, default to
+    # the calling user — this is the self-service path that the
+    # hub_routing.txt "extensions/apps" intent class targets. Closes the
+    # anti-fab fallback class where 'какие у меня расширения?' used to
+    # route to conversational and hit the now-deleted hardcoded apps list.
+    ref = params.user_id or (
+        await _resolve_user_by_email(params.email) if params.email else None
+    )
     if not ref:
-        return ActionResult.error("user_id or email required" if not params.email else f"User '{params.email}' not found")
+        # No explicit target — fall back to the caller's own imperal_id.
+        # ctx.user.imperal_id is kernel-authoritative; cannot be spoofed.
+        ref = getattr(ctx.user, "imperal_id", "") or ""
+    if not ref:
+        return ActionResult.error(
+            "user_id or email required" if not params.email else f"User '{params.email}' not found"
+        )
     result = await _gw_request("GET", f"/v1/users/{ref}/extensions")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
