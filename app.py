@@ -61,6 +61,38 @@ async def _gw_request(method, path, data=None):
     return r.json()
 
 
+def _verify_write_reflected(result, expected: dict) -> str | None:
+    """Federal I-EXT-VERIFY-WRITE-REFLECTS-INTENT.
+
+    After a mutating call (PATCH/POST), confirm the response echoes back the
+    values we asked for. Catches replication-lag fabricated-success, silent
+    server-side coercion, and split-brain residue (see galera incident
+    2026-05-11: US slave SQL_thread stopped → reads returned stale snapshot
+    while writes succeeded on EU master → Webbee narrated success on no-op).
+
+    Returns a drift-description string if mismatch detected, None if reflected
+    correctly. Callers convert to ActionResult.error.
+    """
+    if not isinstance(result, dict):
+        return None
+    for key, want in expected.items():
+        if want is None:
+            continue
+        got = result.get(key)
+        if got == want:
+            continue
+        if isinstance(want, list) and isinstance(got, list) and sorted(want) == sorted(got):
+            continue
+        if isinstance(want, dict) and isinstance(got, dict):
+            if all(got.get(k) == v for k, v in want.items()):
+                continue
+        return (
+            f"server did not reflect '{key}': requested {want!r}, "
+            f"got {got!r} (possible replication lag or silent coercion)"
+        )
+    return None
+
+
 async def _registry_get(path):
     async with httpx.AsyncClient(timeout=10) as c:
         return await c.get(f"{REGISTRY_URL}{path}", headers={"x-api-key": REGISTRY_KEY})
@@ -161,7 +193,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.2.3",
+    version="5.2.4",
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
         "admin:users:read", "admin:users:write", "admin:users:delete",

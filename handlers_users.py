@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _gw_request, EmptyParams
+from app import chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -75,6 +75,9 @@ async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
     })
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    drift = _verify_write_reflected(result, {"email": params.email, "role": params.role})
+    if drift:
+        return ActionResult.error(f"User creation did not reflect — {drift}")
     return ActionResult.success(
         data={"user": result},
         summary=f"User {params.email} created with role {params.role}",
@@ -93,6 +96,9 @@ async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
     result = await _gw_request("PATCH", f"/v1/users/{params.user_id}", data)
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    drift = _verify_write_reflected(result, data)
+    if drift:
+        return ActionResult.error(f"Update did not take effect — {drift}")
     return ActionResult.success(
         data={"user": result},
         summary=f"User {params.user_id} updated",
