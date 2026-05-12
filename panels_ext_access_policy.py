@@ -17,7 +17,7 @@ from panels_sections import _fetch_scopes, _fetch_roles
 
 # ── Data fetcher ──────────────────────────────────────────────────────
 
-async def _fetch_policy(app_id: str, tenant_id: str = "default") -> dict:
+async def _fetch_policy(app_id: str, tenant_id: str) -> dict:
     try:
         cfg = await _gw_request(
             "GET",

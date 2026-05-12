@@ -35,7 +35,7 @@ async def _fetch_extension_users(app_id: str) -> list[dict]:
                          lambda: _fetch_extension_users_raw(app_id))
 
 
-async def _fetch_access_policy_raw(app_id: str, tenant_id: str = "default") -> dict:
+async def _fetch_access_policy_raw(app_id: str, tenant_id: str) -> dict:
     try:
         cfg = await _gw_request(
             "GET",
@@ -46,7 +46,7 @@ async def _fetch_access_policy_raw(app_id: str, tenant_id: str = "default") -> d
         return {"mode": "public"}
 
 
-async def _fetch_access_policy(app_id: str, tenant_id: str = "default") -> dict:
+async def _fetch_access_policy(app_id: str, tenant_id: str) -> dict:
     return await _cached(f"ext_policy:{tenant_id}:{app_id}",
                          lambda: _fetch_access_policy_raw(app_id, tenant_id))
 

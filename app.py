@@ -1,5 +1,5 @@
 """
-Admin v5.2.3 — shared state.
+Admin v5.2.5 — shared state.
 
 Platform administration via Auth Gateway + Registry APIs.
 """
