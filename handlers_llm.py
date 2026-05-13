@@ -41,11 +41,10 @@ class SaveLlmConfigParams(BaseModel):
     narration_history_limit: Optional[int] = Field(default=None, ge=4, le=50, description="History turns fed to narration")
     confirmation_card_tokens: Optional[int] = Field(default=None, ge=200, le=1024, description="Confirmation card max_tokens")
     judge_digest_chars: Optional[int] = Field(default=None, ge=2000, le=32000, description="Audit-judge digest cap (chars)")
-    planner_max_tokens: Optional[int] = Field(default=None, ge=200, le=2048, description="Chain-step planner max_tokens")
     chain_prior_step_max_chars: Optional[int] = Field(default=None, ge=500, le=32000, description="Chain prior-step truncation cap (chars)")
     chain_prior_total_max_chars: Optional[int] = Field(default=None, ge=3000, le=200000, description="Chain prior-summary total cap (chars) fed to next step")
-    # ── Token Budget Controls — full audit (TBC-FULL, 2026-04-29) — 8 admin-tunable max_tokens caps
-    structured_gen_max_tokens: Optional[int] = Field(default=None, ge=1024, le=32000, description="Structured-output generator default max_tokens (responses/structured_gen.py)")
+    # ── Token Budget Controls — full audit (TBC-FULL, 2026-04-29 → cleanup 2026-05-13) — 7 admin-tunable max_tokens caps
+    # (planner_max_tokens + structured_gen_max_tokens dropped — orphan UI; no kernel reader.)
     automation_main_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="Automation plan-parser max_tokens (activities/automation.py:358)")
     automation_condition_max_tokens: Optional[int] = Field(default=None, ge=10, le=1024, description="Automation condition-eval max_tokens (activities/automation.py:448)")
     intent_classifier_planner_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="Intent classifier max_tokens (hub/intent_classifier.py:881)")
@@ -121,10 +120,10 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # Generic config update
         skip_fields = {"set_extension_override", "override_model", "override_provider", "reset_extension_override",
             # Token Budget fields routed via tenant-defaults endpoint, not Redis llm config.
-            "narration_history_limit", "confirmation_card_tokens", "judge_digest_chars", "planner_max_tokens",
+            "narration_history_limit", "confirmation_card_tokens", "judge_digest_chars",
             "chain_prior_step_max_chars", "chain_prior_total_max_chars",
-            # TBC-FULL 2026-04-29 — 8 admin-tunable max_tokens caps
-            "structured_gen_max_tokens", "automation_main_max_tokens", "automation_condition_max_tokens",
+            # TBC-FULL 2026-04-29 → cleanup 2026-05-13 — 7 admin-tunable max_tokens caps
+            "automation_main_max_tokens", "automation_condition_max_tokens",
             "intent_classifier_planner_max_tokens", "prose_judge_max_tokens", "system_handlers_max_tokens",
             "responses_judge_max_tokens", "rule_engine_max_tokens",
             "default_max_response_tokens", "default_max_tool_rounds", "default_routing_context", "default_kav_max_retries", "default_confirmation_enabled",
@@ -202,11 +201,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.narration_history_limit is not None: tb_payload["narration_history_limit"] = params.narration_history_limit
         if params.confirmation_card_tokens is not None: tb_payload["confirmation_card_tokens"] = params.confirmation_card_tokens
         if params.judge_digest_chars is not None: tb_payload["judge_digest_chars"] = params.judge_digest_chars
-        if params.planner_max_tokens is not None: tb_payload["planner_max_tokens"] = params.planner_max_tokens
         if params.chain_prior_step_max_chars is not None: tb_payload["chain_prior_step_max_chars"] = params.chain_prior_step_max_chars
         if params.chain_prior_total_max_chars is not None: tb_payload["chain_prior_total_max_chars"] = params.chain_prior_total_max_chars
-        # TBC-FULL 2026-04-29 — 8 admin-tunable max_tokens caps
-        if params.structured_gen_max_tokens is not None: tb_payload["structured_gen_max_tokens"] = params.structured_gen_max_tokens
+        # TBC-FULL 2026-04-29 → cleanup 2026-05-13 — 7 admin-tunable max_tokens caps
         if params.automation_main_max_tokens is not None: tb_payload["automation_main_max_tokens"] = params.automation_main_max_tokens
         if params.automation_condition_max_tokens is not None: tb_payload["automation_condition_max_tokens"] = params.automation_condition_max_tokens
         if params.intent_classifier_planner_max_tokens is not None: tb_payload["intent_classifier_planner_max_tokens"] = params.intent_classifier_planner_max_tokens

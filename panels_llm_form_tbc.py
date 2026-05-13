@@ -39,13 +39,6 @@ def build_tbc_section(defaults: dict) -> object:
             label="judge_digest_chars",
             param_name="judge_digest_chars",
         ),
-        ui.Text("Planner max_tokens (chain-step planner)", variant="caption"),
-        ui.Slider(
-            min=200, max=2048, step=64,
-            value=defaults["planner_max_tokens"],
-            label="planner_max_tokens",
-            param_name="planner_max_tokens",
-        ),
         ui.Text("Chain prior-step max chars (truncation per step)", variant="caption"),
         ui.Slider(
             min=500, max=32000, step=500,
@@ -61,14 +54,8 @@ def build_tbc_section(defaults: dict) -> object:
             param_name="chain_prior_total_max_chars",
         ),
 
-        # TBC-FULL audit (2026-04-29) — 8 admin-tunable max_tokens caps
-        ui.Text("Structured-gen max_tokens (responses/structured_gen.py default)", variant="caption"),
-        ui.Slider(
-            min=1024, max=32000, step=256,
-            value=defaults["structured_gen_max_tokens"],
-            label="structured_gen_max_tokens",
-            param_name="structured_gen_max_tokens",
-        ),
+        # TBC-FULL audit (2026-04-29 → cleanup 2026-05-13) — 7 admin-tunable max_tokens caps
+        # (structured_gen_max_tokens dropped — no kernel reader; all 3 callers pass purpose-specific caps.)
         ui.Text("Automation plan-parser max_tokens (activities/automation.py:358)", variant="caption"),
         ui.Slider(
             min=256, max=16000, step=256,

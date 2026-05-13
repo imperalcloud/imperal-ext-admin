@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "4.2.10",
   "app_id": "admin",
-  "version": "5.2.7",
+  "version": "5.2.8",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -2426,21 +2426,6 @@
             "description": "Audit-judge digest cap (chars)",
             "title": "Judge Digest Chars"
           },
-          "planner_max_tokens": {
-            "anyOf": [
-              {
-                "maximum": 2048,
-                "minimum": 200,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Chain-step planner max_tokens",
-            "title": "Planner Max Tokens"
-          },
           "chain_prior_step_max_chars": {
             "anyOf": [
               {
@@ -2470,21 +2455,6 @@
             "default": null,
             "description": "Chain prior-summary total cap (chars) fed to next step",
             "title": "Chain Prior Total Max Chars"
-          },
-          "structured_gen_max_tokens": {
-            "anyOf": [
-              {
-                "maximum": 32000,
-                "minimum": 1024,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Structured-output generator default max_tokens (responses/structured_gen.py)",
-            "title": "Structured Gen Max Tokens"
           },
           "automation_main_max_tokens": {
             "anyOf": [

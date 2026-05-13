@@ -112,11 +112,10 @@ def build_llm_form(
         "narration_history_limit": int(_td.get("narration_history_limit", 12)),
         "confirmation_card_tokens": int(_td.get("confirmation_card_tokens", 300)),
         "judge_digest_chars": int(_td.get("judge_digest_chars", 8000)),
-        "planner_max_tokens": int(_td.get("planner_max_tokens", 300)),
         "chain_prior_step_max_chars": int(_td.get("chain_prior_step_max_chars", 8000)),
         "chain_prior_total_max_chars": int(_td.get("chain_prior_total_max_chars", 64000)),
-        # Token Budget Controls — full audit (TBC-FULL, 2026-04-29) — 8 admin-tunable max_tokens caps
-        "structured_gen_max_tokens": int(_td.get("structured_gen_max_tokens", 8192)),
+        # Token Budget Controls — full audit (TBC-FULL, 2026-04-29) — 7 admin-tunable max_tokens caps
+        # (planner_max_tokens + structured_gen_max_tokens dropped 2026-05-13 — orphan UI; no kernel reader.)
         "automation_main_max_tokens": int(_td.get("automation_main_max_tokens", 4096)),
         "automation_condition_max_tokens": int(_td.get("automation_condition_max_tokens", 50)),
         "intent_classifier_planner_max_tokens": int(_td.get("intent_classifier_planner_max_tokens", 4096)),
