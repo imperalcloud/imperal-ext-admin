@@ -58,7 +58,23 @@ async def _gw_request(method, path, data=None):
         r = await getattr(c, method.lower())(path, json=data)
     else:
         r = await getattr(c, method.lower())(path)
-    return r.json()
+    # Federal: never call r.json() blindly. Auth-gw may return 4xx/5xx
+    # with HTML body, empty body, or {"detail": "..."} — surface readable
+    # error to ActionResult.error path instead of JSONDecodeError.
+    if r.status_code >= 400:
+        body = (r.text or "").strip()
+        try:
+            payload = r.json()
+            detail = payload.get("detail") or payload.get("error") or body[:300]
+        except Exception:
+            detail = body[:300] or "(empty body)"
+        return {"error": f"HTTP {r.status_code}: {detail}"}
+    if not r.content:
+        return {}
+    try:
+        return r.json()
+    except Exception as e:
+        return {"error": f"non-JSON response from auth-gw (HTTP {r.status_code}): {(r.text or '')[:200]} :: {e}"}
 
 
 def _verify_write_reflected(result, expected: dict) -> str | None:
@@ -193,7 +209,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.2.8",
+    version="5.2.9",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
