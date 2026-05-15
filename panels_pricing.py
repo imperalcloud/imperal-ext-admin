@@ -22,7 +22,7 @@ _TIER_OPTIONS = [
 ]
 
 
-async def _fetch_rates() -> list[dict]:
+async def _fetch_rates(ctx) -> list[dict]:
     """Fetch all rates (including unavailable) for admin display."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return []
@@ -50,7 +50,7 @@ async def build_pricing(ctx, **kwargs):
     kwargs:
         edit_id: model_id selected for edit (form pre-fills its values)
     """
-    rates = await _fetch_rates()
+    rates = await _fetch_rates(ctx)
 
     rows = []
     for r in rates:

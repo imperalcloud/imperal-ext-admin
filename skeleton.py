@@ -16,7 +16,7 @@ from app import ext, AUTH_GW, REGISTRY_URL, _gw_request, _registry_get
 async def on_skeleton_refresh(ctx, **kwargs) -> dict:
     stats: dict = {}
     try:
-        raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+        raw = await _gw_request(ctx, "GET", "/v1/users?include_inactive=true")
         users = raw.get("items", raw) if isinstance(raw, dict) else raw
         if isinstance(users, list):
             stats["users_total"] = len(users)
@@ -29,12 +29,12 @@ async def on_skeleton_refresh(ctx, **kwargs) -> dict:
     except Exception:
         stats["users_total"] = 0
     try:
-        roles = await _gw_request("GET", "/v1/roles")
+        roles = await _gw_request(ctx, "GET", "/v1/roles")
         stats["roles_count"] = len(roles) if isinstance(roles, list) else 0
     except Exception:
         stats["roles_count"] = 0
     try:
-        r = await _registry_get("/v1/apps?status=active")
+        r = await _registry_get(ctx, "/v1/apps?status=active")
         apps = r.json() if r.status_code == 200 else []
         stats["extensions_active"] = len(apps) if isinstance(apps, list) else 0
     except Exception:

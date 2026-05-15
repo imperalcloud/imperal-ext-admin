@@ -20,8 +20,8 @@ from panels_sections import (
 async def build_dashboard(ctx):
     """Dashboard: Card-wrapped stats + actions + LLM usage + status."""
     users, roles, extensions, llm, actions = await asyncio.gather(
-        _fetch_users(), _fetch_roles(), _fetch_extensions(),
-        _fetch_llm_usage(), _fetch_action_stats(),
+        _fetch_users(ctx), _fetch_roles(ctx), _fetch_extensions(ctx),
+        _fetch_llm_usage(ctx), _fetch_action_stats(ctx),
     )
 
     active_count = sum(1 for u in users if u.get("is_active"))

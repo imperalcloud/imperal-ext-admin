@@ -5,9 +5,13 @@ import logging
 
 from pydantic import BaseModel
 
-from app import chat, ActionResult
+from app import ext, chat, ActionResult
 
 log = logging.getLogger("admin")
+
+
+@ext.secret(name="stripe_secret_key", description="Stripe secret API key", required=False)
+def _secret_stripe(): pass
 
 
 class EmptyParams(BaseModel):
@@ -23,10 +27,11 @@ async def fn_payment_config_get(ctx, params: EmptyParams) -> ActionResult:
     try:
         import os
         stripe_enabled = os.getenv("STRIPE_ENABLED", "false").lower() == "true"
-        has_secret = bool(os.getenv("STRIPE_SECRET_KEY", ""))
+        sk = await ctx.secrets.get("stripe_secret_key")
+        has_secret = bool(sk or os.getenv("STRIPE_SECRET_KEY", ""))
         has_pubkey = bool(os.getenv("STRIPE_PUBLISHABLE_KEY", ""))
         has_webhook = bool(os.getenv("STRIPE_WEBHOOK_SECRET", ""))
-        mode = "test" if "test" in os.getenv("STRIPE_SECRET_KEY", "") else "live"
+        mode = "test" if "test" in (sk or os.getenv("STRIPE_SECRET_KEY", "")) else "live"
 
         return ActionResult.success(
             data={
@@ -55,7 +60,7 @@ async def fn_payment_test_connection(ctx, params: EmptyParams) -> ActionResult:
     try:
         import stripe
         import os
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+        stripe.api_key = await ctx.secrets.get("stripe_secret_key") or os.getenv("STRIPE_SECRET_KEY", "")
         if not stripe.api_key:
             return ActionResult.error("STRIPE_SECRET_KEY not set")
         balance = stripe.Balance.retrieve()

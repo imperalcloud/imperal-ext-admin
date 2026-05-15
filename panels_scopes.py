@@ -120,7 +120,7 @@ async def build_scopes(ctx, resource: str = "", source: str = "", **kwargs) -> U
 
     resource / source — backend filter params propagated via Select.on_change.
     """
-    all_scopes = await _fetch_scopes()
+    all_scopes = await _fetch_scopes(ctx)
 
     # Build filter options from ALL scopes (before filtering)
     resource_values = _unique_sorted(all_scopes, "resource")

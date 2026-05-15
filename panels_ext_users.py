@@ -19,8 +19,8 @@ async def build_ext_users(ctx: Any, app_id: str = "", **kwargs) -> ui.Stack:
     if not app_id:
         return ui.Alert(title="No extension", message="app_id required", type="error")
 
-    aid = await _resolve_app_id(app_id)
-    users = await _fetch_extension_users(aid)
+    aid = await _resolve_app_id(ctx, app_id)
+    users = await _fetch_extension_users(ctx, aid)
 
     granted = [u for u in users if u.get("access") == "granted"]
     denied = [u for u in users if u.get("access") == "denied"]

@@ -90,10 +90,10 @@ def _bool_from_str(val: str) -> bool:
     return str(val).lower() in ("true", "1", "yes", "on")
 
 
-async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
+async def _save_section(ctx, app_id: str, section: str, data: dict) -> ActionResult:
     """PUT one settings section to Registry."""
-    aid = await _resolve_app_id(app_id)
-    r = await _registry_put(f"/v1/apps/{aid}/settings", {section: data})
+    aid = await _resolve_app_id(ctx, app_id)
+    r = await _registry_put(ctx, f"/v1/apps/{aid}/settings", {section: data})
     if r.status_code == 200:
         return ActionResult.success(
             data={"app_id": aid, "section": section, "updated": True},
@@ -105,19 +105,19 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
 # ── Handlers ───────────────────────────────────────────────────────── #
 
 @chat.function(
-    "save_ext_general", action_type="write",
+    "save_ext_general", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension general settings.",
 )
 async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
-    return await _save_section(params.app_id, "general", {
+    return await _save_section(ctx, params.app_id, "general", {
         "display_name": params.display_name,
         "status": params.status,
     })
 
 
 @chat.function(
-    "save_ext_models", action_type="write",
+    "save_ext_models", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension AI model settings.",
 )
@@ -141,16 +141,16 @@ async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
             payload[_k] = float(_raw)
         except (TypeError, ValueError):
             pass  # silently drop garbage; admin form has placeholder
-    return await _save_section(params.app_id, "models", payload)
+    return await _save_section(ctx, params.app_id, "models", payload)
 
 
 @chat.function(
-    "save_ext_persona", action_type="write",
+    "save_ext_persona", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension persona settings.",
 )
 async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
-    return await _save_section(params.app_id, "persona", {
+    return await _save_section(ctx, params.app_id, "persona", {
         "system_prompt_intake": params.system_prompt_intake,
         "system_prompt_intelligence": params.system_prompt_intelligence,
         "language": params.language,
@@ -161,12 +161,12 @@ async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_alerts", action_type="write",
+    "save_ext_alerts", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension alert settings.",
 )
 async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
-    return await _save_section(params.app_id, "alerts", {
+    return await _save_section(ctx, params.app_id, "alerts", {
         "enabled": _bool_from_str(params.enabled),
         "cooldown_seconds": params.cooldown_seconds,
         "max_per_hour": params.max_per_hour,
@@ -174,12 +174,12 @@ async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_router", action_type="write",
+    "save_ext_router", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension router settings.",
 )
 async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
-    return await _save_section(params.app_id, "router", {
+    return await _save_section(ctx, params.app_id, "router", {
         "enabled": _bool_from_str(params.enabled),
         "timeout_ms": params.timeout_ms,
         "fallback": params.fallback,
@@ -187,12 +187,12 @@ async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_session", action_type="write",
+    "save_ext_session", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension session settings.",
 )
 async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
-    return await _save_section(params.app_id, "session", {
+    return await _save_section(ctx, params.app_id, "session", {
         "timeout_hours": params.timeout_hours,
         "max_history": params.max_history,
         "compress_at": params.compress_at,
@@ -201,7 +201,7 @@ async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_context", action_type="write",
+    "save_ext_context", action_type="write", chain_callable=True, effects=["extension.write"],
     event="extension_configured",
     description="Save extension context settings.",
 )
@@ -213,17 +213,17 @@ async def fn_save_ext_context(ctx, params: SaveContextParams) -> ActionResult:
         data["max_result_tokens"] = int(params.max_result_tokens)
     if params.keep_recent_verbatim:
         data["keep_recent_verbatim"] = int(params.keep_recent_verbatim)
-    return await _save_section(params.app_id, "context", data)
+    return await _save_section(ctx, params.app_id, "context", data)
 
 
 @chat.function(
-    "save_ext_skeleton", action_type="write",
+    "save_ext_skeleton", action_type="write", chain_callable=True, effects=["extension.write"],
     event="skeleton_updated",
     description="Save extension skeleton section settings.",
 )
 async def fn_save_ext_skeleton(ctx, params: SaveSkeletonParams) -> ActionResult:
     import json
-    extra = params.model_extra or {}
+    extra = params.dict()
 
     # Reconstruct sections from per-field params (skel_ttl_X, skel_alert_X)
     section_names = set()
@@ -258,4 +258,4 @@ async def fn_save_ext_skeleton(ctx, params: SaveSkeletonParams) -> ActionResult:
             }
             for s in sections if s.get("section_name")
         ]
-    return await _save_section(params.app_id, "skeleton", {"sections": clean})
+    return await _save_section(ctx, params.app_id, "skeleton", {"sections": clean})

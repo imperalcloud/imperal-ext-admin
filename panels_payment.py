@@ -13,7 +13,7 @@ def _test_stripe_connection() -> tuple[bool, str]:
     """Test Stripe API connection. Returns (success, message)."""
     try:
         import stripe
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+        stripe.api_key = await ctx.secrets.get("stripe_secret_key") or os.getenv("STRIPE_SECRET_KEY", "")
         if not stripe.api_key:
             return False, "STRIPE_SECRET_KEY not set"
         balance = stripe.Balance.retrieve()
@@ -27,7 +27,8 @@ def _test_stripe_connection() -> tuple[bool, str]:
 async def build_payment(ctx, **kwargs):
     """Payment provider settings — Stripe keys, tiers, status."""
     stripe_enabled = os.getenv("STRIPE_ENABLED", "false").lower() == "true"
-    has_secret = bool(os.getenv("STRIPE_SECRET_KEY", ""))
+    sk = await ctx.secrets.get("stripe_secret_key")
+    has_secret = bool(sk or os.getenv("STRIPE_SECRET_KEY", ""))
     has_pubkey = bool(os.getenv("STRIPE_PUBLISHABLE_KEY", ""))
     has_webhook = bool(os.getenv("STRIPE_WEBHOOK_SECRET", ""))
 
@@ -39,7 +40,7 @@ async def build_payment(ctx, **kwargs):
     else:
         status_badge = ui.Badge("Not Configured", color="red")
 
-    mode = "test" if "test" in os.getenv("STRIPE_SECRET_KEY", "") else "live"
+    mode = "test" if "test" in (sk or os.getenv("STRIPE_SECRET_KEY", "")) else "live"
 
     children = [
         ui.Header("Payment Provider", level=3),

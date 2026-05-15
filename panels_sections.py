@@ -25,14 +25,14 @@ _cache: dict[str, tuple[float, object]] = {}
 _CACHE_TTL = 10  # seconds — short enough to see changes quickly
 
 
-async def _cached(key: str, factory):
+async def _cached(ctx, key: str, factory):
     """Return cached result if <TTL, otherwise call factory and cache."""
     now = time.monotonic()
     if key in _cache:
         ts, val = _cache[key]
         if now - ts < _CACHE_TTL:
             return val
-    val = await factory()
+    val = await factory(ctx)
     _cache[key] = (now, val)
     return val
 
@@ -66,9 +66,9 @@ def _fmt_latency(ms) -> str:
 # ── Data fetchers (safe, never raise) ─────────────────────────────────
 
 
-async def _fetch_users_raw() -> list[dict]:
+async def _fetch_users_raw(ctx) -> list[dict]:
     try:
-        raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+        raw = await _gw_request(ctx, "GET", "/v1/users?include_inactive=true")
         users = raw.get("items", raw) if isinstance(raw, dict) else raw
         return users if isinstance(users, list) else []
     except Exception as e:
@@ -76,26 +76,26 @@ async def _fetch_users_raw() -> list[dict]:
         return []
 
 
-async def _fetch_users() -> list[dict]:
-    return await _cached("users", _fetch_users_raw)
+async def _fetch_users(ctx) -> list[dict]:
+    return await _cached(ctx, "users", _fetch_users_raw)
 
 
-async def _fetch_roles_raw() -> list[dict]:
+async def _fetch_roles_raw(ctx) -> list[dict]:
     try:
-        roles = await _gw_request("GET", "/v1/roles")
+        roles = await _gw_request(ctx, "GET", "/v1/roles")
         return roles if isinstance(roles, list) else []
     except Exception as e:
         log.warning("Panel: fetch roles failed: %s", e)
         return []
 
 
-async def _fetch_roles() -> list[dict]:
-    return await _cached("roles", _fetch_roles_raw)
+async def _fetch_roles(ctx) -> list[dict]:
+    return await _cached(ctx, "roles", _fetch_roles_raw)
 
 
-async def _fetch_extensions_raw() -> list[dict]:
+async def _fetch_extensions_raw(ctx) -> list[dict]:
     try:
-        r = await _registry_get("/v1/apps?status=active")
+        r = await _registry_get(ctx, "/v1/apps?status=active")
         if r.status_code == 200:
             apps = r.json()
             return apps if isinstance(apps, list) else []
@@ -105,33 +105,33 @@ async def _fetch_extensions_raw() -> list[dict]:
         return []
 
 
-async def _fetch_extensions() -> list[dict]:
-    return await _cached("extensions", _fetch_extensions_raw)
+async def _fetch_extensions(ctx) -> list[dict]:
+    return await _cached(ctx, "extensions", _fetch_extensions_raw)
 
 
-async def _fetch_scopes_raw() -> list[dict]:
+async def _fetch_scopes_raw(ctx) -> list[dict]:
     """Fetch all scopes (full objects) from Auth GW."""
     try:
-        scopes = await _gw_request("GET", "/v1/scopes")
+        scopes = await _gw_request(ctx, "GET", "/v1/scopes")
         return scopes if isinstance(scopes, list) else []
     except Exception:
         return []
 
 
-async def _fetch_scopes() -> list[dict]:
-    return await _cached("scopes", _fetch_scopes_raw)
+async def _fetch_scopes(ctx) -> list[dict]:
+    return await _cached(ctx, "scopes", _fetch_scopes_raw)
 
 
-async def _fetch_scope_names() -> list[str]:
+async def _fetch_scope_names(ctx) -> list[str]:
     """Convenience: just scope name strings."""
-    scopes = await _fetch_scopes()
+    scopes = await _fetch_scopes(ctx)
     return [s.get("name", "") for s in scopes if s.get("name")]
 
 
-async def _fetch_user_extensions_raw(user_id: str) -> list[dict]:
+async def _fetch_user_extensions_raw(ctx, user_id: str) -> list[dict]:
     """Fetch per-user extension access list from Auth GW."""
     try:
-        result = await _gw_request("GET", f"/v1/users/{user_id}/extensions")
+        result = await _gw_request(ctx, "GET", f"/v1/users/{user_id}/extensions")
         if isinstance(result, dict):
             return result.get("extensions", [])
         return result if isinstance(result, list) else []
@@ -139,17 +139,17 @@ async def _fetch_user_extensions_raw(user_id: str) -> list[dict]:
         return []
 
 
-async def _fetch_user_extensions(user_id: str) -> list[dict]:
-    return await _cached(
+async def _fetch_user_extensions(ctx, user_id: str) -> list[dict]:
+    return await _cached(ctx,
         f"user_ext:{user_id}",
-        lambda: _fetch_user_extensions_raw(user_id),
+        lambda ctx: _fetch_user_extensions_raw(ctx, user_id),
     )
 
 
-async def _fetch_llm_usage_raw() -> dict:
+async def _fetch_llm_usage_raw(ctx) -> dict:
     """Fetch LLM usage from Auth GW, transform to UI-compatible names."""
     try:
-        raw = await _gw_request("GET", "/v1/internal/config/llm/usage")
+        raw = await _gw_request(ctx, "GET", "/v1/internal/config/llm/usage")
         if not isinstance(raw, dict):
             return {}
         calls = int(raw.get("calls", 0))
@@ -166,22 +166,22 @@ async def _fetch_llm_usage_raw() -> dict:
         return {}
 
 
-async def _fetch_llm_usage() -> dict:
-    return await _cached("llm_usage", _fetch_llm_usage_raw)
+async def _fetch_llm_usage(ctx) -> dict:
+    return await _cached(ctx, "llm_usage", _fetch_llm_usage_raw)
 
 
-async def _fetch_action_stats_raw() -> dict:
+async def _fetch_action_stats_raw(ctx) -> dict:
     try:
-        return await _gw_request("GET", "/v1/internal/actions/stats?admin=true")
+        return await _gw_request(ctx, "GET", "/v1/internal/actions/stats?admin=true")
     except Exception:
         return {}
 
 
-async def _fetch_action_stats() -> dict:
-    return await _cached("action_stats", _fetch_action_stats_raw)
+async def _fetch_action_stats(ctx) -> dict:
+    return await _cached(ctx, "action_stats", _fetch_action_stats_raw)
 
 
-async def _check_health_raw(name: str, url: str) -> str:
+async def _check_health_raw(ctx, name: str, url: str) -> str:
     try:
         async with httpx.AsyncClient(timeout=3) as c:
             r = await c.get(url)
@@ -190,18 +190,18 @@ async def _check_health_raw(name: str, url: str) -> str:
         return "Unreachable"
 
 
-async def _check_health(name: str, url: str) -> str:
-    return await _cached(f"health:{name}", lambda: _check_health_raw(name, url))
+async def _check_health(ctx, name: str, url: str) -> str:
+    return await _cached(ctx, f"health:{name}", lambda ctx: _check_health_raw(ctx, name, url))
 
 
-async def _fetch_context_defaults() -> dict:
+async def _fetch_context_defaults(ctx) -> dict:
     """Fetch actual context defaults from Auth GW platform config.
 
     React reads from GET /v1/internal/config/platform/platform -> config.context_defaults.
     Must use same source for data parity.
     """
     try:
-        raw = await _gw_request("GET", "/v1/internal/config/platform/platform")
+        raw = await _gw_request(ctx, "GET", "/v1/internal/config/platform/platform")
         if isinstance(raw, dict):
             config = raw.get("config", {})
             return config.get("context_defaults", {})
@@ -232,7 +232,7 @@ async def build_system(ctx, **kwargs):
     gw, reg, stored = await asyncio.gather(
         _check_health("auth_gateway", f"{AUTH_GW}/healthz"),
         _check_health("registry", f"{REGISTRY_URL}/health"),
-        _fetch_context_defaults(),
+        _fetch_context_defaults(ctx),
     )
 
     gw_color = "green" if gw == "Operational" else "red"

@@ -20,9 +20,9 @@ from panels_sections import (
 log = logging.getLogger("admin")
 
 
-async def _fetch_effective_scopes_raw(user_id: str) -> list[str]:
+async def _fetch_effective_scopes_raw(ctx, user_id: str) -> list[str]:
     try:
-        result = await _gw_request("GET", f"/v1/scopes/effective/{user_id}")
+        result = await _gw_request(ctx, "GET", f"/v1/scopes/effective/{user_id}")
         if isinstance(result, list):
             return result
         if isinstance(result, dict):
@@ -32,10 +32,10 @@ async def _fetch_effective_scopes_raw(user_id: str) -> list[str]:
         return []
 
 
-async def _fetch_effective_scopes(user_id: str) -> list[str]:
-    return await _cached(
+async def _fetch_effective_scopes(ctx, user_id: str) -> list[str]:
+    return await _cached(ctx,
         f"eff_scopes:{user_id}",
-        lambda: _fetch_effective_scopes_raw(user_id),
+        lambda ctx: _fetch_effective_scopes_raw(ctx, user_id),
     )
 
 
@@ -50,16 +50,16 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     if not user_id:
         return ui.Alert(message="No user selected", type="error")
 
-    async def _get_user():
-        return await _gw_request("GET", f"/v1/users/{user_id}")
+    async def _get_user(ctx):
+        return await _gw_request(ctx, "GET", f"/v1/users/{user_id}")
 
-    user = await _cached(f"user:{user_id}", _get_user)
+    user = await _cached(ctx, f"user:{user_id}", _get_user)
     if not isinstance(user, dict) or "error" in user:
         return ui.Alert(message=f"User {user_id} not found", type="error")
 
     roles, all_scopes, extensions, user_exts, effective = await asyncio.gather(
-        _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
-        _fetch_user_extensions(user_id), _fetch_effective_scopes(user_id),
+        _fetch_roles(ctx), _fetch_scope_names(ctx), _fetch_extensions(ctx),
+        _fetch_user_extensions(ctx, user_id), _fetch_effective_scopes(ctx, user_id),
     )
 
     email = user.get("email", "?")

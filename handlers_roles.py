@@ -58,17 +58,17 @@ class DeleteScopeParams(BaseModel):
 
 @chat.function("list_roles", action_type="read", description="List all roles with default scopes.")
 async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
-    roles = await _gw_request("GET", "/v1/roles")
+    roles = await _gw_request(ctx, "GET", "/v1/roles")
     if not isinstance(roles, list):
         return ActionResult.error("Failed to fetch roles")
     return ActionResult.success(data={"roles": roles, "total": len(roles)},
                                 summary=f"{len(roles)} roles found")
 
 
-@chat.function("create_role", action_type="write", event="role_created",
+@chat.function("create_role", action_type="write", chain_callable=True, effects=["role.write"], event="role_created",
                description="Create a new role with name and default scopes.")
 async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
-    result = await _gw_request("POST", "/v1/roles", {
+    result = await _gw_request(ctx, "POST", "/v1/roles", {
         "name": params.name,
         "display_name": params.display_name or params.name,
         "default_scopes": params.default_scopes or [],
@@ -79,12 +79,12 @@ async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
                                 summary=f"Role '{params.name}' created", refresh_panels=["tools"])
 
 
-@chat.function("delete_role", action_type="destructive", event="role_deleted",
+@chat.function("delete_role", action_type="destructive", chain_callable=True, effects=["role.write"], event="role_deleted",
                description="Delete a role by ID or name.")
 async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
     role_id = params.role_id
     if params.role_name and not role_id:
-        roles = await _gw_request("GET", "/v1/roles")
+        roles = await _gw_request(ctx, "GET", "/v1/roles")
         if isinstance(roles, list):
             match = next((r for r in roles if r.get("name") == params.role_name), None)
             if match:
@@ -93,7 +93,7 @@ async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
                 return ActionResult.error(f"Role '{params.role_name}' not found")
     if not role_id:
         return ActionResult.error("role_id or role_name required")
-    result = await _gw_request("DELETE", f"/v1/roles/{role_id}")
+    result = await _gw_request(ctx, "DELETE", f"/v1/roles/{role_id}")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     return ActionResult.success(
@@ -103,12 +103,12 @@ async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
     )
 
 
-@chat.function("update_role", action_type="write", event="role_updated",
+@chat.function("update_role", action_type="write", chain_callable=True, effects=["role.write"], event="role_updated",
                description="Update role scopes, limits, or display name. Can cascade.")
 async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
     role_id = params.role_id
     if params.role_name and not role_id:
-        role = await _resolve_role_by_name(params.role_name)
+        role = await _resolve_role_by_name(ctx, params.role_name)
         if not role:
             return ActionResult.error(f"Role '{params.role_name}' not found")
         role_id = role["id"]
@@ -128,7 +128,7 @@ async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
         return ActionResult.error("Nothing to update.")
 
     cascade = str(params.cascade).lower()
-    result = await _gw_request("PATCH", f"/v1/roles/{role_id}?cascade={cascade}", data)
+    result = await _gw_request(ctx, "PATCH", f"/v1/roles/{role_id}?cascade={cascade}", data)
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     cascaded = result.get("cascaded_count", 0) if isinstance(result, dict) else 0
@@ -147,34 +147,34 @@ async def fn_list_scopes(ctx, params: ListScopesParams) -> ActionResult:
     if params.resource: parts.append(f"resource={params.resource}")
     if params.source:   parts.append(f"source={params.source}")
     qs = "?" + "&".join(parts) if parts else ""
-    scopes = await _gw_request("GET", f"/v1/scopes{qs}")
+    scopes = await _gw_request(ctx, "GET", f"/v1/scopes{qs}")
     if not isinstance(scopes, list):
         return ActionResult.error("Failed to list scopes")
     return ActionResult.success(data={"scopes": scopes, "total": len(scopes)},
                                 summary=f"{len(scopes)} scopes found")
 
 
-@chat.function("create_scope", action_type="write", event="scope_created",
+@chat.function("create_scope", action_type="write", chain_callable=True, effects=["scope.write"], event="scope_created",
                description="Create a scope in resource:action format.")
 async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
     name = f"{params.resource}:{params.action}"
     data: dict = {"name": name, "resource": params.resource, "action": params.action}
     if params.display_name: data["display_name"] = params.display_name
     if params.description:  data["description"] = params.description
-    result = await _gw_request("POST", "/v1/scopes", data)
+    result = await _gw_request(ctx, "POST", "/v1/scopes", data)
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"scope": result, "name": name},
                                 summary=f"Scope '{name}' created", refresh_panels=["tools"])
 
 
-@chat.function("delete_scope", action_type="destructive", event="scope_deleted",
+@chat.function("delete_scope", action_type="destructive", chain_callable=True, effects=["scope.write"], event="scope_deleted",
                description="Delete a scope by name or ID.")
 async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:
     if params.scope_id:
-        result = await _gw_request("DELETE", f"/v1/scopes/{params.scope_id}")
+        result = await _gw_request(ctx, "DELETE", f"/v1/scopes/{params.scope_id}")
     elif params.scope_name:
-        scopes = await _gw_request("GET", "/v1/scopes?resource=")
+        scopes = await _gw_request(ctx, "GET", "/v1/scopes?resource=")
         if not isinstance(scopes, list):
             return ActionResult.error("Failed to list scopes")
         match = next(
@@ -184,7 +184,7 @@ async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:
         )
         if not match:
             return ActionResult.error(f"Scope '{params.scope_name}' not found")
-        result = await _gw_request("DELETE", f"/v1/scopes/{match.get('id')}")
+        result = await _gw_request(ctx, "DELETE", f"/v1/scopes/{match.get('id')}")
     else:
         return ActionResult.error("scope_name or scope_id required")
     if isinstance(result, dict) and "error" in result:

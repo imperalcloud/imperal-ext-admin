@@ -18,9 +18,9 @@ from panels_sections import _cached, _fetch_extensions as _fetch_extensions_shar
 # Data fetchers
 # ---------------------------------------------------------------------------
 
-async def _fetch_extension_users_raw(app_id: str) -> list[dict]:
+async def _fetch_extension_users_raw(ctx, app_id: str) -> list[dict]:
     try:
-        result = await _gw_request("GET", f"/v1/extensions/{app_id}/users")
+        result = await _gw_request(ctx, "GET", f"/v1/extensions/{app_id}/users")
         if isinstance(result, list):
             return result
         if isinstance(result, dict):
@@ -30,14 +30,14 @@ async def _fetch_extension_users_raw(app_id: str) -> list[dict]:
     return []
 
 
-async def _fetch_extension_users(app_id: str) -> list[dict]:
-    return await _cached(f"ext_users:{app_id}",
-                         lambda: _fetch_extension_users_raw(app_id))
+async def _fetch_extension_users(ctx, app_id: str) -> list[dict]:
+    return await _cached(ctx, f"ext_users:{app_id}",
+                         lambda ctx: _fetch_extension_users_raw(ctx, app_id))
 
 
-async def _fetch_access_policy_raw(app_id: str, tenant_id: str) -> dict:
+async def _fetch_access_policy_raw(ctx, app_id: str, tenant_id: str) -> dict:
     try:
-        cfg = await _gw_request(
+        cfg = await _gw_request(ctx,
             "GET",
             f"/v1/internal/config/app/{app_id}?tenant_id={tenant_id}&app_id={app_id}",
         )
@@ -46,9 +46,9 @@ async def _fetch_access_policy_raw(app_id: str, tenant_id: str) -> dict:
         return {"mode": "public"}
 
 
-async def _fetch_access_policy(app_id: str, tenant_id: str) -> dict:
-    return await _cached(f"ext_policy:{tenant_id}:{app_id}",
-                         lambda: _fetch_access_policy_raw(app_id, tenant_id))
+async def _fetch_access_policy(ctx, app_id: str, tenant_id: str) -> dict:
+    return await _cached(ctx, f"ext_policy:{tenant_id}:{app_id}",
+                         lambda ctx: _fetch_access_policy_raw(ctx, app_id, tenant_id))
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> 
 
 async def build_extensions(ctx: Any, category_filter: str = "",
                            status_filter: str = "", **kwargs) -> ui.Stack:
-    extensions = await _fetch_extensions_shared()
+    extensions = await _fetch_extensions_shared(ctx)
     if not extensions:
         return ui.Stack(children=[
             ui.Header(text="Extensions", level=3),
@@ -189,13 +189,13 @@ async def build_extensions(ctx: Any, category_filter: str = "",
     _tid = _tenant_id(ctx)
     if fetch_users:
         _user_results, _policy_results = await asyncio.gather(
-            asyncio.gather(*[_fetch_extension_users(aid) for aid in _app_ids]),
-            asyncio.gather(*[_fetch_access_policy(aid, _tid) for aid in _app_ids]),
+            asyncio.gather(*[_fetch_extension_users(ctx, aid) for aid in _app_ids]),
+            asyncio.gather(*[_fetch_access_policy(ctx, aid, _tid) for aid in _app_ids]),
         )
         user_counts = {aid: len(ul) for aid, ul in zip(_app_ids, _user_results)}
     else:
         _policy_results = await asyncio.gather(
-            *[_fetch_access_policy(aid, _tid) for aid in _app_ids])
+            *[_fetch_access_policy(ctx, aid, _tid) for aid in _app_ids])
         user_counts: dict[str, int] = {}
 
     policies = dict(zip(_app_ids, _policy_results))

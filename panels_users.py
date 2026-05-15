@@ -170,7 +170,7 @@ async def build_users(ctx, role_filter: str = "",
                       status_filter: str = "", **kwargs):
     """User management: expandable cards with inline editing + filters."""
     users, roles, all_scopes, extensions = await asyncio.gather(
-        _fetch_users(), _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
+        _fetch_users(ctx), _fetch_roles(ctx), _fetch_scope_names(ctx), _fetch_extensions(ctx),
     )
 
     if not users:
@@ -196,7 +196,7 @@ async def build_users(ctx, role_filter: str = "",
 
     # Fetch per-user extensions in parallel (max 20)
     _uids = [u.get("imperal_id", u.get("id", "")) for u in filtered[:20]]
-    _ext_results = await asyncio.gather(*[_fetch_user_extensions(uid) for uid in _uids])
+    _ext_results = await asyncio.gather(*[_fetch_user_extensions(ctx, uid) for uid in _uids])
     user_ext_map: dict[str, list[dict]] = dict(zip(_uids, _ext_results))
 
     # Filter bar

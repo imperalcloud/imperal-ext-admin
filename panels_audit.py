@@ -72,10 +72,10 @@ def _format_timestamp(ts: str) -> str:
         return ts
 
 
-async def _fetch_audit_raw(hours: int = 24) -> list:
+async def _fetch_audit_raw(ctx, hours: int = 24) -> list:
     try:
         since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        result = await _gw_request("GET", f"/v1/audit?since={since}&limit=200")
+        result = await _gw_request(ctx, "GET", f"/v1/audit?since={since}&limit=200")
         if isinstance(result, list):
             return result
         if isinstance(result, dict):
@@ -85,8 +85,8 @@ async def _fetch_audit_raw(hours: int = 24) -> list:
         return []
 
 
-async def _fetch_audit(hours: int = 24) -> list:
-    return await _cached(f"audit:{hours}", lambda: _fetch_audit_raw(hours))
+async def _fetch_audit(ctx, hours: int = 24) -> list:
+    return await _cached(ctx, f"audit:{hours}", lambda ctx: _fetch_audit_raw(ctx, hours))
 
 
 def _action_color(action: str) -> str:
@@ -156,7 +156,7 @@ async def build_audit(ctx, **kwargs) -> object:
     source_filter = kwargs.get("source_filter", "")
     target_type_filter = kwargs.get("target_type_filter", "")
 
-    all_entries = await _fetch_audit(hours)
+    all_entries = await _fetch_audit(ctx, hours)
 
     # Build filter options from full unfiltered dataset
     actions = sorted(set(e.get("action", "") for e in all_entries if e.get("action")))

@@ -16,7 +16,7 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
     stack_items = [ui.Header("App Review", level=2)]
 
     try:
-        pending = await _gw_request("GET", "/v1/admin/apps/pending")
+        pending = await _gw_request(ctx, "GET", "/v1/admin/apps/pending")
     except Exception as exc:
         log.error("Failed to fetch pending apps: %s", exc)
         return ui.Stack(children=[

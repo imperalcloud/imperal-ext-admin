@@ -22,19 +22,19 @@ log = logging.getLogger("admin")
 
 # ── Data fetchers ─────────────────────────────────────────────────────
 
-async def _fetch_llm_config_raw() -> dict:
+async def _fetch_llm_config_raw(ctx) -> dict:
     try:
-        return await _gw_request("GET", "/v1/internal/config/llm")
+        return await _gw_request(ctx, "GET", "/v1/internal/config/llm")
     except Exception as e:
         log.warning("Panel: fetch LLM config failed: %s", e)
         return {}
 
 
-async def _fetch_llm_config() -> dict:
-    return await _cached("llm_config", _fetch_llm_config_raw)
+async def _fetch_llm_config(ctx) -> dict:
+    return await _cached(ctx, "llm_config", _fetch_llm_config_raw)
 
 
-async def _fetch_tenant_defaults_raw() -> dict:
+async def _fetch_tenant_defaults_raw(ctx) -> dict:
     """Fetch admin-set tenant defaults (Token Budget Controls 2026-04-27).
 
     Endpoint: GET /v1/admin/tenant-defaults?tenant_id=default. Returns the
@@ -42,7 +42,7 @@ async def _fetch_tenant_defaults_raw() -> dict:
     populate initial form values for the Token Budget Controls section.
     """
     try:
-        resp = await _gw_request(
+        resp = await _gw_request(ctx,
             "GET", "/v1/admin/tenant-defaults?tenant_id=default"
         )
         if isinstance(resp, dict):
@@ -53,8 +53,8 @@ async def _fetch_tenant_defaults_raw() -> dict:
         return {}
 
 
-async def _fetch_tenant_defaults() -> dict:
-    return await _cached("tenant_defaults", _fetch_tenant_defaults_raw)
+async def _fetch_tenant_defaults(ctx) -> dict:
+    return await _cached(ctx, "tenant_defaults", _fetch_tenant_defaults_raw)
 
 
 def _env_providers() -> list[str]:
@@ -71,7 +71,7 @@ def _env_providers() -> list[str]:
 
 # ── Inline test ───────────────────────────────────────────────────────
 
-async def _run_test(cfg: dict, target: str) -> dict:
+async def _run_test(ctx, cfg: dict, target: str) -> dict:
     """Run connection test, return {ok, message}."""
     try:
         if target == "failover":
@@ -158,7 +158,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
 
     # Inline test result (shown when user clicked Test)
     if run_test:
-        result = await _run_test(cfg, run_test)
+        result = await _run_test(ctx, cfg, run_test)
         label = "Failover" if run_test == "failover" else "Default Provider"
         children.append(ui.Alert(
             title=f"Test {label}",

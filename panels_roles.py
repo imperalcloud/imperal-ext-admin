@@ -195,7 +195,7 @@ def _build_role_expanded(
 async def build_roles(ctx, **kwargs):
     """Roles management: searchable list with expandable role cards."""
     roles, users, all_scopes = await asyncio.gather(
-        _fetch_roles(), _fetch_users(), _fetch_scope_names(),
+        _fetch_roles(ctx), _fetch_users(ctx), _fetch_scope_names(ctx),
     )
 
     create_form = ui.Accordion(sections=[{

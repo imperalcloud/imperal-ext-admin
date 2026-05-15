@@ -82,7 +82,7 @@ class SaveLlmConfigParams(BaseModel):
     purpose_judge_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for judge")
 
 
-@chat.function("save_llm_config", action_type="write", event="llm_config_saved",
+@chat.function("save_llm_config", action_type="write", chain_callable=True, effects=["llm.write"], event="llm_config_saved",
                description="Save LLM provider/model config to Redis Config Store.")
 async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
     try:
@@ -222,7 +222,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             try:
                 import httpx as _httpx
                 gw = os.getenv("IMPERAL_GATEWAY_URL", "http://104.224.88.155:8085")
-                svc = os.getenv("AUTH_SERVICE_TOKEN", "")
+                svc = await ctx.secrets.get("auth_service_token") or os.getenv("AUTH_SERVICE_TOKEN", "")
                 acting = ""
                 try:
                     acting = str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")

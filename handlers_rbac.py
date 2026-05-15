@@ -46,9 +46,9 @@ class AuditLogParams(BaseModel):
 
 # ─── Internal ─────────────────────────────────────────────────────────── #
 
-async def _resolve_ref(user_id: str, email: str) -> str | None:
+async def _resolve_ref(ctx, user_id: str, email: str) -> str | None:
     if user_id: return user_id
-    if email:   return await _resolve_user_by_email(email)
+    if email:   return await _resolve_user_by_email(ctx, email)
     return None
 
 
@@ -56,10 +56,10 @@ async def _resolve_ref(user_id: str, email: str) -> str | None:
 
 @chat.function("effective_scopes", action_type="read", description="Show all effective scopes for a user with sources.")
 async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
-    ref = await _resolve_ref(params.user_id, params.email)
+    ref = await _resolve_ref(ctx, params.user_id, params.email)
     if not ref:
         return ActionResult.error("user_id or email required" if not params.email else f"User '{params.email}' not found")
-    result = await _gw_request("GET", f"/v1/scopes/effective/{ref}")
+    result = await _gw_request(ctx, "GET", f"/v1/scopes/effective/{ref}")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     scopes = result.get("scopes", result) if isinstance(result, dict) else result
@@ -72,10 +72,10 @@ async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
 async def fn_check_permission(ctx, params: CheckPermissionParams) -> ActionResult:
     if not params.scope:
         return ActionResult.error("scope is required")
-    ref = await _resolve_ref(params.user_id, params.email)
+    ref = await _resolve_ref(ctx, params.user_id, params.email)
     if not ref:
         return ActionResult.error("user_id or email required" if not params.email else f"User '{params.email}' not found")
-    result = await _gw_request("GET", f"/v1/scopes/effective/{ref}")
+    result = await _gw_request(ctx, "GET", f"/v1/scopes/effective/{ref}")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     scopes = result.get("scopes", result) if isinstance(result, dict) else result
@@ -92,7 +92,7 @@ async def fn_check_permission(ctx, params: CheckPermissionParams) -> ActionResul
 
 @chat.function("compare_roles", action_type="read", description="Compare two roles — common and unique scopes.")
 async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
-    roles = await _gw_request("GET", "/v1/roles")
+    roles = await _gw_request(ctx, "GET", "/v1/roles")
     if not isinstance(roles, list):
         return ActionResult.error("Failed to fetch roles")
     r1 = next((r for r in roles if r.get("name", "").lower() == params.role1.lower()), None)
@@ -107,12 +107,12 @@ async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
         summary=f"{r1['name']} vs {r2['name']}: {len(common)} common, {len(only1)}+{len(only2)} unique")
 
 
-@chat.function("bulk_assign_role", action_type="write", event="roles_assigned", description="Assign a role to multiple users. Max 100.")
+@chat.function("bulk_assign_role", action_type="write", chain_callable=True, effects=["role.write"], event="roles_assigned", description="Assign a role to multiple users. Max 100.")
 async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult:
-    target_role = await _resolve_role_by_name(params.role)
+    target_role = await _resolve_role_by_name(ctx, params.role)
     if not target_role:
         return ActionResult.error(f"Role '{params.role}' not found")
-    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    raw = await _gw_request(ctx, "GET", "/v1/users?include_inactive=true")
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
         return ActionResult.error("Failed to fetch users")
@@ -130,7 +130,7 @@ async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult
     for u in targets:
         uid = u.get("imperal_id") or u.get("id")
         try:
-            r = await _gw_request("PATCH", f"/v1/users/{uid}", {"role": target_role["name"]})
+            r = await _gw_request(ctx, "PATCH", f"/v1/users/{uid}", {"role": target_role["name"]})
             if isinstance(r, dict) and "error" in r: errors.append({"user": u.get("email"), "error": r["error"]})
             else: success += 1
         except Exception as e:
@@ -147,7 +147,7 @@ async def fn_audit_log(ctx, params: AuditLogParams) -> ActionResult:
     if params.actor:  parts.append(f"actor={params.actor}")
     if params.target: parts.append(f"target={params.target}")
     if params.action: parts.append(f"action={params.action}")
-    result = await _gw_request("GET", f"/v1/audit?{'&'.join(parts)}")
+    result = await _gw_request(ctx, "GET", f"/v1/audit?{'&'.join(parts)}")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     entries = result if isinstance(result, list) else result.get("entries", result.get("data", []))

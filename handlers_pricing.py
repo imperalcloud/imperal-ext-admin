@@ -49,7 +49,7 @@ class DeleteLlmModelRateParams(BaseModel):
     model_id: str = Field(..., min_length=1)
 
 
-@chat.function("save_llm_model_rate", action_type="write",
+@chat.function("save_llm_model_rate", action_type="write", chain_callable=True, effects=["billing.write"],
                event="llm_model_rate_saved",
                description="Save (upsert) an LLM model rate row in llm_model_rates.")
 async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionResult:
@@ -95,7 +95,7 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
     )
 
 
-@chat.function("delete_llm_model_rate", action_type="destructive",
+@chat.function("delete_llm_model_rate", action_type="destructive", chain_callable=True, effects=["billing.write"],
                event="llm_model_rate_deleted",
                description="Soft-delete (mark unavailable) an LLM model rate row.")
 async def fn_delete_llm_model_rate(ctx, params: DeleteLlmModelRateParams) -> ActionResult:

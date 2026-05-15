@@ -14,9 +14,9 @@ from app import _registry_get, _resolve_app_id
 
 # ── Data fetcher ──────────────────────────────────────────────────────
 
-async def _fetch_settings(app_id: str) -> dict:
-    aid = await _resolve_app_id(app_id)
-    r = await _registry_get(f"/v1/apps/{aid}/settings")
+async def _fetch_settings(ctx, app_id: str) -> dict:
+    aid = await _resolve_app_id(ctx, app_id)
+    r = await _registry_get(ctx, f"/v1/apps/{aid}/settings")
     if r.status_code == 200:
         return r.json()
     return {}
@@ -163,7 +163,7 @@ async def build_ext_settings(ctx: Any, app_id: str = "",
     if not app_id:
         return ui.Alert(title="No extension selected", message="app_id required", type="error")
 
-    settings = await _fetch_settings(app_id)
+    settings = await _fetch_settings(ctx, app_id)
     if not settings:
         return ui.Alert(title="Settings not found",
                         message=f"Could not load settings for '{app_id}'", type="error")

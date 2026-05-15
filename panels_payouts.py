@@ -16,7 +16,7 @@ async def build_payouts(ctx, **kwargs) -> ui.Stack:
     stack_items = [ui.Header("Developer Payouts", level=2)]
 
     try:
-        result = await _gw_request("GET", "/v1/admin/payouts/pending")
+        result = await _gw_request(ctx, "GET", "/v1/admin/payouts/pending")
     except Exception as exc:
         log.error("Failed to fetch pending payouts: %s", exc)
         return ui.Stack(children=[

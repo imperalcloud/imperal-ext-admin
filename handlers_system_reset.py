@@ -21,16 +21,16 @@ _BUILTIN_DEFAULTS = {
 }
 
 
-@chat.function("reset_context_defaults", action_type="destructive",
+@chat.function("reset_context_defaults", action_type="destructive", chain_callable=True, effects=["system.write"],
                description="Reset platform context defaults to built-in values.")
 async def fn_reset_context_defaults(ctx, params: EmptyParams) -> ActionResult:
     """Reset context defaults via Auth GW platform config (same as React)."""
     try:
-        raw = await _gw_request("GET", "/v1/internal/config/platform/platform")
+        raw = await _gw_request(ctx, "GET", "/v1/internal/config/platform/platform")
         current_config = raw.get("config", {}) if isinstance(raw, dict) else {}
         current_config["context_defaults"] = dict(_BUILTIN_DEFAULTS)
 
-        await _gw_request("PUT", "/v1/internal/config/platform/platform",
+        await _gw_request(ctx, "PUT", "/v1/internal/config/platform/platform",
                           {"config": current_config})
 
         return ActionResult.success(

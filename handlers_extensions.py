@@ -58,7 +58,7 @@ class DenyAllowParams(BaseModel):
 
 @chat.function("list_extensions", action_type="read", description="List all active extensions.")
 async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
-    r = await _registry_get("/v1/apps?status=active")
+    r = await _registry_get(ctx, "/v1/apps?status=active")
     if r.status_code != 200:
         return ActionResult.error(f"Failed: HTTP {r.status_code}")
     apps = r.json()
@@ -69,54 +69,54 @@ async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("get_extension_config", action_type="read", description="Get full extension config.")
 async def fn_get_extension_config(ctx, params: AppIdParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
-    r = await _registry_get(f"/v1/apps/{aid}/settings")
+    r = await _registry_get(ctx, f"/v1/apps/{aid}/settings")
     if r.status_code != 200:
         return ActionResult.error(f"Failed for '{aid}': HTTP {r.status_code}")
     return ActionResult.success(data={"app_id": aid, "config": r.json()}, summary=f"Config for {aid}")
 
 
-@chat.function("update_extension_config", action_type="write", event="extension_configured", description="Update extension config.")
+@chat.function("update_extension_config", action_type="write", chain_callable=True, effects=["extension.write"], event="extension_configured", description="Update extension config.")
 async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
     if not params.config:
         return ActionResult.error("No config provided")
-    r = await _registry_put(f"/v1/apps/{aid}/settings", params.config)
+    r = await _registry_put(ctx, f"/v1/apps/{aid}/settings", params.config)
     if r.status_code == 200:
         return ActionResult.success(data={"app_id": aid, "updated": True}, summary=f"Config updated for {aid}", refresh_panels=["tools"])
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
-@chat.function("update_skeleton_ttl", action_type="write", event="skeleton_updated", description="Update skeleton refresh TTL.")
+@chat.function("update_skeleton_ttl", action_type="write", chain_callable=True, effects=["extension.write"], event="skeleton_updated", description="Update skeleton refresh TTL.")
 async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
     payload = {"skeleton": {"sections": [{"section_name": params.section_name, "ttl": params.ttl}]}} if params.section_name else {"skeleton": {"ttl": params.ttl}}
-    r = await _registry_put(f"/v1/apps/{aid}/settings", payload)
+    r = await _registry_put(ctx, f"/v1/apps/{aid}/settings", payload)
     if r.status_code == 200:
         return ActionResult.success(data={"app_id": aid, "ttl": params.ttl}, summary=f"Skeleton TTL {params.ttl}s for {aid}", refresh_panels=["tools"])
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
-@chat.function("suspend_extension", action_type="destructive", event="extension_suspended", description="Suspend an extension.")
+@chat.function("suspend_extension", action_type="destructive", chain_callable=True, effects=["extension.write"], event="extension_suspended", description="Suspend an extension.")
 async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id, include_all=True)
-    r = await _registry_patch(f"/v1/apps/{aid}", {"status": "suspended"})
+    aid = await _resolve_app_id(ctx, params.app_id, include_all=True)
+    r = await _registry_patch(ctx, f"/v1/apps/{aid}", {"status": "suspended"})
     if r.status_code != 200:
         return ActionResult.error(f"Failed: HTTP {r.status_code}")
-    v = await _registry_get(f"/v1/apps/{aid}")
+    v = await _registry_get(ctx, f"/v1/apps/{aid}")
     if v.status_code == 200 and v.json().get("status") == "suspended":
-        await _invalidate_extension_caches()
+        await _invalidate_extension_caches(ctx)
         return ActionResult.success(data={"app_id": aid, "status": "suspended", "verified": True}, summary=f"{aid} suspended", refresh_panels=["tools"])
     return ActionResult.success(data={"app_id": aid}, summary=f"{aid} suspend sent (unverified)")
 
 
-@chat.function("activate_extension", action_type="write", event="extension_activated", description="Activate a suspended extension.")
+@chat.function("activate_extension", action_type="write", chain_callable=True, effects=["extension.write"], event="extension_activated", description="Activate a suspended extension.")
 async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id, include_all=True)
-    r = await _registry_get(f"/v1/apps/{aid}")
+    aid = await _resolve_app_id(ctx, params.app_id, include_all=True)
+    r = await _registry_get(ctx, f"/v1/apps/{aid}")
     if r.status_code == 404:
         return ActionResult.error(f"'{aid}' not found. Must be registered first.")
     cur = r.json().get("status", "unknown")
@@ -124,12 +124,12 @@ async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
         return ActionResult.success(data={"app_id": aid, "status": "active"}, summary=f"{aid} already active", refresh_panels=["tools"])
     if cur == "deleted":
         return ActionResult.error(f"'{aid}' was deleted. Must be re-registered.")
-    r = await _registry_patch(f"/v1/apps/{aid}", {"status": "active"})
+    r = await _registry_patch(ctx, f"/v1/apps/{aid}", {"status": "active"})
     if r.status_code != 200:
         return ActionResult.error(f"Failed: HTTP {r.status_code}")
-    v = await _registry_get(f"/v1/apps/{aid}")
+    v = await _registry_get(ctx, f"/v1/apps/{aid}")
     if v.status_code == 200 and v.json().get("status") == "active":
-        await _invalidate_extension_caches()
+        await _invalidate_extension_caches(ctx)
         return ActionResult.success(data={"app_id": aid, "status": "active", "previous": cur}, summary=f"{aid} activated (was {cur})")
     return ActionResult.success(data={"app_id": aid}, summary=f"{aid} activate sent (unverified)")
 
@@ -154,7 +154,7 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
     # anti-fab fallback class where 'какие у меня расширения?' used to
     # route to conversational and hit the now-deleted hardcoded apps list.
     ref = params.user_id or (
-        await _resolve_user_by_email(params.email) if params.email else None
+        await _resolve_user_by_email(ctx, params.email) if params.email else None
     )
     if not ref:
         # No explicit target — fall back to the caller's own imperal_id.
@@ -164,16 +164,16 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
         return ActionResult.error(
             "user_id or email required" if not params.email else f"User '{params.email}' not found"
         )
-    result = await _gw_request("GET", f"/v1/users/{ref}/extensions")
+    result = await _gw_request(ctx, "GET", f"/v1/users/{ref}/extensions")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     exts = result if isinstance(result, list) else result.get("extensions", [])
     return ActionResult.success(data={"user_id": ref, "extensions": exts, "total": len(exts)}, summary=f"{len(exts)} extensions for {ref}")
 
 
-@chat.function("set_access_policy", action_type="write", event="access_policy_set", description="Set extension access policy.")
+@chat.function("set_access_policy", action_type="write", chain_callable=True, effects=["extension.write"], event="access_policy_set", description="Set extension access policy.")
 async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
     policy: dict = {}
     if params.mode: policy["mode"] = params.mode
@@ -184,22 +184,22 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
     if exceptions: policy["exceptions"] = exceptions
     if not policy:
         return ActionResult.success(data={"app_id": aid}, summary="No changes needed", refresh_panels=["tools"])
-    cur = await _gw_request("GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
+    cur = await _gw_request(ctx, "GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
     cur_policy = (cur or {}).get("config", {}).get("access_policy", {"mode": "public"})
     merged = {**cur_policy, **policy}
     if "exceptions" in policy:
         merged["exceptions"] = {**cur_policy.get("exceptions", {}), **policy["exceptions"]}
-    await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": merged}})
+    await _gw_request(ctx, "PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": merged}})
     return ActionResult.success(data={"app_id": aid, "policy": merged}, summary=f"Policy for {aid}: mode={merged.get('mode', '?')}")
 
 
 @chat.function("get_access_policy", action_type="read", description="Show access policy with per-role resolution.")
 async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
-    cfg = await _gw_request("GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
+    cfg = await _gw_request(ctx, "GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
     policy = (cfg or {}).get("config", {}).get("access_policy", {"mode": "public"})
-    roles = await _gw_request("GET", "/v1/roles")
+    roles = await _gw_request(ctx, "GET", "/v1/roles")
     resolution = []
     if isinstance(roles, list):
         for role in roles:
@@ -221,8 +221,8 @@ async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
 
 @chat.function("list_extension_users", action_type="read", description="List users who can access an extension.")
 async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id, include_all=True)
-    result = await _gw_request("GET", f"/v1/extensions/{aid}/users")
+    aid = await _resolve_app_id(ctx, params.app_id, include_all=True)
+    result = await _gw_request(ctx, "GET", f"/v1/extensions/{aid}/users")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     users = result if isinstance(result, list) else result.get("users", [])
@@ -232,13 +232,13 @@ async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
                                 summary=f"{granted} granted, {denied} denied for {aid}")
 
 
-@chat.function("deny_extension", action_type="destructive", event="extension_denied", description="Add role/user to denied list.")
+@chat.function("deny_extension", action_type="destructive", chain_callable=True, effects=["extension.write"], event="extension_denied", description="Add role/user to denied list.")
 async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to deny")
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
-    cfg = await _gw_request("GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
+    cfg = await _gw_request(ctx, "GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
     policy = (cfg or {}).get("config", {}).get("access_policy", {"mode": "public", "exceptions": {"denied_roles": [], "denied_users": []}})
     exc = policy.get("exceptions", {"denied_roles": [], "denied_users": []})
     added, uid = [], params.user
@@ -248,24 +248,24 @@ async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
         dr.append(params.role); exc["denied_roles"] = dr; added.append(f"role '{params.role}'")
     if params.user:
         if "@" in str(params.user):
-            uid = await _resolve_user_by_email(params.user)
+            uid = await _resolve_user_by_email(ctx, params.user)
             if not uid: return ActionResult.error(f"User '{params.user}' not found")
         du = exc.get("denied_users", [])
         if uid in du: return ActionResult.error(f"User already denied")
         du.append(uid); exc["denied_users"] = du; added.append(f"user '{uid}'")
     policy["exceptions"] = exc
-    await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": policy}})
-    await _invalidate_extension_caches(user_id=uid if params.user else None)
+    await _gw_request(ctx, "PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": policy}})
+    await _invalidate_extension_caches(ctx, user_id=uid if params.user else None)
     return ActionResult.success(data={"app_id": aid, "denied": added}, summary=f"Denied {', '.join(added)} from {aid}", refresh_panels=["tools"])
 
 
-@chat.function("allow_extension", action_type="write", event="extension_allowed", description="Remove role/user from denied list.")
+@chat.function("allow_extension", action_type="write", chain_callable=True, effects=["extension.write"], event="extension_allowed", description="Remove role/user from denied list.")
 async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to allow")
-    aid = await _resolve_app_id(params.app_id)
+    aid = await _resolve_app_id(ctx, params.app_id)
     tid = _tenant_id(ctx)
-    cfg = await _gw_request("GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
+    cfg = await _gw_request(ctx, "GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
     policy = (cfg or {}).get("config", {}).get("access_policy", {"mode": "public", "exceptions": {"denied_roles": [], "denied_users": []}})
     exc = policy.get("exceptions", {"denied_roles": [], "denied_users": []})
     removed, uid = [], params.user
@@ -275,13 +275,13 @@ async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
         dr.remove(params.role); exc["denied_roles"] = dr; removed.append(f"role '{params.role}'")
     if params.user:
         if "@" in str(params.user):
-            uid = await _resolve_user_by_email(params.user)
+            uid = await _resolve_user_by_email(ctx, params.user)
             if not uid: return ActionResult.error(f"User '{params.user}' not found")
         du = exc.get("denied_users", [])
         if uid not in du: return ActionResult.error(f"User is not denied")
         du.remove(uid); exc["denied_users"] = du; removed.append(f"user '{uid}'")
     policy["exceptions"] = exc
-    await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": policy}})
-    await _invalidate_extension_caches(user_id=uid if params.user else None)
-    if uid and params.user: await _signal_session_refresh(uid)
+    await _gw_request(ctx, "PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": policy}})
+    await _invalidate_extension_caches(ctx, user_id=uid if params.user else None)
+    if uid and params.user: await _signal_session_refresh(ctx, uid)
     return ActionResult.success(data={"app_id": aid, "removed": removed}, summary=f"Allowed {', '.join(removed)} for {aid}", refresh_panels=["tools"])

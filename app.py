@@ -29,8 +29,8 @@ log = logging.getLogger("admin")
 
 AUTH_GW = os.getenv("IMPERAL_GATEWAY_URL", "http://104.224.88.155:8085")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://66.78.41.10:8098")
-REGISTRY_KEY = os.getenv("REGISTRY_API_KEY", "")
-AUTH_SERVICE_TOKEN = os.getenv("AUTH_SERVICE_TOKEN", "")
+REGISTRY_KEY = os.getenv("REGISTRY_API_KEY", "")  # imperal-allow-plaintext-credential: bootstrap
+AUTH_SERVICE_TOKEN = os.getenv("AUTH_SERVICE_TOKEN", "")  # imperal-allow-plaintext-credential: bootstrap
 REDIS_URL = os.getenv("REDIS_URL", "")
 TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "104.224.88.156")
 TEMPORAL_PORT = int(os.getenv("TEMPORAL_PORT", "7233"))
@@ -41,23 +41,17 @@ TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
 _http = None
 
 
-def _get_http():
-    global _http
-    if _http is None:
-        _http = httpx.AsyncClient(
-            base_url=AUTH_GW,
-            headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
-            timeout=10.0,
-        )
-    return _http
-
-
-async def _gw_request(method, path, data=None):
-    c = _get_http()
-    if method.upper() in ("POST", "PUT", "PATCH"):
-        r = await getattr(c, method.lower())(path, json=data)
-    else:
-        r = await getattr(c, method.lower())(path)
+async def _gw_request(ctx, method, path, data=None):
+    token = await ctx.secrets.get("auth_service_token") or AUTH_SERVICE_TOKEN
+    async with httpx.AsyncClient(
+        base_url=AUTH_GW,
+        headers={"X-Service-Token": token},
+        timeout=10.0,
+    ) as c:
+        if method.upper() in ("POST", "PUT", "PATCH"):
+            r = await getattr(c, method.lower())(path, json=data)
+        else:
+            r = await getattr(c, method.lower())(path)
     # Federal: never call r.json() blindly. Auth-gw may return 4xx/5xx
     # with HTML body, empty body, or {"detail": "..."} — surface readable
     # error to ActionResult.error path instead of JSONDecodeError.
@@ -109,21 +103,24 @@ def _verify_write_reflected(result, expected: dict) -> str | None:
     return None
 
 
-async def _registry_get(path):
+async def _registry_get(ctx, path):
+    key = await ctx.secrets.get("registry_api_key") or REGISTRY_KEY
     async with httpx.AsyncClient(timeout=10) as c:
-        return await c.get(f"{REGISTRY_URL}{path}", headers={"x-api-key": REGISTRY_KEY})
+        return await c.get(f"{REGISTRY_URL}{path}", headers={"x-api-key": key})
 
 
-async def _registry_put(path, data):
+async def _registry_put(ctx, path, data):
+    key = await ctx.secrets.get("registry_api_key") or REGISTRY_KEY
     async with httpx.AsyncClient(timeout=10) as c:
         return await c.put(f"{REGISTRY_URL}{path}", json=data,
-                           headers={"x-api-key": REGISTRY_KEY, "Content-Type": "application/json"})
+                           headers={"x-api-key": key, "Content-Type": "application/json"})
 
 
-async def _registry_patch(path, data):
+async def _registry_patch(ctx, path, data):
+    key = await ctx.secrets.get("registry_api_key") or REGISTRY_KEY
     async with httpx.AsyncClient(timeout=10) as c:
         return await c.patch(f"{REGISTRY_URL}{path}", json=data,
-                             headers={"x-api-key": REGISTRY_KEY, "Content-Type": "application/json"})
+                             headers={"x-api-key": key, "Content-Type": "application/json"})
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -138,11 +135,11 @@ def _tenant_id(ctx) -> str:
     return "default"
 
 
-async def _resolve_app_id(app_id, include_all=False):
+async def _resolve_app_id(ctx, app_id, include_all=False):
     if not app_id:
         return app_id
     status = "all" if include_all else "active"
-    r = await _registry_get(f"/v1/apps?status={status}")
+    r = await _registry_get(ctx, f"/v1/apps?status={status}")
     if r.status_code != 200:
         return app_id
     apps = r.json()
@@ -158,8 +155,8 @@ async def _resolve_app_id(app_id, include_all=False):
     return app_id
 
 
-async def _resolve_user_by_email(email):
-    raw = await _gw_request("GET", f"/v1/users?search={email}")
+async def _resolve_user_by_email(ctx, email):
+    raw = await _gw_request(ctx, "GET", f"/v1/users?search={email}")
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if isinstance(users, list):
         for u in users:
@@ -168,8 +165,8 @@ async def _resolve_user_by_email(email):
     return None
 
 
-async def _resolve_role_by_name(role_name):
-    roles = await _gw_request("GET", "/v1/roles")
+async def _resolve_role_by_name(ctx, role_name):
+    roles = await _gw_request(ctx, "GET", "/v1/roles")
     if isinstance(roles, list):
         for r in roles:
             if r.get("name", "").lower() == role_name.lower():
@@ -177,7 +174,7 @@ async def _resolve_role_by_name(role_name):
     return None
 
 
-async def _invalidate_extension_caches(user_id: str = None):
+async def _invalidate_extension_caches(ctx, user_id: str = None):
     if not REDIS_URL:
         return
     try:
@@ -191,7 +188,7 @@ async def _invalidate_extension_caches(user_id: str = None):
         log.warning(f"Cache invalidation non-critical: {e}")
 
 
-async def _signal_session_refresh(user_id: str):
+async def _signal_session_refresh(ctx, user_id: str):
     try:
         from temporalio.client import Client
         client = await Client.connect(f"{TEMPORAL_HOST}:{TEMPORAL_PORT}", namespace=TEMPORAL_NAMESPACE)
@@ -209,7 +206,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.2.10",
+    version="5.3.0",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
@@ -241,9 +238,9 @@ ext = Extension(
         # Cross-user target scope guard (admin routinely targets other users)
         "users:read", "users:manage", "users:admin",
     ],
-    display_name='Admin',
+    display_name='Platform Administration',
     description=(
-        'Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.'
+        'Manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.'
     ),
     icon="icon.svg",
     actions_explicit=True,
@@ -302,7 +299,7 @@ chat._build_system_prompt = _patched_build_system_prompt
 
 
 @ext.health_check
-async def health(ctx) -> dict:
+async def health(ctx, **kwargs) -> dict:
     results = {}
     for name, url in [("auth_gateway", f"{AUTH_GW}/healthz"), ("registry", f"{REGISTRY_URL}/health")]:
         try:
@@ -318,5 +315,13 @@ async def health(ctx) -> dict:
 # ── Lifecycle Hooks ───────────────────────────────────────────────────────────
 
 @ext.on_install
-async def on_install(ctx):
+async def on_install(ctx, **kwargs):
     log.info(f"admin installed for user {ctx.user.imperal_id if ctx and hasattr(ctx, 'user') and ctx.user else 'system'}")
+
+
+@ext.secret(name="auth_service_token", description="Token for Auth Gateway service-to-service calls", required=True)
+def _secret_auth(): pass
+
+
+@ext.secret(name="registry_api_key", description="API key for Registry service-to-service calls", required=True)
+def _secret_registry(): pass

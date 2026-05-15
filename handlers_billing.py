@@ -26,11 +26,11 @@ HOLD_PREFIX = "imperal:wallet:hold:"
 STREAM_KEY = "imperal:billing:events"
 
 
-async def _redis() -> aioredis.Redis:
+async def _redis(ctx) -> aioredis.Redis:
     return aioredis.from_url(REDIS_URL, decode_responses=True)
 
 
-async def _normalize_to_imperal_id(value: str) -> tuple[str | None, str | None]:
+async def _normalize_to_imperal_id(ctx, value: str) -> tuple[str | None, str | None]:
     """Coerce a user identifier to a canonical `imp_u_*` imperal_id.
 
     Returns ``(imperal_id, None)`` on success or ``(None, error_message)`` on failure.
@@ -53,7 +53,7 @@ async def _normalize_to_imperal_id(value: str) -> tuple[str | None, str | None]:
         return v, None
     if "@" in v:
         try:
-            resolved = await _resolve_user_by_email(v)
+            resolved = await _resolve_user_by_email(ctx, v)
         except Exception as e:
             return None, f"email lookup failed for {v!r}: {e}"
         if not resolved:
@@ -70,7 +70,7 @@ async def _normalize_to_imperal_id(value: str) -> tuple[str | None, str | None]:
     )
 
 
-async def _scan_keys(r: aioredis.Redis, pattern: str) -> list[str]:
+async def _scan_keys(ctx, r: aioredis.Redis, pattern: str) -> list[str]:
     """Collect all keys matching pattern via SCAN."""
     keys: list[str] = []
     cursor = "0"
@@ -106,9 +106,9 @@ async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
             resp = await c.get(f"{AUTH_GW}/v1/billing/plans")
         plans = resp.json() if resp.status_code == 200 else []
 
-        r = await _redis()
+        r = await _redis(ctx)
         try:
-            all_keys = await _scan_keys(r, f"{WALLET_PREFIX}*")
+            all_keys = await _scan_keys(ctx, r, f"{WALLET_PREFIX}*")
             wallet_count = sum(1 for k in all_keys if k.count(":") == 2)
             stream_len = await r.xlen(STREAM_KEY)
         finally:
@@ -135,9 +135,9 @@ async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
                description="List all user wallet balances with totals.")
 async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
     try:
-        r = await _redis()
+        r = await _redis(ctx)
         try:
-            all_keys = await _scan_keys(r, f"{WALLET_PREFIX}*")
+            all_keys = await _scan_keys(ctx, r, f"{WALLET_PREFIX}*")
             wallets, total = [], 0
             for key in all_keys:
                 uid = key.removeprefix(WALLET_PREFIX)
@@ -163,14 +163,14 @@ async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
 @chat.function("get_user_balance", action_type="read",
                description="Get token balance for a specific user including active holds.")
 async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
-    target_id, err = await _normalize_to_imperal_id(params.user_id)
+    target_id, err = await _normalize_to_imperal_id(ctx, params.user_id)
     if err:
         return ActionResult.error(err)
     try:
-        r = await _redis()
+        r = await _redis(ctx)
         try:
             bal = int(await r.get(f"{WALLET_PREFIX}{target_id}") or 0)
-            hold_keys = await _scan_keys(r, f"{HOLD_PREFIX}{target_id}:*")
+            hold_keys = await _scan_keys(ctx, r, f"{HOLD_PREFIX}{target_id}:*")
             holds = []
             for key in hold_keys:
                 held = int(await r.get(key) or 0)
@@ -190,16 +190,16 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
         return ActionResult.error(f"Failed: {e}", retryable=True)
 
 
-@chat.function("adjust_balance", action_type="write", event="billing_adjusted",
+@chat.function("adjust_balance", action_type="write", chain_callable=True, effects=["billing.write"], event="billing_adjusted",
                description="Credit or deduct tokens. Positive=credit, negative=deduct.")
 async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
     if params.amount == 0:
         return ActionResult.error("Amount must be non-zero")
-    target_id, err = await _normalize_to_imperal_id(params.user_id)
+    target_id, err = await _normalize_to_imperal_id(ctx, params.user_id)
     if err:
         return ActionResult.error(err)
     try:
-        r = await _redis()
+        r = await _redis(ctx)
         try:
             wallet_key = f"{WALLET_PREFIX}{target_id}"
             if params.amount > 0:
@@ -240,7 +240,7 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
                description="Check billing system health: stream, consumers, pending lag.")
 async def fn_billing_health(ctx, params: EmptyParams) -> ActionResult:
     try:
-        r = await _redis()
+        r = await _redis(ctx)
         try:
             stream_len, first_id, last_id = 0, None, None
             try:

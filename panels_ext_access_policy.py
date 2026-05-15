@@ -17,9 +17,9 @@ from panels_sections import _fetch_scopes, _fetch_roles
 
 # ── Data fetcher ──────────────────────────────────────────────────────
 
-async def _fetch_policy(app_id: str, tenant_id: str) -> dict:
+async def _fetch_policy(ctx, app_id: str, tenant_id: str) -> dict:
     try:
-        cfg = await _gw_request(
+        cfg = await _gw_request(ctx,
             "GET",
             f"/v1/internal/config/app/{app_id}?tenant_id={tenant_id}&app_id={app_id}",
         )
@@ -80,7 +80,7 @@ async def build_ext_access_policy(ctx: Any, app_id: str = "",
         return ui.Alert(title="No extension", message="app_id required",
                         type="error")
 
-    aid = await _resolve_app_id(app_id)
+    aid = await _resolve_app_id(ctx, app_id)
     tid = _tenant_id(ctx)
 
     policy, all_scopes, all_roles = await asyncio.gather(

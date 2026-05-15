@@ -2,9 +2,9 @@
   "manifest_schema_version": 3,
   "sdk_version": "4.2.10",
   "app_id": "admin",
-  "version": "5.2.10",
-  "name": "Admin",
-  "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
+  "version": "5.3.0",
+  "name": "Platform Administration",
+  "description": "Manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
   "actions_explicit": true,
   "system": true,
@@ -41,7 +41,7 @@
   "tools": [
     {
       "name": "tool_admin_chat",
-      "description": "Admin assistant — manage users, roles, extensions and system health. RBAC scopes, effective permissions, compare roles, bulk assign, audit log, extension access policies, deny/allow extensions",
+      "description": "Admin assistant \u2014 manage users, roles, extensions and system health. RBAC scopes, effective permissions, compare roles, bulk assign, audit log, extension access policies, deny/allow extensions",
       "scopes": [],
       "parameters": {
         "message": {
@@ -84,7 +84,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -99,7 +99,9 @@
       "description": "Create a new user with email, password, and role.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create a new platform user.",
@@ -138,7 +140,9 @@
       "description": "Update user role, scopes, attributes, or status.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update user properties.",
@@ -214,7 +218,9 @@
       "description": "Deactivate user (can reactivate later).",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.delete"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific user.",
@@ -241,7 +247,9 @@
       "description": "PERMANENT delete. Cannot be undone.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.delete"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific user.",
@@ -268,7 +276,9 @@
       "description": "Update individual limit overrides for a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update individual limit overrides for a user.",
@@ -334,7 +344,9 @@
       "description": "Set a single attribute key-value on a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set a single attribute key-value on a user.",
@@ -373,7 +385,9 @@
       "description": "Remove an attribute key from a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "user.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Remove a single attribute key from a user.",
@@ -409,7 +423,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -424,7 +438,9 @@
       "description": "Create a new role with name and default scopes.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "role.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create a new role with name and default scopes.",
@@ -473,7 +489,9 @@
       "description": "Delete a role by ID or name.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "role.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Delete a role by ID or name.",
@@ -504,7 +522,9 @@
       "description": "Update role scopes, limits, or display name. Can cascade.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "role.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update a role's properties including limits.",
@@ -620,7 +640,9 @@
       "description": "Create a scope in resource:action format.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "scope.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create a scope in resource:action format.",
@@ -665,7 +687,9 @@
       "description": "Delete a scope by name or ID.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "scope.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Delete a scope.",
@@ -770,7 +794,7 @@
     },
     {
       "name": "compare_roles",
-      "description": "Compare two roles — common and unique scopes.",
+      "description": "Compare two roles \u2014 common and unique scopes.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -806,7 +830,9 @@
       "description": "Assign a role to multiple users. Max 100.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "role.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Assign a role to multiple users.",
@@ -909,7 +935,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -951,7 +977,9 @@
       "description": "Update extension config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update extension config.",
@@ -985,7 +1013,9 @@
       "description": "Update skeleton refresh TTL.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update skeleton refresh interval.",
@@ -1024,7 +1054,9 @@
       "description": "Suspend an extension.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific extension.",
@@ -1051,7 +1083,9 @@
       "description": "Activate a suspended extension.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific extension.",
@@ -1075,7 +1109,7 @@
     },
     {
       "name": "list_user_extensions",
-      "description": "List the calling user's installed extensions when called with no user_id/email (self-service mode — used by 'what extensions do I have' chat intent); list another user's extensions when user_id or email is specified (admin mode — requires admin scope at the gateway). B-3 self-service path added 2026-05-11.",
+      "description": "List the calling user's installed extensions when called with no user_id/email (self-service mode \u2014 used by 'what extensions do I have' chat intent); list another user's extensions when user_id or email is specified (admin mode \u2014 requires admin scope at the gateway). B-3 self-service path added 2026-05-11.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -1109,7 +1143,9 @@
       "description": "Set extension access policy.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set extension access policy.",
@@ -1244,7 +1280,9 @@
       "description": "Add role/user to denied list.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Deny or allow access for a role/user.",
@@ -1283,7 +1321,9 @@
       "description": "Remove role/user from denied list.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Deny or allow access for a role/user.",
@@ -1322,7 +1362,9 @@
       "description": "Save extension general settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1360,7 +1402,9 @@
       "description": "Save extension AI model settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1448,7 +1492,9 @@
       "description": "Save extension persona settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1506,7 +1552,9 @@
       "description": "Save extension alert settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1551,7 +1599,9 @@
       "description": "Save extension router settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1595,7 +1645,9 @@
       "description": "Save extension session settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1646,7 +1698,9 @@
       "description": "Save extension context settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -1690,7 +1744,9 @@
       "description": "Save extension skeleton section settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "extension.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "additionalProperties": true,
@@ -1726,7 +1782,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -1744,7 +1800,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -1759,7 +1815,9 @@
       "description": "Create automation from natural language.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create automation from natural language.",
@@ -1798,7 +1856,9 @@
       "description": "Delete an automation rule.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific rule.",
@@ -1825,7 +1885,9 @@
       "description": "Pause an automation rule.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific rule.",
@@ -1852,7 +1914,9 @@
       "description": "Resume a paused rule. Resets trigger_count.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific rule.",
@@ -1879,7 +1943,9 @@
       "description": "Set confirmation policy for a role.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set confirmation policy for a role.",
@@ -1939,7 +2005,9 @@
       "description": "Set confirmation for a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set user confirmation settings.",
@@ -2005,7 +2073,9 @@
       "description": "Set max concurrent tasks for a role (1-50).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set task limit for a role.",
@@ -2065,7 +2135,9 @@
       "description": "Save platform-wide context window defaults via Auth GW.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Platform-wide context window defaults.",
@@ -2204,7 +2276,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -2219,10 +2291,12 @@
       "description": "Reset platform context defaults to built-in values.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "system.write"
+      ],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -2237,7 +2311,9 @@
       "description": "Save LLM provider/model config to Redis Config Store.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "llm.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Save LLM provider/model configuration.",
@@ -2799,7 +2875,9 @@
       "description": "Save (upsert) an LLM model rate row in llm_model_rates.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "billing.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Save (upsert) a single LLM model rate row.",
@@ -2863,7 +2941,9 @@
       "description": "Soft-delete (mark unavailable) an LLM model rate row.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "billing.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Soft-delete (set is_available=false) a model rate row.",
@@ -2893,7 +2973,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -2911,7 +2991,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -2953,7 +3033,9 @@
       "description": "Credit or deduct tokens. Positive=credit, negative=deduct.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "billing.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Credit or deduct tokens from a user wallet.",
@@ -2995,7 +3077,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model \u2014 this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
         "properties": {},
         "title": "EmptyParams",
         "type": "object"
@@ -3044,7 +3126,9 @@
       "description": "Approve or reject a developer app submission",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "developer.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -3082,7 +3166,9 @@
       "description": "Approve or reject a developer payout request",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "developer.write"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -3130,5 +3216,22 @@
     "on_install": {
       "signature": "(ctx)"
     }
-  }
+  },
+  "secrets": [
+    {
+      "name": "auth_service_token",
+      "description": "Token for Auth Gateway service-to-service calls",
+      "required": true
+    },
+    {
+      "name": "registry_api_key",
+      "description": "API key for Registry service-to-service calls",
+      "required": true
+    },
+    {
+      "name": "stripe_secret_key",
+      "description": "Stripe secret API key",
+      "required": false
+    }
+  ]
 }

@@ -27,7 +27,7 @@ class PayoutReviewParams(BaseModel):
 
 # ── App review ───────────────────────────────────────────────────────────────
 
-@chat.function("review_app", action_type="write", description="Approve or reject a developer app submission")
+@chat.function("review_app", action_type="write", chain_callable=True, effects=["developer.write"], description="Approve or reject a developer app submission")
 async def review_app(ctx, params: AppReviewParams) -> ActionResult:
     action = params.action.lower()
     app_id = params.app_id
@@ -38,15 +38,15 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
     if action == "reject":
         if not params.reason:
             return ActionResult.error("reason is required when rejecting an app", retryable=False)
-        result = await _gw_request("POST", f"/v1/admin/apps/{app_id}/reject", {"reason": params.reason})
+        result = await _gw_request(ctx, "POST", f"/v1/admin/apps/{app_id}/reject", {"reason": params.reason})
         return ActionResult.success(result, summary=f"App {app_id} rejected: {params.reason}", refresh_panels=["tools"])
 
     # approve
-    result = await _gw_request("POST", f"/v1/admin/apps/{app_id}/approve")
+    result = await _gw_request(ctx, "POST", f"/v1/admin/apps/{app_id}/approve")
 
     # Non-critical: register approved app in Registry
     try:
-        pending = await _gw_request("GET", "/v1/admin/apps/pending")
+        pending = await _gw_request(ctx, "GET", "/v1/admin/apps/pending")
         display_name = app_id
         if isinstance(pending, list):
             for entry in pending:
@@ -69,7 +69,7 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
 
 # ── Payout review ────────────────────────────────────────────────────────────
 
-@chat.function("review_payout", action_type="write", description="Approve or reject a developer payout request")
+@chat.function("review_payout", action_type="write", chain_callable=True, effects=["developer.write"], description="Approve or reject a developer payout request")
 async def review_payout(ctx, params: PayoutReviewParams) -> ActionResult:
     action = params.action.lower()
     payout_id = params.payout_id
@@ -77,7 +77,7 @@ async def review_payout(ctx, params: PayoutReviewParams) -> ActionResult:
     if action not in ("approve", "reject"):
         return ActionResult.error("action must be 'approve' or 'reject'", retryable=False)
 
-    result = await _gw_request(
+    result = await _gw_request(ctx,
         "POST",
         f"/v1/admin/payouts/{payout_id}/{action}",
         {"note": params.note},

@@ -91,7 +91,7 @@ async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
         return ActionResult.success(data={"rules": rules, "total": len(rules), "my_rules_count": my},
                                     summary=f"{len(rules)} rules total, {my} yours")
 
-@chat.function("create_rule", action_type="write", event="rule_created", description="Create automation from natural language.")
+@chat.function("create_rule", action_type="write", chain_callable=True, effects=["system.write"], event="rule_created", description="Create automation from natural language.")
 async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.post(f"{AUTH_GW}/v1/automations", json={"prompt": params.prompt, "cooldown_seconds": params.cooldown_seconds, "max_per_hour": params.max_per_hour},
@@ -100,19 +100,19 @@ async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
             return ActionResult.success(data={"rule": r.json()}, summary="Automation rule created", refresh_panels=["tools"])
         return ActionResult.error(f"Failed: {r.text}")
 
-@chat.function("delete_rule", action_type="destructive", event="rule_deleted", description="Delete an automation rule.")
+@chat.function("delete_rule", action_type="destructive", chain_callable=True, effects=["system.write"], event="rule_deleted", description="Delete an automation rule.")
 async def fn_delete_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         await c.delete(f"{AUTH_GW}/v1/automations/{params.rule_id}", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
     return ActionResult.success(data={"deleted": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} deleted", refresh_panels=["tools"])
 
-@chat.function("pause_rule", action_type="write", event="rule_paused", description="Pause an automation rule.")
+@chat.function("pause_rule", action_type="write", chain_callable=True, effects=["system.write"], event="rule_paused", description="Pause an automation rule.")
 async def fn_pause_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         await c.post(f"{AUTH_GW}/v1/automations/{params.rule_id}/pause", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
     return ActionResult.success(data={"paused": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} paused", refresh_panels=["tools"])
 
-@chat.function("resume_rule", action_type="write", event="rule_resumed", description="Resume a paused rule. Resets trigger_count.")
+@chat.function("resume_rule", action_type="write", chain_callable=True, effects=["system.write"], event="rule_resumed", description="Resume a paused rule. Resets trigger_count.")
 async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         h = {"X-Service-Token": AUTH_SERVICE_TOKEN, "Content-Type": "application/json"}
@@ -122,30 +122,30 @@ async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
 
 # ─── Confirmation Policy ──────────────────────────────────────────────── #
 
-@chat.function("set_confirmation_policy", action_type="write", event="confirmation_set", description="Set confirmation policy for a role.")
+@chat.function("set_confirmation_policy", action_type="write", chain_callable=True, effects=["system.write"], event="confirmation_set", description="Set confirmation policy for a role.")
 async def fn_set_confirmation_policy(ctx, params: ConfirmationPolicyParams) -> ActionResult:
     valid = ("enforced", "default_on", "default_off", "disabled")
     if params.policy not in valid:
         return ActionResult.error(f"Invalid: must be {', '.join(valid)}")
-    role = await _resolve_role_by_name(params.role_name)
+    role = await _resolve_role_by_name(ctx, params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")
-    result = await _gw_request("PATCH", f"/v1/roles/{role['id']}", {"confirmation_policy": params.policy})
+    result = await _gw_request(ctx, "PATCH", f"/v1/roles/{role['id']}", {"confirmation_policy": params.policy})
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"role": params.role_name, "policy": params.policy}, summary=f"'{params.role_name}' confirmation: {params.policy}", refresh_panels=["tools"])
 
 @chat.function("get_confirmation_policy", action_type="read", description="Get confirmation policy for a role.")
 async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResult:
-    role = await _resolve_role_by_name(params.role_name)
+    role = await _resolve_role_by_name(ctx, params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")
     return ActionResult.success(data={"role": params.role_name, "policy": role.get("confirmation_policy", "default_on")},
                                 summary=f"'{params.role_name}': {role.get('confirmation_policy', 'default_on')}")
 
-@chat.function("set_user_confirmation", action_type="write", event="confirmation_set", description="Set confirmation for a user.")
+@chat.function("set_user_confirmation", action_type="write", chain_callable=True, effects=["system.write"], event="confirmation_set", description="Set confirmation for a user.")
 async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> ActionResult:
-    result = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
+    result = await _gw_request(ctx, "PATCH", f"/v1/users/{params.user_id}",
                                {"attributes": {"confirmation_enabled": params.enabled, "confirmation_skip_read": params.skip_read}})
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
@@ -154,7 +154,7 @@ async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> Actio
 
 @chat.function("get_user_confirmation", action_type="read", description="Get user confirmation settings.")
 async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
-    user = await _gw_request("GET", f"/v1/users/{params.user_id}")
+    user = await _gw_request(ctx, "GET", f"/v1/users/{params.user_id}")
     if isinstance(user, dict) and user.get("error"):
         return ActionResult.error(user["error"])
     attrs = user.get("attributes", {}) if isinstance(user, dict) else {}
@@ -166,14 +166,14 @@ async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
 
 # ─── Task Limits ──────────────────────────────────────────────────────── #
 
-@chat.function("set_task_limit", action_type="write", event="task_limit_set", description="Set max concurrent tasks for a role (1-50).")
+@chat.function("set_task_limit", action_type="write", chain_callable=True, effects=["system.write"], event="task_limit_set", description="Set max concurrent tasks for a role (1-50).")
 async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
     if not 1 <= params.max_tasks <= 50:
         return ActionResult.error("max_tasks must be 1-50")
-    role = await _resolve_role_by_name(params.role_name)
+    role = await _resolve_role_by_name(ctx, params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")
-    result = await _gw_request("PATCH", f"/v1/roles/{role['id']}", {"max_concurrent_tasks": params.max_tasks})
+    result = await _gw_request(ctx, "PATCH", f"/v1/roles/{role['id']}", {"max_concurrent_tasks": params.max_tasks})
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"role": params.role_name, "max_tasks": params.max_tasks},
@@ -181,7 +181,7 @@ async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
 
 @chat.function("get_task_limit", action_type="read", description="Get max concurrent tasks for a role.")
 async def fn_get_task_limit(ctx, params: RoleNameParams) -> ActionResult:
-    role = await _resolve_role_by_name(params.role_name)
+    role = await _resolve_role_by_name(ctx, params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")
     return ActionResult.success(data={"role": params.role_name, "max_tasks": role.get("max_concurrent_tasks", 3)},
@@ -189,13 +189,13 @@ async def fn_get_task_limit(ctx, params: RoleNameParams) -> ActionResult:
 
 # ─── Context Defaults ─────────────────────────────────────────────────── #
 
-@chat.function("save_context_defaults", action_type="write",
+@chat.function("save_context_defaults", action_type="write", chain_callable=True, effects=["system.write"],
                description="Save platform-wide context window defaults via Auth GW.")
 async def fn_save_context_defaults(ctx, params: ContextDefaultsParams) -> ActionResult:
     """Persist context defaults via Auth GW platform config (same as React)."""
     try:
         # Read current platform config
-        raw = await _gw_request("GET", "/v1/internal/config/platform/platform")
+        raw = await _gw_request(ctx, "GET", "/v1/internal/config/platform/platform")
         current_config = raw.get("config", {}) if isinstance(raw, dict) else {}
         current_defaults = current_config.get("context_defaults", {})
 
@@ -209,7 +209,7 @@ async def fn_save_context_defaults(ctx, params: ContextDefaultsParams) -> Action
         current_config["context_defaults"] = current_defaults
 
         # Write back via Auth GW
-        await _gw_request("PUT", "/v1/internal/config/platform/platform",
+        await _gw_request(ctx, "PUT", "/v1/internal/config/platform/platform",
                           {"config": current_config})
 
         return ActionResult.success(
@@ -224,55 +224,63 @@ async def fn_save_context_defaults(ctx, params: ContextDefaultsParams) -> Action
 # ─── Panel Data ───────────────────────────────────────────────────────── #
 
 from imperal_sdk import ui
+from panels_sections import _fetch_users, _fetch_roles, _fetch_extensions, _check_health
 
 @chat.function("get_panel_data", action_type="read",
                description="Get panel Declarative UI data for admin extension.")
 async def fn_get_panel_data(ctx, params: EmptyParams) -> ActionResult:
-    """Build admin dashboard UI from skeleton cache."""
-    cached = ctx.skeleton_data.get("admin_stats", {}) if hasattr(ctx, "skeleton_data") else {}
-    stats = cached if isinstance(cached, dict) else {}
+    """Build admin dashboard UI from live data (V24 compliant)."""
+    import asyncio
+    users, roles, exts, health_gw, health_reg = await asyncio.gather(
+        _fetch_users(ctx),
+        _fetch_roles(ctx),
+        _fetch_extensions(ctx),
+        _check_health(ctx, "auth_gateway", f"{AUTH_GW}/healthz"),
+        _check_health(ctx, "registry", f"{REGISTRY_URL}/health")
+    )
+
+    active_users = sum(1 for u in users if u.get("is_active"))
 
     # Left panel: user list
-    users = stats.get("users_list", [])
     items = [
         ui.ListItem(
-            id=u.get("id", ""),
+            id=u.get("imperal_id") or u.get("id", ""),
             title=u.get("email", "?"),
             subtitle=u.get("role", "user"),
-            badge=ui.Badge("active", color="green") if u.get("active") else ui.Badge("inactive", color="gray"),
-            on_click=ui.Call("effective_scopes", user_id=u.get("id", "")),
+            badge=ui.Badge("active", color="green") if u.get("is_active") else ui.Badge("inactive", color="gray"),
+            on_click=ui.Call("effective_scopes", user_id=u.get("imperal_id") or u.get("id", "")),
         )
-        for u in users
+        for u in users[:50]  # Cap for UI performance
     ]
     left = ui.List(items=items, searchable=True)
 
     # Right panel: dashboard widgets
     right = ui.Stack([
         ui.Grid([
-            ui.Stat(label="Users", value=stats.get("users_total", 0), icon="users", color="blue"),
-            ui.Stat(label="Active", value=stats.get("users_active", 0), icon="user-check", color="green"),
-            ui.Stat(label="Roles", value=stats.get("roles_count", 0), icon="shield", color="purple"),
-            ui.Stat(label="Extensions", value=stats.get("extensions_active", 0), icon="puzzle", color="cyan"),
+            ui.Stat(label="Users", value=len(users), icon="users", color="blue"),
+            ui.Stat(label="Active", value=active_users, icon="user-check", color="green"),
+            ui.Stat(label="Roles", value=len(roles), icon="shield", color="purple"),
+            ui.Stat(label="Extensions", value=len(exts), icon="puzzle", color="cyan"),
         ], columns=2),
         ui.Card(
             title="System Health",
             content=ui.Stack([
                 ui.Alert(
                     title="Auth Gateway",
-                    message=stats.get("health_auth_gateway", "unknown"),
-                    type="success" if stats.get("health_auth_gateway") == "operational" else "error",
+                    message=health_gw,
+                    type="success" if health_gw == "Operational" else "error",
                 ),
                 ui.Alert(
                     title="Registry",
-                    message=stats.get("health_registry", "unknown"),
-                    type="success" if stats.get("health_registry") == "operational" else "error",
+                    message=health_reg,
+                    type="success" if health_reg == "Operational" else "error",
                 ),
             ]),
         ),
     ])
 
     # Tray value
-    health_ok = stats.get("health_auth_gateway") == "operational" and stats.get("health_registry") == "operational"
+    health_ok = health_gw == "Operational" and health_reg == "Operational"
     tray_value = 1 if health_ok else 0
 
     return ActionResult.success(
