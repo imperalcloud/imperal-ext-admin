@@ -250,8 +250,8 @@ ext = Extension(
 )
 
 chat = ChatExtension(
-    ext=ext,
-    tool_name="tool_admin_chat",
+    ext,
+    "tool_admin_chat",
     description=(
         "Admin assistant — manage users, roles, extensions and system health. "
         "RBAC scopes, effective permissions, compare roles, bulk assign, audit log, "
@@ -261,42 +261,12 @@ chat = ChatExtension(
     max_rounds=10,
 )
 
-# Inject skeleton live stats into system prompt
-_original_build_system = chat._build_system_prompt
-
-
-def _patched_build_system_prompt(ctx):
-    base = _original_build_system(ctx)
-    skeleton = ctx.skeleton_data or {} if hasattr(ctx, "skeleton_data") else {}
-    stats = skeleton.get("admin_stats", {})
-    context = skeleton.get("_context", {})
-
-    extra = ""
-    if stats:
-        users_block = ""
-        for u in stats.get("users_list", []):
-            status = "ACTIVE" if u.get("active") else "INACTIVE"
-            users_block += f"  - {u.get('email','')} | {u.get('role','')} | {status} | id={u.get('id','')}\n"
-        extra += f"""
-LIVE STATS (awareness only — call functions for actual data):
-- Users: {stats.get('users_total', '?')} total, {stats.get('users_active', '?')} active
-- Roles: {stats.get('roles_count', '?')}
-- Extensions: {stats.get('extensions_active', '?')} active
-- Auth Gateway: {stats.get('health_auth_gateway', '?')}
-- Registry: {stats.get('health_registry', '?')}
-{users_block}"""
-
-    if context.get("hub_mode"):
-        exts = context.get("extensions_info", [])
-        if exts:
-            extra += "\nACTIVE EXTENSIONS:\n"
-            for e in exts:
-                extra += f"  - {e.get('name', e.get('app_id', '?'))} ({e.get('app_id', '')})\n"
-
-    return base + extra
-
-
-chat._build_system_prompt = _patched_build_system_prompt
+# Note: the prior `_build_system_prompt` monkey-patch that read
+# `ctx.skeleton_data` to inject live admin stats has been removed.
+# `ctx.skeleton_data` was removed in SDK v1.6.0 (federal I-SKELETON-LLM-ONLY:
+# skeleton access is restricted to @ext.skeleton handlers). The intent
+# classifier now reads the admin_stats skeleton section automatically on
+# every chat turn — see skeleton.py for the producer.
 
 # ── Health check ──────────────────────────────────────────────────────────────
 

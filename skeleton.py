@@ -6,14 +6,18 @@ import httpx
 from app import ext, AUTH_GW, REGISTRY_URL, _gw_request, _registry_get
 
 
-# ─── Skeleton ─────────────────────────────────────────────────────────── #
+# ─── Public helper (used by skeleton + panel handler) ───────────────────── #
 
-@ext.skeleton(
-    "admin_stats",
-    alert=True,
-    description="Background refresh for admin dashboard.",
-)
-async def on_skeleton_refresh(ctx, **kwargs) -> dict:
+async def build_admin_stats(ctx) -> dict:
+    """Build the admin dashboard stats snapshot.
+
+    Public helper invoked by both the @ext.skeleton refresh tool (kernel-driven,
+    per-user, on a TTL schedule) and the get_panel_data @chat.function (called
+    when the panel renders). Centralising the fetch logic here removes the
+    earlier `ctx.skeleton_data` short-circuit, which violated the federal
+    I-SKELETON-LLM-ONLY contract (skeleton storage is classifier-only —
+    reads from @chat.function context raise SkeletonAccessForbidden).
+    """
     stats: dict = {}
     try:
         raw = await _gw_request("GET", "/v1/users?include_inactive=true")
@@ -47,7 +51,18 @@ async def on_skeleton_refresh(ctx, **kwargs) -> dict:
         except Exception:
             stats[f"health_{name}"] = "unreachable"
 
-    return {"response": stats}
+    return stats
+
+
+# ─── Skeleton ─────────────────────────────────────────────────────────── #
+
+@ext.skeleton(
+    "admin_stats",
+    alert=True,
+    description="Background refresh for admin dashboard.",
+)
+async def on_skeleton_refresh(ctx, **kwargs) -> dict:
+    return {"response": await build_admin_stats(ctx)}
 
 
 # Paired alert tool (must remain @ext.tool — the V13 decorator only declares the

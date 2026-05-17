@@ -185,9 +185,9 @@ from imperal_sdk import ui
 @chat.function("get_panel_data", action_type="read",
                description="Get panel Declarative UI data for admin extension.")
 async def fn_get_panel_data(ctx, params: EmptyParams) -> ActionResult:
-    """Build admin dashboard UI from skeleton cache."""
-    cached = ctx.skeleton_data.get("admin_stats", {}) if hasattr(ctx, "skeleton_data") else {}
-    stats = cached if isinstance(cached, dict) else {}
+    """Build admin dashboard UI by calling the shared admin_stats fetcher."""
+    from skeleton import build_admin_stats  # local import — avoids circular at module load
+    stats = await build_admin_stats(ctx)
 
     # Left panel: user list
     users = stats.get("users_list", [])
