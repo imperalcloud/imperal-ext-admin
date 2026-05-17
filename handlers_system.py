@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, REGISTRY_URL, _gw_request, _resolve_role_by_name, _tenant_id, EmptyParams
+from models_records import (
+    AdminRulesListResponse, ConfirmationPolicyResponse, SystemHealthResponse, TaskLimitResponse, UserConfirmationResponse,
+)
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -50,21 +53,9 @@ class TaskLimitParams(BaseModel):
     role_name: str = Field(description="Role name")
     max_tasks: int = Field(default=3, description="Max concurrent tasks (1-50)")
 
-class ContextDefaultsParams(BaseModel):
-    """Platform-wide context window defaults."""
-    quality_ceiling_tokens: Optional[int]  = Field(default=None, description="Quality ceiling tokens")
-    default_context_window: Optional[int]  = Field(default=None, description="Default history window")
-    default_max_tool_rounds: Optional[int] = Field(default=None, description="Max tool rounds")
-    default_max_result_tokens: Optional[int] = Field(default=None, description="Max result size tokens")
-    default_keep_recent: Optional[int]     = Field(default=None, description="Keep recent verbatim")
-    list_truncate_items: Optional[int]     = Field(default=None, description="List truncate items")
-    string_truncate_chars: Optional[int]   = Field(default=None, description="String truncate chars")
-    max_history_stored: Optional[int]      = Field(default=None, description="Max messages stored")
-    history_ttl_days: Optional[int]        = Field(default=None, description="History TTL days")
-
 # ─── System Health ────────────────────────────────────────────────────── #
 
-@chat.function("system_health", action_type="read", description="Check platform health.")
+@chat.function("system_health", action_type="read", data_model=SystemHealthResponse, description="Check platform health.")
 async def fn_system_health(ctx, params: EmptyParams) -> ActionResult:
     results = {}
     for name, url in [("auth_gateway", f"{AUTH_GW}/healthz"), ("registry", f"{REGISTRY_URL}/health")]:
@@ -78,7 +69,7 @@ async def fn_system_health(ctx, params: EmptyParams) -> ActionResult:
 
 # ─── Automation Rules ─────────────────────────────────────────────────── #
 
-@chat.function("list_rules", action_type="read", description="List all automation rules.")
+@chat.function("list_rules", action_type="read", data_model=AdminRulesListResponse, description="List all automation rules.")
 async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         r = await c.get(f"{AUTH_GW}/v1/automations/internal/all", params={"tenant_id": _tenant_id(ctx)},
@@ -135,7 +126,7 @@ async def fn_set_confirmation_policy(ctx, params: ConfirmationPolicyParams) -> A
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"role": params.role_name, "policy": params.policy}, summary=f"'{params.role_name}' confirmation: {params.policy}", refresh_panels=["tools"])
 
-@chat.function("get_confirmation_policy", action_type="read", description="Get confirmation policy for a role.")
+@chat.function("get_confirmation_policy", action_type="read", data_model=ConfirmationPolicyResponse, description="Get confirmation policy for a role.")
 async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResult:
     role = await _resolve_role_by_name(params.role_name)
     if not role:
@@ -152,7 +143,7 @@ async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> Actio
     return ActionResult.success(data={"user_id": params.user_id, "enabled": params.enabled},
                                 summary=f"User {params.user_id} confirmation {'enabled' if params.enabled else 'disabled'}", refresh_panels=["tools"])
 
-@chat.function("get_user_confirmation", action_type="read", description="Get user confirmation settings.")
+@chat.function("get_user_confirmation", action_type="read", data_model=UserConfirmationResponse, description="Get user confirmation settings.")
 async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
     if isinstance(user, dict) and user.get("error"):
@@ -179,47 +170,13 @@ async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
     return ActionResult.success(data={"role": params.role_name, "max_tasks": params.max_tasks},
                                 summary=f"'{params.role_name}' task limit: {params.max_tasks}")
 
-@chat.function("get_task_limit", action_type="read", description="Get max concurrent tasks for a role.")
+@chat.function("get_task_limit", action_type="read", data_model=TaskLimitResponse, description="Get max concurrent tasks for a role.")
 async def fn_get_task_limit(ctx, params: RoleNameParams) -> ActionResult:
     role = await _resolve_role_by_name(params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")
     return ActionResult.success(data={"role": params.role_name, "max_tasks": role.get("max_concurrent_tasks", 3)},
                                 summary=f"'{params.role_name}' task limit: {role.get('max_concurrent_tasks', 3)}")
-
-# ─── Context Defaults ─────────────────────────────────────────────────── #
-
-@chat.function("save_context_defaults", action_type="write",
-               description="Save platform-wide context window defaults via Auth GW.")
-async def fn_save_context_defaults(ctx, params: ContextDefaultsParams) -> ActionResult:
-    """Persist context defaults via Auth GW platform config (same as React)."""
-    try:
-        # Read current platform config
-        raw = await _gw_request("GET", "/v1/internal/config/platform/platform")
-        current_config = raw.get("config", {}) if isinstance(raw, dict) else {}
-        current_defaults = current_config.get("context_defaults", {})
-
-        updates = {}
-        for field_name in ContextDefaultsParams.model_fields:
-            val = getattr(params, field_name)
-            if val is not None:
-                updates[field_name] = int(val)
-
-        current_defaults.update(updates)
-        current_config["context_defaults"] = current_defaults
-
-        # Write back via Auth GW
-        await _gw_request("PUT", "/v1/internal/config/platform/platform",
-                          {"config": current_config})
-
-        return ActionResult.success(
-            data={"saved": updates, "full_config": current_defaults},
-            summary=f"Saved {len(updates)} context defaults",
-        refresh_panels=["tools"],
-        )
-    except Exception as e:
-        log.error("save_context_defaults failed: %s", e)
-        return ActionResult.error(f"Failed to save: {e}", retryable=True)
 
 # ─── Panel Data ───────────────────────────────────────────────────────── #
 

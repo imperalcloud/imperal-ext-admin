@@ -6,6 +6,9 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams
+from models_records import (
+    UserListResponse,
+)
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -55,6 +58,7 @@ class RemoveUserAttributeParams(BaseModel):
 # ─── Handlers ─────────────────────────────────────────────────────────── #
 
 @chat.function("list_users", action_type="read",
+               data_model=UserListResponse,
                description="List all users with roles, scopes, status.")
 async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
     raw = await _gw_request("GET", "/v1/users?include_inactive=true")

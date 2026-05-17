@@ -194,63 +194,21 @@ async def _check_health(name: str, url: str) -> str:
     return await _cached(f"health:{name}", lambda: _check_health_raw(name, url))
 
 
-async def _fetch_context_defaults() -> dict:
-    """Fetch actual context defaults from Auth GW platform config.
-
-    React reads from GET /v1/internal/config/platform/platform -> config.context_defaults.
-    Must use same source for data parity.
-    """
-    try:
-        raw = await _gw_request("GET", "/v1/internal/config/platform/platform")
-        if isinstance(raw, dict):
-            config = raw.get("config", {})
-            return config.get("context_defaults", {})
-        return {}
-    except Exception as e:
-        log.warning("Panel: fetch context defaults failed: %s", e)
-    return {}
-
-
 # ── System ────────────────────────────────────────────────────────────
 
-# (key, label, default, min, max)
-_CTX_FIELDS = [
-    ("quality_ceiling_tokens", "Quality Ceiling (tokens)", 50000, 5000, 500000),
-    ("default_context_window", "Default History Window", 20, 5, 200),
-    ("default_max_tool_rounds", "Max Tool Rounds", 10, 1, 50),
-    ("default_max_result_tokens", "Max Result Size (tokens)", 3000, 500, 50000),
-    ("default_keep_recent", "Keep Recent Verbatim", 6, 1, 50),
-    ("list_truncate_items", "List Truncate (items)", 10, 1, 100),
-    ("string_truncate_chars", "String Truncate (chars)", 1500, 100, 50000),
-    ("max_history_stored", "Max Messages Stored", 40, 10, 200),
-    ("history_ttl_days", "History TTL (days)", 7, 1, 90),
-]
-
-
 async def build_system(ctx, **kwargs):
-    """System info + context defaults form with ACTUAL values from Redis."""
-    gw, reg, stored = await asyncio.gather(
+    """System info — health + identity only.
+
+    Context/LLM tunables moved to LLM Config tab → Token Budget Controls
+    section (Phase 16, 2026-05-17). Federal rule 11: no orphan UI.
+    """
+    gw, reg = await asyncio.gather(
         _check_health("auth_gateway", f"{AUTH_GW}/healthz"),
         _check_health("registry", f"{REGISTRY_URL}/health"),
-        _fetch_context_defaults(),
     )
 
     gw_color = "green" if gw == "Operational" else "red"
     reg_color = "green" if reg == "Operational" else "red"
-
-    form_defaults = {}
-    form_children = []
-    for key, label, default, mn, mx in _CTX_FIELDS:
-        current = stored.get(key, default)
-        form_defaults[key] = str(current)
-        form_children.append(ui.Stack([
-            ui.Text(f"{label}  ({mn}\u2013{mx}, default {default})", variant="caption"),
-            ui.Input(
-                placeholder=str(default),
-                param_name=key,
-                value=str(current),
-            ),
-        ], gap=1))
 
     return ui.Stack(children=[
         ui.Header("System", level=3),
@@ -263,18 +221,9 @@ async def build_system(ctx, **kwargs):
             {"key": "Auth Gateway", "value": f"auth.imperal.io ({AUTH_GW})"},
             {"key": "Registry", "value": f"api-server:8098 ({REGISTRY_URL})"},
         ]),
-        ui.Divider(),
-        ui.Header("Context Defaults", level=4,
-                   subtitle="Platform-wide context window settings"),
-        ui.Form(
-            action="save_context_defaults",
-            submit_label="Save Context Defaults",
-            defaults=form_defaults,
-            children=form_children,
-        ),
-        ui.Button(
-            "Reset to Defaults",
-            variant="ghost",
-            on_click=ui.Call("reset_context_defaults"),
+        ui.Alert(
+            title="Context & LLM tunables",
+            message="Moved to the LLM Config tab → Token Budget Controls (Phase 16, 2026-05-17).",
+            type="info",
         ),
     ])

@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.0.0",
   "app_id": "admin",
-  "version": "5.3.0",
+  "version": "5.3.1",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -74,7 +74,27 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "description": "list_users return shape.",
+        "properties": {
+          "users": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Users",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "UserListResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -415,7 +435,26 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "roles": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "RoleListResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -619,7 +658,25 @@
         "title": "ListScopesParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "scopes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "ScopeListResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -739,7 +796,52 @@
         "title": "UserRefParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "effective_scopes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Effective Scopes",
+            "type": "array"
+          },
+          "formatted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Formatted"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sources"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "EffectiveScopesResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -780,7 +882,53 @@
         "title": "CheckPermissionParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "has_permission": {
+            "title": "Has Permission",
+            "type": "boolean"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Answer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source"
+          }
+        },
+        "required": [
+          "user_id",
+          "scope",
+          "has_permission"
+        ],
+        "title": "PermissionCheckResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -815,7 +963,60 @@
         "title": "CompareRolesParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "role_a": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role A"
+          },
+          "role_b": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role B"
+          },
+          "common": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Common",
+            "type": "array"
+          },
+          "only_a": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Only A",
+            "type": "array"
+          },
+          "only_b": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Only B",
+            "type": "array"
+          }
+        },
+        "title": "CompareRolesResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -919,7 +1120,38 @@
         "title": "AuditLogParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "entries": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Period"
+          }
+        },
+        "title": "AuditLogResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -939,7 +1171,26 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "extensions": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Extensions",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "ExtensionsListResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -968,7 +1219,61 @@
         "title": "AppIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "App Id"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Config"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Version"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          }
+        },
+        "title": "ExtensionConfigRecord",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1248,7 +1553,75 @@
         "title": "AppIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "App Id"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mode"
+          },
+          "per_role": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Per Role"
+          },
+          "per_user": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Per User"
+          },
+          "resolved": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resolved"
+          }
+        },
+        "title": "AccessPolicyRecord",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1277,7 +1650,38 @@
         "title": "AppIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "users": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Users",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "App Id"
+          }
+        },
+        "title": "ExtensionUsersResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1796,7 +2200,57 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "auth_gateway": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Auth Gateway"
+          },
+          "registry": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Registry"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Overall"
+          },
+          "services": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Services"
+          }
+        },
+        "title": "SystemHealthResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -1816,7 +2270,31 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "rules": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "my_rules_count": {
+            "default": 0,
+            "title": "My Rules Count",
+            "type": "integer"
+          }
+        },
+        "title": "AdminRulesListResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -2008,7 +2486,32 @@
         "title": "RoleNameParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ConfirmationPolicyResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -2078,7 +2581,85 @@
         "title": "UserIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "skip_read": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Skip Read"
+          },
+          "role_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role Policy"
+          }
+        },
+        "title": "UserConfirmationResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -2142,145 +2723,24 @@
         "title": "RoleNameParams",
         "type": "object"
       },
-      "return_schema": {},
-      "event": "",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "save_context_defaults",
-      "description": "Save platform-wide context window defaults via Auth GW.",
-      "action_type": "write",
-      "chain_callable": true,
-      "effects": [],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Platform-wide context window defaults.",
+      "return_schema": {
         "properties": {
-          "quality_ceiling_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Quality ceiling tokens",
-            "title": "Quality Ceiling Tokens"
+          "role": {
+            "title": "Role",
+            "type": "string"
           },
-          "default_context_window": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Default history window",
-            "title": "Default Context Window"
-          },
-          "default_max_tool_rounds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Max tool rounds",
-            "title": "Default Max Tool Rounds"
-          },
-          "default_max_result_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Max result size tokens",
-            "title": "Default Max Result Tokens"
-          },
-          "default_keep_recent": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Keep recent verbatim",
-            "title": "Default Keep Recent"
-          },
-          "list_truncate_items": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "List truncate items",
-            "title": "List Truncate Items"
-          },
-          "string_truncate_chars": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "String truncate chars",
-            "title": "String Truncate Chars"
-          },
-          "max_history_stored": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Max messages stored",
-            "title": "Max History Stored"
-          },
-          "history_ttl_days": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "History TTL days",
-            "title": "History Ttl Days"
+          "max_tasks": {
+            "title": "Max Tasks",
+            "type": "integer"
           }
         },
-        "title": "ContextDefaultsParams",
+        "required": [
+          "role",
+          "max_tasks"
+        ],
+        "title": "TaskLimitResponse",
         "type": "object"
       },
-      "return_schema": {},
       "event": "",
       "background": false,
       "long_running": false,
@@ -2291,26 +2751,6 @@
       "name": "get_panel_data",
       "description": "Get panel Declarative UI data for admin extension.",
       "action_type": "read",
-      "chain_callable": true,
-      "effects": [],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
-        "properties": {},
-        "title": "EmptyParams",
-        "type": "object"
-      },
-      "return_schema": {},
-      "event": "",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "reset_context_defaults",
-      "description": "Reset platform context defaults to built-in values.",
-      "action_type": "destructive",
       "chain_callable": true,
       "effects": [],
       "id_projection": "",
@@ -2479,7 +2919,7 @@
           "narration_history_limit": {
             "anyOf": [
               {
-                "maximum": 50,
+                "maximum": 200,
                 "minimum": 4,
                 "type": "integer"
               },
@@ -2488,13 +2928,13 @@
               }
             ],
             "default": null,
-            "description": "History turns fed to narration",
+            "description": "UNIT: turns. How many recent conversation turns the narrator LLM sees when composing replies. Higher = better continuity, more tokens per call. Default 12. Affects narration prompt context window in chain_renderer.py.",
             "title": "Narration History Limit"
           },
           "confirmation_card_tokens": {
             "anyOf": [
               {
-                "maximum": 1024,
+                "maximum": 8000,
                 "minimum": 200,
                 "type": "integer"
               },
@@ -2503,13 +2943,13 @@
               }
             ],
             "default": null,
-            "description": "Confirmation card max_tokens",
+            "description": "UNIT: tokens. max_tokens cap for the LLM that summarizes write/destructive actions on confirmation cards. Default 300. Higher = more detailed card text, slightly more cost per confirmation. Reads at safety/confirmation.py:340.",
             "title": "Confirmation Card Tokens"
           },
           "judge_digest_chars": {
             "anyOf": [
               {
-                "maximum": 32000,
+                "maximum": 128000,
                 "minimum": 2000,
                 "type": "integer"
               },
@@ -2518,13 +2958,13 @@
               }
             ],
             "default": null,
-            "description": "Audit-judge digest cap (chars)",
+            "description": "UNIT: characters. Cap on audit-judge digest of tool results before LLM critique runs. Default 8000. Higher = judge sees more raw data, more cost per audit. Reads at responses/judge.py:151.",
             "title": "Judge Digest Chars"
           },
           "chain_prior_step_max_chars": {
             "anyOf": [
               {
-                "maximum": 32000,
+                "maximum": 128000,
                 "minimum": 500,
                 "type": "integer"
               },
@@ -2533,13 +2973,13 @@
               }
             ],
             "default": null,
-            "description": "Chain prior-step truncation cap (chars)",
+            "description": "UNIT: characters. Per-step truncation cap of prior step output that subsequent chain steps see in their context. Default 8000. Higher = next step has more context, more LLM tokens. Reads at chain_executor.py:_summarise_prior_steps.",
             "title": "Chain Prior Step Max Chars"
           },
           "chain_prior_total_max_chars": {
             "anyOf": [
               {
-                "maximum": 200000,
+                "maximum": 500000,
                 "minimum": 3000,
                 "type": "integer"
               },
@@ -2548,13 +2988,13 @@
               }
             ],
             "default": null,
-            "description": "Chain prior-summary total cap (chars) fed to next step",
+            "description": "UNIT: characters. Total budget across ALL prior-step summaries fed to current step (max sum of per-step caps). Default 64000. Higher = richer cross-step context but bigger prompt. Reads at chain_executor.py:_summarise_prior_steps.",
             "title": "Chain Prior Total Max Chars"
           },
           "automation_main_max_tokens": {
             "anyOf": [
               {
-                "maximum": 16000,
+                "maximum": 32000,
                 "minimum": 256,
                 "type": "integer"
               },
@@ -2563,13 +3003,13 @@
               }
             ],
             "default": null,
-            "description": "Automation plan-parser max_tokens (activities/automation.py:358)",
+            "description": "UNIT: tokens. max_tokens for automation rule plan-parser LLM that decodes user prompt into structured rule definition. Default 4096. Reads at activities/automation.py:358.",
             "title": "Automation Main Max Tokens"
           },
           "automation_condition_max_tokens": {
             "anyOf": [
               {
-                "maximum": 1024,
+                "maximum": 4096,
                 "minimum": 10,
                 "type": "integer"
               },
@@ -2578,13 +3018,13 @@
               }
             ],
             "default": null,
-            "description": "Automation condition-eval max_tokens (activities/automation.py:448)",
+            "description": "UNIT: tokens. max_tokens for automation condition-eval LLM that decides whether an event matches a rule condition. Default 50 (small — yes/no answers). Reads at activities/automation.py:448.",
             "title": "Automation Condition Max Tokens"
           },
           "intent_classifier_planner_max_tokens": {
             "anyOf": [
               {
-                "maximum": 16000,
+                "maximum": 32000,
                 "minimum": 256,
                 "type": "integer"
               },
@@ -2593,13 +3033,13 @@
               }
             ],
             "default": null,
-            "description": "Intent classifier max_tokens (hub/intent_classifier.py:881)",
+            "description": "UNIT: tokens. max_tokens for intent classifier (Haiku) that routes every user turn. Default 4096. Includes chain plans + action_plans. Reads at hub/intent_classifier.py:881.",
             "title": "Intent Classifier Planner Max Tokens"
           },
           "prose_judge_max_tokens": {
             "anyOf": [
               {
-                "maximum": 16000,
+                "maximum": 32000,
                 "minimum": 256,
                 "type": "integer"
               },
@@ -2608,13 +3048,13 @@
               }
             ],
             "default": null,
-            "description": "Prose-judge Gate 6 max_tokens (narration/prose_judge.py:234)",
+            "description": "UNIT: tokens. max_tokens for prose-judge LLM (federal Gate 6 anti-fabrication review of every narrator output). Default 4096. Reads at narration/prose_judge.py:234.",
             "title": "Prose Judge Max Tokens"
           },
           "system_handlers_max_tokens": {
             "anyOf": [
               {
-                "maximum": 16000,
+                "maximum": 32000,
                 "minimum": 256,
                 "type": "integer"
               },
@@ -2623,13 +3063,13 @@
               }
             ],
             "default": null,
-            "description": "system_chat handler max_tokens (pipeline/system_handlers.py:300)",
+            "description": "UNIT: tokens. max_tokens for kernel system_chat handler (the LLM that answers free-form 'what can you do' / capability questions). Default 4096. Reads at pipeline/system_handlers.py:300.",
             "title": "System Handlers Max Tokens"
           },
           "responses_judge_max_tokens": {
             "anyOf": [
               {
-                "maximum": 16000,
+                "maximum": 32000,
                 "minimum": 256,
                 "type": "integer"
               },
@@ -2638,13 +3078,13 @@
               }
             ],
             "default": null,
-            "description": "Audit-judge max_tokens (responses/judge.py:163)",
+            "description": "UNIT: tokens. max_tokens for audit-judge LLM (federal post-action review that records pass/fail in audit ledger). Default 4096. Reads at responses/judge.py:163.",
             "title": "Responses Judge Max Tokens"
           },
           "rule_engine_max_tokens": {
             "anyOf": [
               {
-                "maximum": 512,
+                "maximum": 4096,
                 "minimum": 10,
                 "type": "integer"
               },
@@ -2653,13 +3093,13 @@
               }
             ],
             "default": null,
-            "description": "Rule-engine eval max_tokens (services/rule_engine.py:182)",
+            "description": "UNIT: tokens. max_tokens for rule-engine eval LLM (one-shot trigger/condition matchers). Default 50. Reads at services/rule_engine.py:182.",
             "title": "Rule Engine Max Tokens"
           },
           "default_max_response_tokens": {
             "anyOf": [
               {
-                "maximum": 4096,
+                "maximum": 32000,
                 "minimum": 256,
                 "type": "integer"
               },
@@ -2668,13 +3108,13 @@
               }
             ],
             "default": null,
-            "description": "Default narration max_tokens for new users",
+            "description": "UNIT: tokens. Default max_tokens for chat narration in new user accounts. Default 1024. Higher = longer detailed answers, more cost per response. Reads at kctx.max_response_tokens.",
             "title": "Default Max Response Tokens"
           },
           "default_max_tool_rounds": {
             "anyOf": [
               {
-                "maximum": 30,
+                "maximum": 100,
                 "minimum": 1,
                 "type": "integer"
               },
@@ -2683,13 +3123,13 @@
               }
             ],
             "default": null,
-            "description": "Default tool-call rounds cap",
+            "description": "UNIT: count. How many sequential tool-call rounds the SDK chat handler may execute per turn (chain depth ceiling). Default 10. Higher = deeper auto-iteration, more cost. Reads at SDK chat/handler.py:252.",
             "title": "Default Max Tool Rounds"
           },
           "default_routing_context": {
             "anyOf": [
               {
-                "maximum": 50,
+                "maximum": 200,
                 "minimum": 4,
                 "type": "integer"
               },
@@ -2698,13 +3138,13 @@
               }
             ],
             "default": null,
-            "description": "Default classifier history limit",
+            "description": "UNIT: turns. How many recent conversation turns the classifier LLM (Haiku, every turn) sees for context. Default 20. Higher = better anaphora resolution, more tokens. Reads at kctx.routing_context.",
             "title": "Default Routing Context"
           },
           "default_kav_max_retries": {
             "anyOf": [
               {
-                "maximum": 10,
+                "maximum": 50,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2713,7 +3153,7 @@
               }
             ],
             "default": null,
-            "description": "Default KAV retry cap",
+            "description": "UNIT: retries. How many times KAV (Kernel Action Validator) retries a tool call before reporting fail. Default 2. Higher = more resilient on transient errors, slower failure surface. Reads at kctx.kav_max_retries.",
             "title": "Default Kav Max Retries"
           },
           "default_confirmation_enabled": {
@@ -2726,8 +3166,98 @@
               }
             ],
             "default": null,
-            "description": "Default confirmation_enabled for new users",
+            "description": "UNIT: boolean. Whether new users get write/destructive 2-step confirmation cards by default. Default false (admin tenants typically opt in via Settings). Reads at kctx.confirmation_enabled.",
             "title": "Default Confirmation Enabled"
+          },
+          "narrator_structured_data_chars": {
+            "anyOf": [
+              {
+                "maximum": 200000,
+                "minimum": 1000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Cap on JSON-serialized ActionResult.data shown to single-step narrator. Default 8000. Higher = narrator sees more raw tool data, can enumerate more items (e.g. show all 50 emails instead of first 5 + placeholders). Reads at chain_renderer.py:_synth_chain_prose.",
+            "title": "Narrator Structured Data Chars"
+          },
+          "default_max_result_tokens": {
+            "anyOf": [
+              {
+                "maximum": 200000,
+                "minimum": 500,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. Cap on per-tool response/output text shown to narrator prose block (distinct from cross-step context cap and JSON data cap). Default 3000 tokens. Higher = narrator sees more verbose tool outputs.",
+            "title": "Default Max Result Tokens"
+          },
+          "list_truncate_items": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 5,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: count. Max items rendered when $REF resolver shows a list as markdown bullets/table rows. Default 50. Higher = longer tables in chat, more output tokens. Reads at chain_arg_refs.py:_md_target_list.",
+            "title": "List Truncate Items"
+          },
+          "quality_ceiling_tokens": {
+            "anyOf": [
+              {
+                "maximum": 500000,
+                "minimum": 1024,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. Federal hard cap on max_tokens for ANY LLM call regardless of per-purpose setting. Default 50000. Protects against cost runaway. Reads at llm/provider.py:create_message.",
+            "title": "Quality Ceiling Tokens"
+          },
+          "string_truncate_chars": {
+            "anyOf": [
+              {
+                "maximum": 50000,
+                "minimum": 200,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Cap on message/response preview length stored in SessionMemory turn digest (was hardcoded 1500). Default 1500. Higher = richer history context but more Redis storage. Reads at core/session_memory.py:_truncate_preview.",
+            "title": "String Truncate Chars"
+          },
+          "history_ttl_days": {
+            "anyOf": [
+              {
+                "maximum": 90,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: days. SessionMemory Redis TTL (was hardcoded 1 day / 86400s). Default 1 day. Higher = users keep more conversation history but more Redis storage. Reads via IMPERAL_HISTORY_TTL_SECONDS env at core/session_memory.py:_history_ttl_seconds (env set on worker boot).",
+            "title": "History Ttl Days"
           },
           "purpose_routing_temperature": {
             "default": "",
@@ -2886,7 +3416,72 @@
         "title": "TestLlmParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Success"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "title": "LLMTestResultRecord",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -3001,7 +3596,36 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "plans": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "plans_count": {
+            "default": 0,
+            "title": "Plans Count",
+            "type": "integer"
+          },
+          "wallets_active": {
+            "default": 0,
+            "title": "Wallets Active",
+            "type": "integer"
+          },
+          "stream_events_total": {
+            "default": 0,
+            "title": "Stream Events Total",
+            "type": "integer"
+          }
+        },
+        "title": "BillingOverviewResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -3021,7 +3645,31 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "wallets": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Wallets",
+            "type": "array"
+          },
+          "total_users": {
+            "default": 0,
+            "title": "Total Users",
+            "type": "integer"
+          },
+          "total_tokens_in_circulation": {
+            "default": 0,
+            "title": "Total Tokens In Circulation",
+            "type": "integer"
+          }
+        },
+        "title": "UserBalancesResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -3050,7 +3698,100 @@
         "title": "UserBalanceParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Balance"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plan"
+          },
+          "cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cap"
+          },
+          "held": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Held"
+          },
+          "holds": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Holds"
+          }
+        },
+        "title": "UserBalanceRecord",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -3111,7 +3852,65 @@
         "title": "EmptyParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "redis": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Redis"
+          },
+          "lua_scripts": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lua Scripts"
+          },
+          "wallets": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wallets"
+          },
+          "holds": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Holds"
+          },
+          "issues": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Issues"
+          }
+        },
+        "title": "BillingHealthResponse",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,

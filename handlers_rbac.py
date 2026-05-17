@@ -6,6 +6,9 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _gw_request, _resolve_user_by_email, _resolve_role_by_name
+from models_records import (
+    AuditLogResponse, CompareRolesResponse, EffectiveScopesResponse, PermissionCheckResponse,
+)
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -54,7 +57,7 @@ async def _resolve_ref(user_id: str, email: str) -> str | None:
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #
 
-@chat.function("effective_scopes", action_type="read", description="Show all effective scopes for a user with sources.")
+@chat.function("effective_scopes", action_type="read", data_model=EffectiveScopesResponse, description="Show all effective scopes for a user with sources.")
 async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
     ref = await _resolve_ref(params.user_id, params.email)
     if not ref:
@@ -68,7 +71,7 @@ async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
                                 summary=f"Effective scopes for {ref}")
 
 
-@chat.function("check_permission", action_type="read", description="Check if user has a specific scope. YES/NO.")
+@chat.function("check_permission", action_type="read", data_model=PermissionCheckResponse, description="Check if user has a specific scope. YES/NO.")
 async def fn_check_permission(ctx, params: CheckPermissionParams) -> ActionResult:
     if not params.scope:
         return ActionResult.error("scope is required")
@@ -90,7 +93,7 @@ async def fn_check_permission(ctx, params: CheckPermissionParams) -> ActionResul
                                 summary=f"{answer} — {params.scope} (source: {source})")
 
 
-@chat.function("compare_roles", action_type="read", description="Compare two roles — common and unique scopes.")
+@chat.function("compare_roles", action_type="read", data_model=CompareRolesResponse, description="Compare two roles — common and unique scopes.")
 async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
     roles = await _gw_request("GET", "/v1/roles")
     if not isinstance(roles, list):
@@ -141,7 +144,7 @@ async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult
         refresh_panels=["tools"])
 
 
-@chat.function("audit_log", action_type="read", description="View audit log. Default last 24h, max 50 entries.")
+@chat.function("audit_log", action_type="read", data_model=AuditLogResponse, description="View audit log. Default last 24h, max 50 entries.")
 async def fn_audit_log(ctx, params: AuditLogParams) -> ActionResult:
     parts = [f"hours={params.hours}"]
     if params.actor:  parts.append(f"actor={params.actor}")

@@ -129,6 +129,13 @@ def build_llm_form(
         "default_routing_context": int(_td.get("routing_context", 12)),
         "default_kav_max_retries": int(_td.get("kav_max_retries", 2)),
         "default_confirmation_enabled": bool(_td.get("confirmation_enabled", False)),
+        # Phase 16 (2026-05-17): orphans wired from System tab
+        "narrator_structured_data_chars": int(_td.get("narrator_structured_data_chars", 8000)),
+        "default_max_result_tokens": int(_td.get("default_max_result_tokens", 3000)),
+        "list_truncate_items": int(_td.get("list_truncate_items", 50)),
+        "quality_ceiling_tokens": int(_td.get("quality_ceiling_tokens", 50000)),
+        "string_truncate_chars": int(_td.get("string_truncate_chars", 1500)),
+        "history_ttl_days": int(_td.get("history_ttl_days", 1)),
     }
 
     # ── Per-purpose AI params (LCU-4, 2026-04-30) ────────────────

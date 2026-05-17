@@ -8,6 +8,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 from app import chat, ActionResult
+from models_records import (
+    LLMTestResultRecord,
+)
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -37,27 +40,214 @@ class SaveLlmConfigParams(BaseModel):
     override_model: str = Field(default="", description="Model for extension override")
     override_provider: str = Field(default="", description="Provider for extension override")
     reset_extension_override: str = Field(default="", description="Extension ID to remove override for")
-    # ── Token Budget Controls (2026-04-27) — admin-only kernel-internal knobs
-    narration_history_limit: Optional[int] = Field(default=None, ge=4, le=50, description="History turns fed to narration")
-    confirmation_card_tokens: Optional[int] = Field(default=None, ge=200, le=1024, description="Confirmation card max_tokens")
-    judge_digest_chars: Optional[int] = Field(default=None, ge=2000, le=32000, description="Audit-judge digest cap (chars)")
-    chain_prior_step_max_chars: Optional[int] = Field(default=None, ge=500, le=32000, description="Chain prior-step truncation cap (chars)")
-    chain_prior_total_max_chars: Optional[int] = Field(default=None, ge=3000, le=200000, description="Chain prior-summary total cap (chars) fed to next step")
-    # ── Token Budget Controls — full audit (TBC-FULL, 2026-04-29 → cleanup 2026-05-13) — 7 admin-tunable max_tokens caps
-    # (planner_max_tokens + structured_gen_max_tokens dropped — orphan UI; no kernel reader.)
-    automation_main_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="Automation plan-parser max_tokens (activities/automation.py:358)")
-    automation_condition_max_tokens: Optional[int] = Field(default=None, ge=10, le=1024, description="Automation condition-eval max_tokens (activities/automation.py:448)")
-    intent_classifier_planner_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="Intent classifier max_tokens (hub/intent_classifier.py:881)")
-    prose_judge_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="Prose-judge Gate 6 max_tokens (narration/prose_judge.py:234)")
-    system_handlers_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="system_chat handler max_tokens (pipeline/system_handlers.py:300)")
-    responses_judge_max_tokens: Optional[int] = Field(default=None, ge=256, le=16000, description="Audit-judge max_tokens (responses/judge.py:163)")
-    rule_engine_max_tokens: Optional[int] = Field(default=None, ge=10, le=512, description="Rule-engine eval max_tokens (services/rule_engine.py:182)")
-    # ── Token Budget Controls — default user limits (admin sets tenant defaults)
-    default_max_response_tokens: Optional[int] = Field(default=None, ge=256, le=4096, description="Default narration max_tokens for new users")
-    default_max_tool_rounds: Optional[int] = Field(default=None, ge=1, le=30, description="Default tool-call rounds cap")
-    default_routing_context: Optional[int] = Field(default=None, ge=4, le=50, description="Default classifier history limit")
-    default_kav_max_retries: Optional[int] = Field(default=None, ge=0, le=10, description="Default KAV retry cap")
-    default_confirmation_enabled: Optional[bool] = Field(default=None, description="Default confirmation_enabled for new users")
+    # ── Token Budget Controls (TBC, Phase 16 federal refactor 2026-05-17) ──
+    # All fields admin-tunable; sourced from user_settings via Auth GW tenant-defaults.
+    # Every field has explicit UNIT in description: tokens / chars / turns / count.
+    # Max bounds raised to fit modern 200K-context models (Sonnet/Opus 4.x).
+
+    narration_history_limit: Optional[int] = Field(
+        default=None, ge=4, le=200,
+        description=(
+            "UNIT: turns. How many recent conversation turns the narrator LLM "
+            "sees when composing replies. Higher = better continuity, more "
+            "tokens per call. Default 12. Affects narration prompt context "
+            "window in chain_renderer.py."
+        ),
+    )
+    confirmation_card_tokens: Optional[int] = Field(
+        default=None, ge=200, le=8000,
+        description=(
+            "UNIT: tokens. max_tokens cap for the LLM that summarizes write/"
+            "destructive actions on confirmation cards. Default 300. Higher = "
+            "more detailed card text, slightly more cost per confirmation. "
+            "Reads at safety/confirmation.py:340."
+        ),
+    )
+    judge_digest_chars: Optional[int] = Field(
+        default=None, ge=2000, le=128000,
+        description=(
+            "UNIT: characters. Cap on audit-judge digest of tool results before "
+            "LLM critique runs. Default 8000. Higher = judge sees more raw data, "
+            "more cost per audit. Reads at responses/judge.py:151."
+        ),
+    )
+    chain_prior_step_max_chars: Optional[int] = Field(
+        default=None, ge=500, le=128000,
+        description=(
+            "UNIT: characters. Per-step truncation cap of prior step output that "
+            "subsequent chain steps see in their context. Default 8000. Higher = "
+            "next step has more context, more LLM tokens. Reads at "
+            "chain_executor.py:_summarise_prior_steps."
+        ),
+    )
+    chain_prior_total_max_chars: Optional[int] = Field(
+        default=None, ge=3000, le=500000,
+        description=(
+            "UNIT: characters. Total budget across ALL prior-step summaries fed to "
+            "current step (max sum of per-step caps). Default 64000. Higher = "
+            "richer cross-step context but bigger prompt. Reads at "
+            "chain_executor.py:_summarise_prior_steps."
+        ),
+    )
+
+    # ── max_tokens caps for kernel-internal LLM purposes ──
+    automation_main_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for automation rule plan-parser LLM that "
+            "decodes user prompt into structured rule definition. Default 4096. "
+            "Reads at activities/automation.py:358."
+        ),
+    )
+    automation_condition_max_tokens: Optional[int] = Field(
+        default=None, ge=10, le=4096,
+        description=(
+            "UNIT: tokens. max_tokens for automation condition-eval LLM that "
+            "decides whether an event matches a rule condition. Default 50 "
+            "(small — yes/no answers). Reads at activities/automation.py:448."
+        ),
+    )
+    intent_classifier_planner_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for intent classifier (Haiku) that routes "
+            "every user turn. Default 4096. Includes chain plans + action_plans. "
+            "Reads at hub/intent_classifier.py:881."
+        ),
+    )
+    prose_judge_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for prose-judge LLM (federal Gate 6 anti-"
+            "fabrication review of every narrator output). Default 4096. Reads "
+            "at narration/prose_judge.py:234."
+        ),
+    )
+    system_handlers_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for kernel system_chat handler (the LLM "
+            "that answers free-form 'what can you do' / capability questions). "
+            "Default 4096. Reads at pipeline/system_handlers.py:300."
+        ),
+    )
+    responses_judge_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for audit-judge LLM (federal post-action "
+            "review that records pass/fail in audit ledger). Default 4096. "
+            "Reads at responses/judge.py:163."
+        ),
+    )
+    rule_engine_max_tokens: Optional[int] = Field(
+        default=None, ge=10, le=4096,
+        description=(
+            "UNIT: tokens. max_tokens for rule-engine eval LLM (one-shot "
+            "trigger/condition matchers). Default 50. Reads at "
+            "services/rule_engine.py:182."
+        ),
+    )
+
+    # ── Default user limits (admin sets tenant baseline; users can override) ──
+    default_max_response_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. Default max_tokens for chat narration in new "
+            "user accounts. Default 1024. Higher = longer detailed answers, "
+            "more cost per response. Reads at kctx.max_response_tokens."
+        ),
+    )
+    default_max_tool_rounds: Optional[int] = Field(
+        default=None, ge=1, le=100,
+        description=(
+            "UNIT: count. How many sequential tool-call rounds the SDK chat "
+            "handler may execute per turn (chain depth ceiling). Default 10. "
+            "Higher = deeper auto-iteration, more cost. Reads at SDK "
+            "chat/handler.py:252."
+        ),
+    )
+    default_routing_context: Optional[int] = Field(
+        default=None, ge=4, le=200,
+        description=(
+            "UNIT: turns. How many recent conversation turns the classifier "
+            "LLM (Haiku, every turn) sees for context. Default 20. Higher = "
+            "better anaphora resolution, more tokens. Reads at "
+            "kctx.routing_context."
+        ),
+    )
+    default_kav_max_retries: Optional[int] = Field(
+        default=None, ge=0, le=50,
+        description=(
+            "UNIT: retries. How many times KAV (Kernel Action Validator) "
+            "retries a tool call before reporting fail. Default 2. Higher = "
+            "more resilient on transient errors, slower failure surface. "
+            "Reads at kctx.kav_max_retries."
+        ),
+    )
+    default_confirmation_enabled: Optional[bool] = Field(
+        default=None,
+        description=(
+            "UNIT: boolean. Whether new users get write/destructive 2-step "
+            "confirmation cards by default. Default false (admin tenants "
+            "typically opt in via Settings). Reads at kctx.confirmation_enabled."
+        ),
+    )
+
+    # ── Phase 16 NEW (wired previously-orphan System tab knobs) ──
+    narrator_structured_data_chars: Optional[int] = Field(
+        default=None, ge=1000, le=200000,
+        description=(
+            "UNIT: characters. Cap on JSON-serialized ActionResult.data shown "
+            "to single-step narrator. Default 8000. Higher = narrator sees more "
+            "raw tool data, can enumerate more items (e.g. show all 50 emails "
+            "instead of first 5 + placeholders). Reads at "
+            "chain_renderer.py:_synth_chain_prose."
+        ),
+    )
+    default_max_result_tokens: Optional[int] = Field(
+        default=None, ge=500, le=200000,
+        description=(
+            "UNIT: tokens. Cap on per-tool response/output text shown to "
+            "narrator prose block (distinct from cross-step context cap and "
+            "JSON data cap). Default 3000 tokens. Higher = narrator sees "
+            "more verbose tool outputs."
+        ),
+    )
+    list_truncate_items: Optional[int] = Field(
+        default=None, ge=5, le=1000,
+        description=(
+            "UNIT: count. Max items rendered when $REF resolver shows a "
+            "list as markdown bullets/table rows. Default 50. Higher = "
+            "longer tables in chat, more output tokens. Reads at "
+            "chain_arg_refs.py:_md_target_list."
+        ),
+    )
+    quality_ceiling_tokens: Optional[int] = Field(
+        default=None, ge=1024, le=500000,
+        description=(
+            "UNIT: tokens. Federal hard cap on max_tokens for ANY LLM call "
+            "regardless of per-purpose setting. Default 50000. Protects "
+            "against cost runaway. Reads at llm/provider.py:create_message."
+        ),
+    )
+    string_truncate_chars: Optional[int] = Field(
+        default=None, ge=200, le=50000,
+        description=(
+            "UNIT: characters. Cap on message/response preview length stored "
+            "in SessionMemory turn digest (was hardcoded 1500). Default 1500. "
+            "Higher = richer history context but more Redis storage. Reads at "
+            "core/session_memory.py:_truncate_preview."
+        ),
+    )
+    history_ttl_days: Optional[int] = Field(
+        default=None, ge=1, le=90,
+        description=(
+            "UNIT: days. SessionMemory Redis TTL (was hardcoded 1 day / 86400s). "
+            "Default 1 day. Higher = users keep more conversation history but more "
+            "Redis storage. Reads via IMPERAL_HISTORY_TTL_SECONDS env at "
+            "core/session_memory.py:_history_ttl_seconds (env set on worker boot)."
+        ),
+    )
 
     # ── Per-purpose AI params (LCU-4, 2026-04-30) — empty string = inherit
     purpose_routing_temperature: str = Field(default="", description="Per-purpose temperature for routing (blank = inherit)")
@@ -216,6 +406,13 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.default_routing_context is not None: tb_payload["routing_context"] = params.default_routing_context
         if params.default_kav_max_retries is not None: tb_payload["kav_max_retries"] = params.default_kav_max_retries
         if params.default_confirmation_enabled is not None: tb_payload["confirmation_enabled"] = params.default_confirmation_enabled
+        # Phase 16 — wire 5 new admin-tunable kctx fields
+        if params.narrator_structured_data_chars is not None: tb_payload["narrator_structured_data_chars"] = params.narrator_structured_data_chars
+        if params.default_max_result_tokens is not None: tb_payload["default_max_result_tokens"] = params.default_max_result_tokens
+        if params.list_truncate_items is not None: tb_payload["list_truncate_items"] = params.list_truncate_items
+        if params.quality_ceiling_tokens is not None: tb_payload["quality_ceiling_tokens"] = params.quality_ceiling_tokens
+        if params.string_truncate_chars is not None: tb_payload["string_truncate_chars"] = params.string_truncate_chars
+        if params.history_ttl_days is not None: tb_payload["history_ttl_days"] = params.history_ttl_days
 
         tb_updated: list = []
         if tb_payload:
@@ -261,6 +458,7 @@ class TestLlmParams(BaseModel):
 
 
 @chat.function("test_llm_connection", action_type="read",
+               data_model=LLMTestResultRecord,
                description="Test connection to LLM provider.")
 async def fn_test_llm_connection(ctx, params: TestLlmParams) -> ActionResult:
     try:

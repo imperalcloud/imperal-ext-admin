@@ -6,6 +6,9 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _gw_request, _resolve_role_by_name, EmptyParams
+from models_records import (
+    RoleListResponse, ScopeListResponse,
+)
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -56,7 +59,7 @@ class DeleteScopeParams(BaseModel):
 
 # ─── Role Handlers ────────────────────────────────────────────────────── #
 
-@chat.function("list_roles", action_type="read", description="List all roles with default scopes.")
+@chat.function("list_roles", action_type="read", data_model=RoleListResponse, description="List all roles with default scopes.")
 async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
     roles = await _gw_request("GET", "/v1/roles")
     if not isinstance(roles, list):
@@ -141,7 +144,7 @@ async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
 
 # ─── Scope Handlers ───────────────────────────────────────────────────── #
 
-@chat.function("list_scopes", action_type="read", description="List all defined scopes.")
+@chat.function("list_scopes", action_type="read", data_model=ScopeListResponse, description="List all defined scopes.")
 async def fn_list_scopes(ctx, params: ListScopesParams) -> ActionResult:
     parts = []
     if params.resource: parts.append(f"resource={params.resource}")

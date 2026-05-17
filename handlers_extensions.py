@@ -10,6 +10,9 @@ from app import (EmptyParams,
     _resolve_app_id, _resolve_user_by_email, _invalidate_extension_caches, _signal_session_refresh,
     _tenant_id,
 )
+from models_records import (
+    AccessPolicyRecord, ExtensionConfigRecord, ExtensionUsersResponse, ExtensionsListResponse,
+)
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -56,7 +59,7 @@ class DenyAllowParams(BaseModel):
 
 # ─── Extension Management ─────────────────────────────────────────────── #
 
-@chat.function("list_extensions", action_type="read", description="List all active extensions.")
+@chat.function("list_extensions", action_type="read", data_model=ExtensionsListResponse, description="List all active extensions.")
 async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
     r = await _registry_get("/v1/apps?status=active")
     if r.status_code != 200:
@@ -67,7 +70,7 @@ async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
     return ActionResult.success(data={"extensions": apps, "total": len(apps)}, summary=f"{len(apps)} active extensions")
 
 
-@chat.function("get_extension_config", action_type="read", description="Get full extension config.")
+@chat.function("get_extension_config", action_type="read", data_model=ExtensionConfigRecord, description="Get full extension config.")
 async def fn_get_extension_config(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -193,7 +196,7 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
     return ActionResult.success(data={"app_id": aid, "policy": merged}, summary=f"Policy for {aid}: mode={merged.get('mode', '?')}")
 
 
-@chat.function("get_access_policy", action_type="read", description="Show access policy with per-role resolution.")
+@chat.function("get_access_policy", action_type="read", data_model=AccessPolicyRecord, description="Show access policy with per-role resolution.")
 async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -219,7 +222,7 @@ async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
                                 summary=f"Policy for {aid}: mode={policy.get('mode', 'public')}")
 
 
-@chat.function("list_extension_users", action_type="read", description="List users who can access an extension.")
+@chat.function("list_extension_users", action_type="read", data_model=ExtensionUsersResponse, description="List users who can access an extension.")
 async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     result = await _gw_request("GET", f"/v1/extensions/{aid}/users")

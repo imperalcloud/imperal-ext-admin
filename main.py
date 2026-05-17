@@ -7,7 +7,7 @@ sys.path.insert(0, _dir)
 for _m in [k for k in sys.modules if k in (
     "app", "handlers_users", "handlers_roles", "handlers_rbac",
     "handlers_extensions", "handlers_ext_settings",
-    "handlers_system", "handlers_system_reset",
+    "handlers_system",
     "handlers_llm", "handlers_billing", "handlers_payment",
     "handlers_developer",
     "skeleton", "panels", "panels_sections",
@@ -29,7 +29,6 @@ import handlers_rbac           # noqa: F401
 import handlers_extensions     # noqa: F401
 import handlers_ext_settings   # noqa: F401
 import handlers_system         # noqa: F401
-import handlers_system_reset   # noqa: F401
 import handlers_llm            # noqa: F401
 import handlers_pricing        # noqa: F401  # Sprint 4 LLM rate CRUD
 import panels_pricing          # noqa: F401  # Sprint 4 LLM Pricing panel

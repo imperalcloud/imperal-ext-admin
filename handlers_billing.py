@@ -16,6 +16,9 @@ import redis.asyncio as aioredis
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, AUTH_GW, EmptyParams, _resolve_user_by_email
+from models_records import (
+    BillingHealthResponse, BillingOverviewResponse, UserBalanceRecord, UserBalancesResponse,
+)
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -99,6 +102,7 @@ class AdjustBalanceParams(BaseModel):
 # ─── Handlers ─────────────────────────────────────────────────────────── #
 
 @chat.function("billing_overview", action_type="read",
+               data_model=BillingOverviewResponse,
                description="Show billing plans, pricing tiers, and platform summary.")
 async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
     try:
@@ -132,6 +136,7 @@ async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("list_user_balances", action_type="read",
+               data_model=UserBalancesResponse,
                description="List all user wallet balances with totals.")
 async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
     try:
@@ -161,6 +166,7 @@ async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("get_user_balance", action_type="read",
+               data_model=UserBalanceRecord,
                description="Get token balance for a specific user including active holds.")
 async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
     target_id, err = await _normalize_to_imperal_id(params.user_id)
@@ -237,6 +243,7 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
 
 
 @chat.function("billing_health", action_type="read",
+               data_model=BillingHealthResponse,
                description="Check billing system health: stream, consumers, pending lag.")
 async def fn_billing_health(ctx, params: EmptyParams) -> ActionResult:
     try:
