@@ -4,22 +4,16 @@ from __future__ import annotations
 import sys, os
 _dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _dir)
-for _m in [k for k in sys.modules if k in (
-    "app", "handlers_users", "handlers_roles", "handlers_rbac",
-    "handlers_extensions", "handlers_ext_settings",
-    "handlers_system",
-    "handlers_llm", "handlers_billing", "handlers_payment",
-    "handlers_developer",
-    "skeleton", "panels", "panels_sections",
-    "panels_dashboard", "panels_users", "panels_user_profile",
-    "panels_roles", "panels_extensions", "panels_scopes",
-    "panels_audit", "panels_llm", "panels_llm_form",
-    "panels_ext_settings", "panels_ext_settings_ai",
-    "panels_ext_settings_ops", "panels_ext_access_policy",
-    "panels_ext_users", "panels_payment",
-    "panels_developer", "panels_payouts",
-)]:
+# Force re-import of every admin module on each load — otherwise the validator's
+# double-load pass (used by the Dev Portal's `validate_extension_deep.py`) sees
+# cached @chat.function decorators bound to a stale ChatExtension, and the new
+# Extension's `_chat_extensions[*]._functions` is missing those entries, which
+# surfaces as a spurious "In manifest but not code" drift warning. Wildcard
+# match keeps the clearing list automatically in sync with new modules.
+for _m in [k for k in list(sys.modules) if k == "app" or k.startswith(("handlers_", "panels_", "skeleton"))]:
     del sys.modules[_m]
+for _m in ("handlers", "panels", "skeleton"):
+    sys.modules.pop(_m, None)
 
 from app import ext, chat  # noqa: F401
 

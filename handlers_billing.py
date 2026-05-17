@@ -1,8 +1,4 @@
-"""Admin · Billing management handlers.
-
-Overview of plans, user balances, token adjustments, and billing health.
-Uses Auth Gateway API for plans and Redis for wallet operations.
-"""
+"""Admin · Billing handlers — plans, balances, token adjustments, health (Auth-GW + Redis)."""
 from __future__ import annotations
 
 import asyncio
