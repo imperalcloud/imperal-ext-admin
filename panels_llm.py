@@ -144,6 +144,11 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     navigate = cfg.get("navigate_model", "")
     chain_narrative = cfg.get("chain_narrative_model", "")
     judge = cfg.get("judge_model", "")
+    # Federalization 2026-05-19 — new per-purpose model overrides
+    conversational = cfg.get("conversational_model", "")
+    step_reclassify = cfg.get("step_reclassify_model", "")
+    tool_picker = cfg.get("tool_picker_model", "")
+    action_narrator = cfg.get("action_narrator_model", "")
     failover_on = cfg.get("failover_enabled", False)
     fo_provider = cfg.get("failover_provider", "")
     fo_model = cfg.get("failover_model", "")
@@ -180,6 +185,11 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             # LCU-4 (2026-04-30): cfg["purpose"] is the kernel cascade
             # nested format `{purpose_name: {temperature, top_p, ...}}`.
             purpose_ai_params=cfg.get("purpose") if isinstance(cfg.get("purpose"), dict) else None,
+            # Federalization 2026-05-19 — new per-purpose model overrides
+            conversational_model=conversational,
+            step_reclassify_model=step_reclassify,
+            tool_picker_model=tool_picker,
+            action_narrator_model=action_narrator,
         ),
         ui.Divider(),
         ui.Section(

@@ -69,6 +69,11 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             "purpose_navigate_temperature", "purpose_navigate_top_p", "purpose_navigate_presence_penalty", "purpose_navigate_frequency_penalty",
             "purpose_chain_narrative_temperature", "purpose_chain_narrative_top_p", "purpose_chain_narrative_presence_penalty", "purpose_chain_narrative_frequency_penalty",
             "purpose_judge_temperature", "purpose_judge_top_p", "purpose_judge_presence_penalty", "purpose_judge_frequency_penalty",
+            # Federalization 2026-05-19 — new per-purpose AI params (handled below)
+            "purpose_conversational_temperature", "purpose_conversational_top_p", "purpose_conversational_presence_penalty", "purpose_conversational_frequency_penalty",
+            "purpose_step_reclassify_temperature", "purpose_step_reclassify_top_p", "purpose_step_reclassify_presence_penalty", "purpose_step_reclassify_frequency_penalty",
+            "purpose_tool_picker_temperature", "purpose_tool_picker_top_p", "purpose_tool_picker_presence_penalty", "purpose_tool_picker_frequency_penalty",
+            "purpose_action_narrator_temperature", "purpose_action_narrator_top_p", "purpose_action_narrator_presence_penalty", "purpose_action_narrator_frequency_penalty",
         }
         updates = {}
         for field in SaveLlmConfigParams.model_fields:
@@ -88,7 +93,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         for _prov, _models in _MODEL_TO_PROVIDER_TABLE.items():
             for _m in _models:
                 _model_to_provider[_m] = _prov
-        for _purpose in ("routing", "execution", "navigate", "chain_narrative", "judge"):
+        for _purpose in ("routing", "execution", "navigate", "chain_narrative", "judge",
+                         # Federalization 2026-05-19 — new per-purpose models
+                         "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _model_key = f"{_purpose}_model"
             _provider_key = f"{_purpose}_provider"
             _model_val = updates.get(_model_key, "")
@@ -103,7 +110,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # nested dict and merge into the existing `purpose` map so existing
         # entries (e.g. ones written by earlier saves) survive.
         _purpose_map: dict = current.get("purpose") if isinstance(current.get("purpose"), dict) else {}
-        for _p in ("routing", "execution", "navigate", "chain_narrative", "judge"):
+        for _p in ("routing", "execution", "navigate", "chain_narrative", "judge",
+                   # Federalization 2026-05-19 — new per-purpose AI params
+                   "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _slot = dict(_purpose_map.get(_p) or {})
             for _k in ("temperature", "top_p", "presence_penalty", "frequency_penalty"):
                 _raw = getattr(params, f"purpose_{_p}_{_k}", "")

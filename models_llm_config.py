@@ -28,6 +28,40 @@ class SaveLlmConfigParams(BaseModel):
     chain_narrative_provider: str = Field(default="", description="Chain narrator provider override (Sprint 2)")
     judge_model: str = Field(default="", description="Judge model override (Sprint 2)")
     judge_provider: str = Field(default="", description="Judge provider override (Sprint 2)")
+    # ── Federalization 2026-05-19 (Sprint 2 fixes #26+) — every kernel LLM
+    # purpose now has an admin-tunable model + provider field. Empty string
+    # = inherit global default (model + provider). Resolver cascade reads
+    # via `f"{purpose}_model"` flat-key in llm/provider.py:866.
+    conversational_model: str = Field(default="", description="Conversational (chitchat fall-through) model override")
+    conversational_provider: str = Field(default="", description="Conversational provider override")
+    step_reclassify_model: str = Field(default="", description="Two-Phase Sprint 1 per-step re-classifier model (was env IMPERAL_STEP_RECLASSIFY_MODEL). Default Sonnet 4.6 — reliable arg-binding on large prior step data.")
+    step_reclassify_provider: str = Field(default="", description="Step re-classifier provider override")
+    tool_picker_model: str = Field(default="", description="Chain executor LLM tool picker (action_plan=null disambiguation path) model")
+    tool_picker_provider: str = Field(default="", description="Tool picker provider override")
+    action_narrator_model: str = Field(default="", description="Action data narrator (post-tool prose) model override")
+    action_narrator_provider: str = Field(default="", description="Action narrator provider override")
+    # ── Feature flags (were env-only, now admin-tunable) ──
+    step_reclassify_enabled: Optional[bool] = Field(
+        default=None,
+        description=(
+            "BOOLEAN. Two-Phase Sprint 1 per-step re-classifier ON/OFF. "
+            "When True, each write/destructive chain step runs through a focused "
+            "Sonnet LLM that binds args from prior step results before dispatch "
+            "(was env IMPERAL_STEP_RECLASSIFY_ENABLED). Default True (Sprint 2 "
+            "production). Disable for cost optimization or A/B testing legacy "
+            "_apply_target_hint_post_ref + _verify_user_named_container_intent "
+            "path. Reads at orchestration/chain_executor.py:_read_step_reclassify_flag."
+        ),
+    )
+    judge_enabled: Optional[bool] = Field(
+        default=None,
+        description=(
+            "BOOLEAN. Federal prose-judge anti-fabrication Gate 6 ON/OFF "
+            "(was env IMPERAL_JUDGE_ENABLED). When True, every narrator output "
+            "is reviewed by a judge LLM that flags fabricated entities/IDs. "
+            "Default False (opt-in). Reads at responses/judge.py:is_judge_enabled."
+        ),
+    )
     failover_enabled: Optional[bool] = Field(default=None, description="Enable failover")
     failover_provider: str = Field(default="", description="Failover provider")
     failover_model: str = Field(default="", description="Failover model")
@@ -141,6 +175,104 @@ class SaveLlmConfigParams(BaseModel):
             "UNIT: tokens. max_tokens for rule-engine eval LLM (one-shot "
             "trigger/condition matchers). Default 50. Reads at "
             "services/rule_engine.py:182."
+        ),
+    )
+
+    # ── Per-purpose max_tokens for kernel LLM purposes (federal Sprint 2 #26) ──
+    # Resolver cascade reads via `_extract_per_purpose_admin` flat-key
+    # `f"{purpose}_max_tokens"` in llm/provider.py:733. NULL = inherit
+    # quality_ceiling_tokens. Previously hardcoded in code; now admin-tunable.
+    routing_max_tokens: Optional[int] = Field(
+        default=None, ge=512, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for classifier/routing LLM (every user turn). "
+            "Default 4096 (was structured_gen 1024 — truncated 6+ step chain JSON). "
+            "Raise to 8000+ for reliable 10-step chain planning. Reads at "
+            "hub/intent_classifier.py:_call_structured_gen via purpose=routing."
+        ),
+    )
+    execution_max_tokens: Optional[int] = Field(
+        default=None, ge=512, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for extension dispatch LLM (BYOLLM router "
+            "inside @chat.function tool routing). Default inherits from "
+            "quality_ceiling_tokens. Reads at llm/provider.py purpose=execution."
+        ),
+    )
+    navigate_max_tokens: Optional[int] = Field(
+        default=None, ge=512, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for hub navigator LLM (offer/clarify "
+            "follow-up prose). Default inherits from quality_ceiling_tokens. "
+            "Reads at llm/provider.py purpose=navigate."
+        ),
+    )
+    chain_narrative_max_tokens: Optional[int] = Field(
+        default=None, ge=512, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for chain narrator LLM (multi-step "
+            "result rendering). Default 8000 (Sprint 2 fix #12 — long mail "
+            "body markdown). Reads at hub/chain_renderer.py purpose=chain_narrative."
+        ),
+    )
+    judge_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for federal prose-judge LLM (anti-fab "
+            "Gate 6). Default 4096. Distinct from prose_judge_max_tokens "
+            "(narration/prose_judge.py); this is responses/judge.py LLM. "
+            "Reads at llm/provider.py purpose=judge."
+        ),
+    )
+    conversational_max_tokens: Optional[int] = Field(
+        default=None, ge=512, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for conversational LLM (chitchat / "
+            "empty-apps fallback). Default 4096. Reads at "
+            "hub/conversational.py purpose=conversational."
+        ),
+    )
+    step_reclassify_max_tokens: Optional[int] = Field(
+        default=None, ge=2048, le=32000,
+        description=(
+            "UNIT: tokens. max_tokens for Two-Phase Sprint 1 per-step "
+            "re-classifier LLM (Sonnet) that binds args from prior step "
+            "data. Default 8000 (Sprint 2 fix #20 — long mail.body markdown "
+            "synthesis from web-tools 3-5KB JSON). Reads at "
+            "hub/step_classifier.py:_call_provider."
+        ),
+    )
+    tool_picker_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=16000,
+        description=(
+            "UNIT: tokens. max_tokens for chain_executor LLM tool picker "
+            "(action_plan=null disambiguation path). Default 1024. Reads "
+            "at orchestration/chain_executor.py:_llm_pick_tool_for_ext."
+        ),
+    )
+    chain_arg_refs_max_tokens: Optional[int] = Field(
+        default=None, ge=512, le=16000,
+        description=(
+            "UNIT: tokens. max_tokens for chain $REF formatter LLM (BUG-M "
+            "JSON-dict → markdown narration for content-shaped fields like "
+            "mail.body, notes.content_text). Default 2000. Reads at "
+            "orchestration/chain_arg_refs.py:format_complex_content_fields_async."
+        ),
+    )
+    semantic_verifier_max_tokens: Optional[int] = Field(
+        default=None, ge=64, le=2048,
+        description=(
+            "UNIT: tokens. max_tokens for semantic verifier LLM (post-action "
+            "yes/no schema-validity check). Default 128 (binary answer). "
+            "Reads at safety/semantic_verifier.py:191."
+        ),
+    )
+    action_narrator_max_tokens: Optional[int] = Field(
+        default=None, ge=256, le=16000,
+        description=(
+            "UNIT: tokens. max_tokens for action data narrator LLM (was env "
+            "IMPERAL_ACTION_NARRATOR_MAX_TOKENS). Default 1024. Reads at "
+            "workflows/action_data_narrator.py:42."
         ),
     )
 
@@ -266,5 +398,22 @@ class SaveLlmConfigParams(BaseModel):
     purpose_judge_top_p: str = Field(default="", description="Per-purpose top_p for judge")
     purpose_judge_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for judge")
     purpose_judge_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for judge")
+    # Federalization 2026-05-19 — per-purpose AI params for new purposes
+    purpose_conversational_temperature: str = Field(default="", description="Per-purpose temperature for conversational (chitchat)")
+    purpose_conversational_top_p: str = Field(default="", description="Per-purpose top_p for conversational")
+    purpose_conversational_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for conversational")
+    purpose_conversational_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for conversational")
+    purpose_step_reclassify_temperature: str = Field(default="", description="Per-purpose temperature for step_reclassify (Two-Phase Sprint 1)")
+    purpose_step_reclassify_top_p: str = Field(default="", description="Per-purpose top_p for step_reclassify")
+    purpose_step_reclassify_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for step_reclassify")
+    purpose_step_reclassify_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for step_reclassify")
+    purpose_tool_picker_temperature: str = Field(default="", description="Per-purpose temperature for tool_picker (chain disambiguation)")
+    purpose_tool_picker_top_p: str = Field(default="", description="Per-purpose top_p for tool_picker")
+    purpose_tool_picker_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for tool_picker")
+    purpose_tool_picker_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for tool_picker")
+    purpose_action_narrator_temperature: str = Field(default="", description="Per-purpose temperature for action_narrator (post-tool prose)")
+    purpose_action_narrator_top_p: str = Field(default="", description="Per-purpose top_p for action_narrator")
+    purpose_action_narrator_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for action_narrator")
+    purpose_action_narrator_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for action_narrator")
 
 
