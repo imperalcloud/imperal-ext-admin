@@ -26,14 +26,22 @@ _CACHE_TTL = 10  # seconds — short enough to see changes quickly
 
 
 async def _cached(key: str, factory):
-    """Return cached result if <TTL, otherwise call factory and cache."""
+    """Return cached result if <TTL, otherwise call factory and cache.
+
+    Empty / falsy results are NOT cached — every fetcher in this module
+    swallows exceptions and falls back to `{}` / `[]`, so caching that
+    fallback would pin the UI to inline `.get("x", default)` defaults for
+    a full TTL window after every transient Auth-GW blip. Re-fetching on
+    the next render is cheap and lets the UI self-heal.
+    """
     now = time.monotonic()
     if key in _cache:
         ts, val = _cache[key]
         if now - ts < _CACHE_TTL:
             return val
     val = await factory()
-    _cache[key] = (now, val)
+    if val:
+        _cache[key] = (now, val)
     return val
 
 

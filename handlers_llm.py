@@ -11,6 +11,7 @@ from app import chat, ActionResult
 from models_records import (
     LLMTestResultRecord,
 )
+from panels_sections import _invalidate_panel_cache
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -138,6 +139,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         current.update(updates)
         await r.set("imperal:config:llm", json.dumps(current))
         await r.aclose()
+        # Drop stale `llm_config` / `tenant_defaults` entries so the next
+        # panel render re-fetches Redis instead of serving the pre-save copy.
+        _invalidate_panel_cache()
 
         # ── Token Budget Controls dispatch (2026-04-27) ─────────────────
         # Admin-only and default-X fields go to PATCH /v1/admin/tenant-defaults
@@ -201,6 +205,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                 "config": current,
             },
             summary=f"LLM config saved: {updates.get('provider', '')} {updates.get('model', '')}".strip() + (f" + {len(tb_updated)} token-budget knob(s)" if tb_updated else ""),
+            refresh_panels=["tools"],
         )
     except Exception as e:
         log.error("save_llm_config failed: %s", e)
