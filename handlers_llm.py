@@ -165,6 +165,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.narrator_structured_data_chars is not None: tb_payload["narrator_structured_data_chars"] = params.narrator_structured_data_chars
         if params.default_max_result_tokens is not None: tb_payload["default_max_result_tokens"] = params.default_max_result_tokens
         if params.list_truncate_items is not None: tb_payload["list_truncate_items"] = params.list_truncate_items
+        if params.classifier_fact_ledger_window is not None: tb_payload["classifier_fact_ledger_window"] = params.classifier_fact_ledger_window
         if params.quality_ceiling_tokens is not None: tb_payload["quality_ceiling_tokens"] = params.quality_ceiling_tokens
         if params.string_truncate_chars is not None: tb_payload["string_truncate_chars"] = params.string_truncate_chars
         if params.history_ttl_days is not None: tb_payload["history_ttl_days"] = params.history_ttl_days

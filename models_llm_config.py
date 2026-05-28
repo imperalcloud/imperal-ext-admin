@@ -350,6 +350,18 @@ class SaveLlmConfigParams(BaseModel):
             "chain_arg_refs.py:_md_target_list."
         ),
     )
+    classifier_fact_ledger_window: Optional[int] = Field(
+        default=None, ge=1, le=200,
+        description=(
+            "UNIT: turns. How many recent assistant turns get their "
+            "data_facts_json (FACTS:) rendered into the classifier prompt "
+            "for cross-turn anaphora resolution. Default 20 (was hardcoded "
+            "5). Higher = better long-conversation memory ('какие письма я "
+            "отправлял пару турнов назад'), more classifier tokens per call. "
+            "Cap mirrors SessionMemory.MAX_TURNS=50 with headroom. Reads at "
+            "hub/classifier/input_builder.py:build_classifier_input."
+        ),
+    )
     quality_ceiling_tokens: Optional[int] = Field(
         default=None, ge=1024, le=500000,
         description=(

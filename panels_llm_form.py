@@ -165,6 +165,7 @@ def build_llm_form(
         "narrator_structured_data_chars": int(_td.get("narrator_structured_data_chars", 8000)),
         "default_max_result_tokens": int(_td.get("default_max_result_tokens", 3000)),
         "list_truncate_items": int(_td.get("list_truncate_items", 50)),
+        "classifier_fact_ledger_window": int(_td.get("classifier_fact_ledger_window", 20)),
         "quality_ceiling_tokens": int(_td.get("quality_ceiling_tokens", 50000)),
         "string_truncate_chars": int(_td.get("string_truncate_chars", 1500)),
         "history_ttl_days": int(_td.get("history_ttl_days", 1)),

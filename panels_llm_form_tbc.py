@@ -133,6 +133,23 @@ def build_tbc_section(defaults: dict):
             param_name="list_truncate_items",
         ),
 
+        ui.Text(
+            "classifier_fact_ledger_window — UNIT: turns. How many recent "
+            "assistant turns get their data_facts_json (FACTS:) rendered into "
+            "the classifier prompt for cross-turn anaphora resolution. "
+            "Default 20 (was hardcoded 5). Higher = lets the user reference "
+            "older turn results ('те 2 письма, что я отправлял') without the "
+            "classifier doing a fresh search. Tradeoff: more classifier tokens "
+            "per call. Consumer: hub/classifier/input_builder.py.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=1, max=200, step=1,
+            value=defaults.get("classifier_fact_ledger_window", 20),
+            label="classifier_fact_ledger_window (turns)",
+            param_name="classifier_fact_ledger_window",
+        ),
+
         # ── Group 2: Chain context ──
         ui.Text("⛓ Cross-step chain context", variant="subtitle"),
 
