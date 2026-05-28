@@ -166,6 +166,9 @@ def build_llm_form(
         "default_max_result_tokens": int(_td.get("default_max_result_tokens", 3000)),
         "list_truncate_items": int(_td.get("list_truncate_items", 50)),
         "classifier_fact_ledger_window": int(_td.get("classifier_fact_ledger_window", 20)),
+        # P5 (2026-05-28): federal I-REF-CAP-PER-ARGS + I-REF-CAP-CROSS-TURN.
+        "chain_max_refs_per_args": int(_td.get("chain_max_refs_per_args", 20)),
+        "cross_turn_max_refs": int(_td.get("cross_turn_max_refs", 5)),
         "quality_ceiling_tokens": int(_td.get("quality_ceiling_tokens", 50000)),
         "string_truncate_chars": int(_td.get("string_truncate_chars", 1500)),
         "history_ttl_days": int(_td.get("history_ttl_days", 1)),

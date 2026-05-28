@@ -170,6 +170,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.default_max_result_tokens is not None: tb_payload["default_max_result_tokens"] = params.default_max_result_tokens
         if params.list_truncate_items is not None: tb_payload["list_truncate_items"] = params.list_truncate_items
         if params.classifier_fact_ledger_window is not None: tb_payload["classifier_fact_ledger_window"] = params.classifier_fact_ledger_window
+        # P5 (2026-05-28): two new REF caps — federal I-REF-CAP-PER-ARGS + I-REF-CAP-CROSS-TURN.
+        if params.chain_max_refs_per_args is not None: tb_payload["chain_max_refs_per_args"] = params.chain_max_refs_per_args
+        if params.cross_turn_max_refs is not None: tb_payload["cross_turn_max_refs"] = params.cross_turn_max_refs
         if params.quality_ceiling_tokens is not None: tb_payload["quality_ceiling_tokens"] = params.quality_ceiling_tokens
         if params.string_truncate_chars is not None: tb_payload["string_truncate_chars"] = params.string_truncate_chars
         if params.history_ttl_days is not None: tb_payload["history_ttl_days"] = params.history_ttl_days

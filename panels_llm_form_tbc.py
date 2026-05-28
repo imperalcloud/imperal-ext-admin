@@ -150,6 +150,42 @@ def build_tbc_section(defaults: dict):
             param_name="classifier_fact_ledger_window",
         ),
 
+        # ── P5 (2026-05-28): REF caps — federal I-REF-CAP-PER-ARGS + I-REF-CAP-CROSS-TURN ──
+        ui.Text(
+            "chain_max_refs_per_args — UNIT: count. Federal I-REF-CAP-PER-ARGS. "
+            "Max $REF tokens allowed inside a single ActionPlan.args payload. "
+            "Default 20. resolve_arg_refs counts $REF substrings in JSON-"
+            "serialised args BEFORE the resolver loop; exceeding the cap "
+            "returns REF_COUNT_EXCEEDS_CAP and aborts dispatch via "
+            "UNRESOLVED_REFS. Anti-spam guard against runaway $REF blobs. "
+            "Consumer: orchestration/chain_arg_refs.py:resolve_arg_refs.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=1, max=200, step=1,
+            value=defaults.get("chain_max_refs_per_args", 20),
+            label="chain_max_refs_per_args (count)",
+            param_name="chain_max_refs_per_args",
+        ),
+
+        ui.Text(
+            "cross_turn_max_refs — UNIT: turns. Federal I-REF-CAP-CROSS-TURN. "
+            "Max depth of cross-turn $REF lookup ($REF:prior_turn[-N].<app>...) "
+            "against SessionMemory.turns. Default 5 (matches legacy "
+            "_CROSS_TURN_MAX_BACK). Lower = tighter context isolation between "
+            "turns; higher = deeper conversation memory for cross-turn refs. "
+            "Bound applied BEFORE the SessionMemory length check, so admin "
+            "tightening fires even on long histories. Consumer: "
+            "orchestration/chain_arg_refs.py:_resolve_explicit_cross_turn.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=1, max=50, step=1,
+            value=defaults.get("cross_turn_max_refs", 5),
+            label="cross_turn_max_refs (turns)",
+            param_name="cross_turn_max_refs",
+        ),
+
         # ── Group 2: Chain context ──
         ui.Text("⛓ Cross-step chain context", variant="subtitle"),
 

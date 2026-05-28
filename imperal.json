@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.0.1",
   "app_id": "admin",
-  "version": "5.4.0",
+  "version": "5.5.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",

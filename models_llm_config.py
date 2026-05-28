@@ -362,6 +362,31 @@ class SaveLlmConfigParams(BaseModel):
             "hub/classifier/input_builder.py:build_classifier_input."
         ),
     )
+    chain_max_refs_per_args: Optional[int] = Field(
+        default=None, ge=1, le=200,
+        description=(
+            "UNIT: count. Federal I-REF-CAP-PER-ARGS (2026-05-28). Max "
+            "$REF tokens allowed inside a single ActionPlan.args payload. "
+            "Default 20. resolve_arg_refs counts $REF substrings in the "
+            "JSON-serialised args BEFORE the resolver loop; exceeding the "
+            "cap returns REF_COUNT_EXCEEDS_CAP failure (caller aborts via "
+            "UNRESOLVED_REFS). Anti-spam guard against runaway $REF blobs. "
+            "Reads at orchestration/chain_arg_refs.py:resolve_arg_refs."
+        ),
+    )
+    cross_turn_max_refs: Optional[int] = Field(
+        default=None, ge=1, le=50,
+        description=(
+            "UNIT: turns. Federal I-REF-CAP-CROSS-TURN (2026-05-28). Max "
+            "depth of cross-turn $REF lookup ($REF:prior_turn[-N].<app>...) "
+            "against SessionMemory.turns. Default 5 (= legacy "
+            "_CROSS_TURN_MAX_BACK). Lower = tighter context isolation; "
+            "higher = deeper conversation memory for refs. Bound applied "
+            "BEFORE len(SM) check, so admin tightening fires even on "
+            "long histories. Reads at orchestration/chain_arg_refs.py:"
+            "_resolve_explicit_cross_turn."
+        ),
+    )
     quality_ceiling_tokens: Optional[int] = Field(
         default=None, ge=1024, le=500000,
         description=(
