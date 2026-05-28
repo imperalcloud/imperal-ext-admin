@@ -158,6 +158,11 @@ def _build_user_expanded(user: dict, role_options: list[dict],
                     **({"is_active": True} if not is_active else {}),
                 ),
             ),
+            ui.Button(
+                "Delete",
+                variant="danger",
+                on_click=ui.Call("hard_delete_user", user_id=uid),
+            ),
         ], direction="h", gap=2),
     ]
     return rows

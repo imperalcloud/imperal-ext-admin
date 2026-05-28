@@ -124,11 +124,17 @@ async def admin_tools(ctx, active: str = "dashboard", section: str = "",
     """Center panel — content switches by `active` section.
 
     Accepts both `active` (canonical, sent by sidebar items) and `section`
-    (legacy alias). kwargs carries downstream filter params (resource,
-    source, hours, role_filter, status_filter, user_id, app_id, tab, etc.)
-    to each section builder.
+    (cross-section navigation from inside another section — e.g. Edit Profile
+    from Users list, or Configure from Extensions list). kwargs carries
+    downstream filter params (resource, source, hours, role_filter,
+    status_filter, user_id, app_id, tab, etc.) to each section builder.
+
+    Priority: `section` wins over `active` because the panel host re-sends the
+    current `active` on every Call — a Button shipping only `section="x"`
+    would otherwise be drowned by the host-supplied `active=<current>` and the
+    target section would never open.
     """
-    current = active or section or "dashboard"
+    current = section or active or "dashboard"
     try:
         builder = _BUILDERS.get(current)
         if builder:
