@@ -70,6 +70,12 @@ def _sidebar_item(section: dict, active: str) -> UINode:
     the center re-renders for the new section, and the host's center→left
     param-passthrough forwards `active` back to the sidebar so the next
     sidebar render shows `selected=True` on this item.
+
+    Ships `section=""` explicitly so the panel host's param-merge replaces
+    any stale `section=` left by a prior cross-section Button (e.g. Edit
+    Profile shipping `section="user_profile"`); the router prefers `section`
+    over `active`, so an unset section would otherwise pin the center panel
+    to the previously-clicked sub-view.
     """
     props = {
         "id": section["id"],
@@ -78,7 +84,7 @@ def _sidebar_item(section: dict, active: str) -> UINode:
         "on_click": {
             "action": "call",
             "function": "__panel__tools",
-            "params": {"active": section["id"]},
+            "params": {"active": section["id"], "section": ""},
         },
     }
     if section["id"] == active:
@@ -92,7 +98,8 @@ async def admin_sidebar(ctx, active: str = "dashboard", **kwargs):
     items = [_sidebar_item(s, active) for s in _SECTIONS]
     root = ui.List(items=items)
     # Auto-open center on first mount so the user lands on a populated workspace.
-    root.props["auto_action"] = ui.Call("__panel__tools", active=active)
+    # `section=""` mirrors _sidebar_item — clears any stale cross-section state.
+    root.props["auto_action"] = ui.Call("__panel__tools", active=active, section="")
     return root
 
 
