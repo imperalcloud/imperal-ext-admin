@@ -279,6 +279,39 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "reset_conversation",
+      "description": "Reset (clear) a user's chat history and conversational state — history, session memory, skeleton caches — and restart their session. Money, usage, billing, and installed apps are PRESERVED. With NO user_id/email this resets the CALLER's own conversation (available to any user). With a user_id or email it resets THAT user (ADMIN only). Use when a user says 'clear my history', 'start over', 'reset my chat', or an admin asks to reset a specific user. Confirmation is required before it runs.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Reset a user's conversation. Omit both fields to reset YOURSELF.",
+        "properties": {
+          "user_id": {
+            "default": "",
+            "description": "imperal_id of the user to reset (admin only; omit to reset yourself)",
+            "title": "User Id",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "description": "email of the user to reset (admin only; omit to reset yourself)",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "title": "ResetConvParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "user_conversation_reset",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "update_user_limits",
       "description": "Update individual limit overrides for a user.",
       "action_type": "write",
@@ -3378,6 +3411,51 @@
             "description": "Per-purpose frequency_penalty for judge",
             "title": "Purpose Judge Frequency Penalty",
             "type": "string"
+          },
+          "classifier_data_facts_chars": {
+            "anyOf": [
+              {
+                "maximum": 200000,
+                "minimum": 200,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Federal I-NO-HARDCODED-DIGEST-CAPS (2026-05-29). Per-tool-call cap on the classifier-facing data_facts_json stored in each SessionMemory turn digest (was hardcoded 1500). This is what the classifier SEES of a prior tool result in the FACTS section. Higher = classifier sees more of large lists/results for cross-turn references, more classifier tokens. Reads at core/session_memory.py:build_turn_digest_from_er.",
+            "title": "Classifier Data Facts Chars"
+          },
+          "cross_turn_facts_full_cap_bytes": {
+            "anyOf": [
+              {
+                "maximum": 2000000,
+                "minimum": 1000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: bytes. Federal I-NO-HARDCODED-DIGEST-CAPS (2026-05-29). Cap on the UNTRUNCATED data_facts_full_json stored per tool call (was hardcoded 50000 / 50KB). This is the source the cross-turn $REF resolver pipes into note/email content. Higher = larger prior results (long task lists, reports) can be put verbatim into a note or email; payloads over the cap are dropped and the resolver returns cross_turn_data_exceeds_cap. Reads at core/session_memory.py:build_turn_digest_from_er.",
+            "title": "Cross Turn Facts Full Cap Bytes"
+          },
+          "classifier_turn_facts_agg_chars": {
+            "anyOf": [
+              {
+                "maximum": 500000,
+                "minimum": 300,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Federal I-NO-HARDCODED-DIGEST-CAPS (2026-05-29). Per-TURN aggregate cap on total data_facts_json across all tool calls in one turn (was hardcoded 3000). Binding constraint for multi-tool turns — re-trims pro-rata when exceeded. Raise together with classifier_data_facts_chars for large-context work. Reads at core/session_memory.py:build_turn_digest_from_er.",
+            "title": "Classifier Turn Facts Agg Chars"
           }
         },
         "title": "SaveLlmConfigParams",
