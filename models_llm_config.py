@@ -387,6 +387,42 @@ class SaveLlmConfigParams(BaseModel):
             "_resolve_explicit_cross_turn."
         ),
     )
+    classifier_data_facts_chars: Optional[int] = Field(
+        default=None, ge=200, le=200000,
+        description=(
+            "UNIT: characters. Federal I-NO-HARDCODED-DIGEST-CAPS (2026-05-29). "
+            "Per-tool-call cap on the classifier-facing data_facts_json stored "
+            "in each SessionMemory turn digest (was hardcoded 1500). This is "
+            "what the classifier SEES of a prior tool result in the FACTS "
+            "section. Higher = classifier sees more of large lists/results for "
+            "cross-turn references, more classifier tokens. Reads at "
+            "core/session_memory.py:build_turn_digest_from_er."
+        ),
+    )
+    cross_turn_facts_full_cap_bytes: Optional[int] = Field(
+        default=None, ge=1000, le=2000000,
+        description=(
+            "UNIT: bytes. Federal I-NO-HARDCODED-DIGEST-CAPS (2026-05-29). "
+            "Cap on the UNTRUNCATED data_facts_full_json stored per tool call "
+            "(was hardcoded 50000 / 50KB). This is the source the cross-turn "
+            "$REF resolver pipes into note/email content. Higher = larger "
+            "prior results (long task lists, reports) can be put verbatim into "
+            "a note or email; payloads over the cap are dropped and the "
+            "resolver returns cross_turn_data_exceeds_cap. Reads at "
+            "core/session_memory.py:build_turn_digest_from_er."
+        ),
+    )
+    classifier_turn_facts_agg_chars: Optional[int] = Field(
+        default=None, ge=300, le=500000,
+        description=(
+            "UNIT: characters. Federal I-NO-HARDCODED-DIGEST-CAPS (2026-05-29). "
+            "Per-TURN aggregate cap on total data_facts_json across all tool "
+            "calls in one turn (was hardcoded 3000). Binding constraint for "
+            "multi-tool turns — re-trims pro-rata when exceeded. Raise together "
+            "with classifier_data_facts_chars for large-context work. Reads at "
+            "core/session_memory.py:build_turn_digest_from_er."
+        ),
+    )
     quality_ceiling_tokens: Optional[int] = Field(
         default=None, ge=1024, le=500000,
         description=(

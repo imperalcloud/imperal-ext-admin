@@ -186,6 +186,56 @@ def build_tbc_section(defaults: dict):
             param_name="cross_turn_max_refs",
         ),
 
+        ui.Text(
+            "classifier_data_facts_chars — UNIT: chars. Federal "
+            "I-NO-HARDCODED-DIGEST-CAPS. Per-tool-call cap on the "
+            "classifier-facing data_facts_json in each SessionMemory turn "
+            "(was hardcoded 1500). What the classifier SEES of a prior tool "
+            "result in FACTS. Higher = classifier sees more of large results "
+            "for cross-turn refs. Consumer: core/session_memory.py:"
+            "build_turn_digest_from_er.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=200, max=200000, step=100,
+            value=defaults.get("classifier_data_facts_chars", 1500),
+            label="classifier_data_facts_chars (chars)",
+            param_name="classifier_data_facts_chars",
+        ),
+
+        ui.Text(
+            "cross_turn_facts_full_cap_bytes — UNIT: bytes. Federal "
+            "I-NO-HARDCODED-DIGEST-CAPS. Cap on the UNTRUNCATED "
+            "data_facts_full_json per tool call (was hardcoded 50000/50KB). "
+            "Source the cross-turn $REF resolver pipes into note/email content. "
+            "Higher = larger prior results (long task lists, reports) can be "
+            "put verbatim into a note/email; over-cap payloads are dropped. "
+            "Consumer: core/session_memory.py:build_turn_digest_from_er.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=1000, max=2000000, step=1000,
+            value=defaults.get("cross_turn_facts_full_cap_bytes", 50000),
+            label="cross_turn_facts_full_cap_bytes (bytes)",
+            param_name="cross_turn_facts_full_cap_bytes",
+        ),
+
+        ui.Text(
+            "classifier_turn_facts_agg_chars — UNIT: chars. Federal "
+            "I-NO-HARDCODED-DIGEST-CAPS. Per-TURN aggregate cap on total "
+            "data_facts_json across all tool calls in one turn (was hardcoded "
+            "3000). Binding constraint for multi-tool turns. Raise together "
+            "with classifier_data_facts_chars for large-context work. "
+            "Consumer: core/session_memory.py:build_turn_digest_from_er.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=300, max=500000, step=100,
+            value=defaults.get("classifier_turn_facts_agg_chars", 3000),
+            label="classifier_turn_facts_agg_chars (chars)",
+            param_name="classifier_turn_facts_agg_chars",
+        ),
+
         # ── Group 2: Chain context ──
         ui.Text("⛓ Cross-step chain context", variant="subtitle"),
 
