@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams
+from app import chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams, _resolve_user_by_email
 from models_records import (
     UserListResponse,
 )
@@ -53,6 +53,12 @@ class RemoveUserAttributeParams(BaseModel):
     """Remove a single attribute key from a user."""
     user_id: str  = Field(description="imperal_id")
     attr_key: str = Field(description="Attribute key to remove")
+
+
+class ResetConvParams(BaseModel):
+    """Reset a user's conversation. Omit both fields to reset YOURSELF."""
+    user_id: str = Field(default="", description="imperal_id of the user to reset (admin only; omit to reset yourself)")
+    email: str   = Field(default="", description="email of the user to reset (admin only; omit to reset yourself)")
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #
@@ -132,6 +138,45 @@ async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
         data={"deleted": result},
         summary=f"User {params.user_id} permanently deleted",
     refresh_panels=["tools"],
+    )
+
+
+@chat.function("reset_conversation", action_type="destructive", event="user_conversation_reset",
+               description=(
+                   "Reset (clear) a user's chat history and conversational state — history, "
+                   "session memory, skeleton caches — and restart their session. Money, usage, "
+                   "billing, and installed apps are PRESERVED. With NO user_id/email this resets "
+                   "the CALLER's own conversation (available to any user). With a user_id or email "
+                   "it resets THAT user (ADMIN only). Use when a user says 'clear my history', "
+                   "'start over', 'reset my chat', or an admin asks to reset a specific user. "
+                   "Confirmation is required before it runs."))
+async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
+    self_uid = getattr(ctx.user, "imperal_id", "") or ""
+    target = (params.user_id or "").strip()
+    if not target and params.email:
+        target = await _resolve_user_by_email(params.email) or ""
+        if not target:
+            return ActionResult.error(f"User '{params.email}' not found.")
+    if not target:
+        target = self_uid
+    if not target:
+        return ActionResult.error("Could not determine which user to reset.")
+
+    # Cross-user reset is admin-only; self-reset is allowed for everyone.
+    if target != self_uid and getattr(ctx.user, "role", "") != "admin":
+        return ActionResult.error("Only admins can reset another user's conversation.")
+
+    result = await _gw_request("POST", f"/v1/users/{target}/reset-conversation")
+    if isinstance(result, dict) and "error" in result:
+        return ActionResult.error(result["error"])
+
+    whose = "your" if target == self_uid else f"{target}'s"
+    return ActionResult.success(
+        data=result,
+        summary=(
+            f"Reset {whose} conversation: {result.get('redis_keys_deleted', 0)} key(s) cleared, "
+            f"session {'restarted' if result.get('workflow_terminated') else 'was not running'}."
+        ),
     )
 
 
