@@ -265,6 +265,20 @@ def build_tbc_section(defaults: dict):
             param_name="chain_prior_total_max_chars",
         ),
 
+        ui.Text(
+            "hub_dispatch_max_depth — UNIT: count. Max nested inter-extension "
+            "delegation depth per turn (root excluded; N = N nested hops). "
+            "Default 6. 0 disables multi-step chains. "
+            "Consumer: orchestration/hub_dispatch_handler.py.",
+            variant="caption",
+        ),
+        ui.Slider(
+            min=0, max=9, step=1,
+            value=defaults["hub_dispatch_max_depth"],
+            label="hub_dispatch_max_depth (count)",
+            param_name="hub_dispatch_max_depth",
+        ),
+
         # ── Group 3: max_tokens per LLM purpose ──
         ui.Text("🤖 max_tokens per kernel-internal LLM purpose", variant="subtitle"),
 

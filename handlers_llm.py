@@ -58,7 +58,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         skip_fields = {"set_extension_override", "override_model", "override_provider", "reset_extension_override",
             # Token Budget fields routed via tenant-defaults endpoint, not Redis llm config.
             "narration_history_limit", "confirmation_card_tokens", "judge_digest_chars",
-            "chain_prior_step_max_chars", "chain_prior_total_max_chars",
+            "chain_prior_step_max_chars", "chain_prior_total_max_chars", "hub_dispatch_max_depth",
             # TBC-FULL 2026-04-29 → cleanup 2026-05-13 — 7 admin-tunable max_tokens caps
             "automation_main_max_tokens", "automation_condition_max_tokens",
             "intent_classifier_planner_max_tokens", "prose_judge_max_tokens", "system_handlers_max_tokens",
@@ -152,6 +152,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.judge_digest_chars is not None: tb_payload["judge_digest_chars"] = params.judge_digest_chars
         if params.chain_prior_step_max_chars is not None: tb_payload["chain_prior_step_max_chars"] = params.chain_prior_step_max_chars
         if params.chain_prior_total_max_chars is not None: tb_payload["chain_prior_total_max_chars"] = params.chain_prior_total_max_chars
+        if params.hub_dispatch_max_depth is not None: tb_payload["hub_dispatch_max_depth"] = params.hub_dispatch_max_depth
         # TBC-FULL 2026-04-29 → cleanup 2026-05-13 — 7 admin-tunable max_tokens caps
         if params.automation_main_max_tokens is not None: tb_payload["automation_main_max_tokens"] = params.automation_main_max_tokens
         if params.automation_condition_max_tokens is not None: tb_payload["automation_condition_max_tokens"] = params.automation_condition_max_tokens

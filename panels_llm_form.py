@@ -146,6 +146,7 @@ def build_llm_form(
         "judge_digest_chars": int(_td.get("judge_digest_chars", 8000)),
         "chain_prior_step_max_chars": int(_td.get("chain_prior_step_max_chars", 8000)),
         "chain_prior_total_max_chars": int(_td.get("chain_prior_total_max_chars", 64000)),
+        "hub_dispatch_max_depth": int(_td.get("hub_dispatch_max_depth", 6)),
         # Token Budget Controls — full audit (TBC-FULL, 2026-04-29) — 7 admin-tunable max_tokens caps
         # (planner_max_tokens + structured_gen_max_tokens dropped 2026-05-13 — orphan UI; no kernel reader.)
         "automation_main_max_tokens": int(_td.get("automation_main_max_tokens", 4096)),

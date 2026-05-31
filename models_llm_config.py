@@ -119,6 +119,15 @@ class SaveLlmConfigParams(BaseModel):
             "chain_executor.py:_summarise_prior_steps."
         ),
     )
+    hub_dispatch_max_depth: Optional[int] = Field(
+        default=None, ge=0, le=9,
+        description=(
+            "UNIT: count. Max nested inter-extension delegation depth a single turn "
+            "may chain (root excluded; N = N nested hops). Default 6. 0 disables "
+            "multi-step chains entirely. Reads at "
+            "orchestration/hub_dispatch_handler.py:_check_depth."
+        ),
+    )
 
     # ── max_tokens caps for kernel-internal LLM purposes ──
     automation_main_max_tokens: Optional[int] = Field(
