@@ -16,11 +16,10 @@ records below now subclass ``sdl.Entity`` (+ matching facets). EVERY existing
 field is kept verbatim — panels, install-flows and the kernel $REF resolver
 keep reading the exact same keys. A ``mode="before"`` validator populates the
 canonical ``id``/``title`` from existing id-ish/name-ish fields, so EXISTING
-``ActionResult.success(data={...})`` construction calls work unchanged. The
-LIST wrappers (UserListResponse, BillingOverviewResponse, ...) keep their
-original shape (``users``/``extensions``/``total``/...) and stay plain
-BaseModel — their inner items are opaque gateway dicts (no typed inner model),
-so per the SDL list rule we do NOT coerce the wrapper into sdl.EntityList.
+``ActionResult.success(data={...})`` construction calls work unchanged. UserListResponse is now a REAL ``sdl.EntityList[UserRecord]`` (2026-06-02, NO
+legacy) — each user is a typed SDL entity so the kernel resolves/refers to users
+as SDL entities. The remaining LIST wrappers (BillingOverviewResponse, ...) keep
+their original shape until their inner items are typed too.
 """
 from __future__ import annotations
 
@@ -32,10 +31,38 @@ from imperal_sdk import sdl
 
 # --- users ---
 
-class UserListResponse(BaseModel):
-    """list_users return shape (list wrapper — shape unchanged)."""
-    users: list[dict] = []
-    total: int = 0
+class UserRecord(sdl.Entity):
+    """A single user as a canonical SDL entity (kind='user'): id=imperal_id,
+    title=display name. Gateway fields are kept verbatim for rendering."""
+    imperal_id: Optional[str] = None
+    display_name: Optional[Any] = None
+    full_name: Optional[Any] = None
+    email: Optional[Any] = None
+    role: Optional[Any] = None
+    is_active: Optional[Any] = None
+    last_login: Optional[Any] = None
+    scopes: Optional[Any] = None
+    attributes: Optional[Any] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data.setdefault("id", data.get("imperal_id") or data.get("id") or "")
+            data.setdefault(
+                "title",
+                data.get("display_name") or data.get("full_name")
+                or data.get("email") or data.get("imperal_id") or "",
+            )
+            data.setdefault("kind", "user")
+        return data
+
+
+class UserListResponse(sdl.EntityList[UserRecord]):
+    """list_users return shape — a REAL sdl.EntityList[UserRecord] (items=[...],
+    x-sdl='entity-list'). Replaces the legacy {users:[dict],total} wrapper so the
+    kernel resolves/refers to users as typed SDL entities. NO legacy."""
+    pass
 
 
 # --- billing (admin-side) ---

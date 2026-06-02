@@ -73,9 +73,27 @@ async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
         return ActionResult.error("Failed to fetch users")
+    # SDL entity-list (NO legacy {users} wrapper): each user is a canonical SDL
+    # entity (id=imperal_id, title=display name, kind="user"); gateway fields are
+    # kept verbatim for rendering. The kernel reads data["items"] + title to
+    # resolve a user SET ("обоим ignat") and fan out by id. Data conforms to the
+    # sdl.EntityList[UserRecord] contract (data_model carries x-sdl="entity-list").
+    items = []
+    for _u in users:
+        if not isinstance(_u, dict):
+            continue
+        _it = dict(_u)
+        _it.setdefault("id", _u.get("imperal_id") or _u.get("id") or "")
+        _it.setdefault(
+            "title",
+            _u.get("display_name") or _u.get("full_name")
+            or _u.get("email") or _u.get("imperal_id") or "",
+        )
+        _it.setdefault("kind", "user")
+        items.append(_it)
     return ActionResult.success(
-        data={"users": users, "total": len(users)},
-        summary=f"{len(users)} users found",
+        data={"items": items, "total": len(items)},
+        summary=f"{len(items)} users found",
     )
 
 
