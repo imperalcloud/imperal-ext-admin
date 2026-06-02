@@ -48,7 +48,10 @@ class UserRecord(sdl.Entity):
     @classmethod
     def _sdl_canon(cls, data):
         if isinstance(data, dict):
-            data.setdefault("id", data.get("imperal_id") or data.get("id") or "")
+            # Canonical id = imperal_id (reset_conversation / user tools key on
+            # it); OVERWRITE any non-canonical gateway "id". Mirrors
+            # _resolve_user_by_email (imperal_id or id).
+            data["id"] = data.get("imperal_id") or data.get("id") or ""
             data.setdefault(
                 "title",
                 data.get("display_name") or data.get("full_name")

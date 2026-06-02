@@ -83,7 +83,11 @@ async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
         if not isinstance(_u, dict):
             continue
         _it = dict(_u)
-        _it.setdefault("id", _u.get("imperal_id") or _u.get("id") or "")
+        # Canonical entity id = imperal_id (the id reset_conversation / every
+        # admin user tool keys on — mirrors _resolve_user_by_email). OVERWRITE,
+        # not setdefault: the gateway dict already carries a separate "id" that
+        # is NOT the imperal_id, and the reset endpoint 404s on it.
+        _it["id"] = _u.get("imperal_id") or _u.get("id") or ""
         _it.setdefault(
             "title",
             _u.get("display_name") or _u.get("full_name")
