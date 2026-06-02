@@ -16,6 +16,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN
+from models_records import LLMModelRateReceipt
 
 log = logging.getLogger("admin")
 
@@ -49,8 +50,12 @@ class DeleteLlmModelRateParams(BaseModel):
     model_id: str = Field(..., min_length=1)
 
 
+# SDL: save/delete_llm_model_rate return a receipt whose runtime keys are
+# {model_id, action}. LLMModelRateReceipt mirrors those keys verbatim
+# (I-EXT-RECORD-FIELD-NAMING-SYMMETRIC).
 @chat.function("save_llm_model_rate", action_type="write",
                event="llm_model_rate_saved",
+               data_model=LLMModelRateReceipt,
                description="Save (upsert) an LLM model rate row in llm_model_rates.")
 async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionResult:
     if params.tier not in VALID_TIERS:
@@ -97,6 +102,7 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
 
 @chat.function("delete_llm_model_rate", action_type="destructive",
                event="llm_model_rate_deleted",
+               data_model=LLMModelRateReceipt,
                description="Soft-delete (mark unavailable) an LLM model rate row.")
 async def fn_delete_llm_model_rate(ctx, params: DeleteLlmModelRateParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:

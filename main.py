@@ -10,7 +10,7 @@ sys.path.insert(0, _dir)
 # Extension's `_chat_extensions[*]._functions` is missing those entries, which
 # surfaces as a spurious "In manifest but not code" drift warning. Wildcard
 # match keeps the clearing list automatically in sync with new modules.
-for _m in [k for k in list(sys.modules) if k == "app" or k.startswith(("handlers_", "panels_", "skeleton"))]:
+for _m in [k for k in list(sys.modules) if k == "app" or k.startswith(("handlers_", "panels_", "models_", "skeleton"))]:
     del sys.modules[_m]
 for _m in ("handlers", "panels", "skeleton"):
     sys.modules.pop(_m, None)

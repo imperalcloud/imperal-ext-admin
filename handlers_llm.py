@@ -9,6 +9,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from app import chat, ActionResult
 from models_records import (
+    LLMConfigReceipt,
     LLMTestResultRecord,
 )
 from panels_sections import _invalidate_panel_cache
@@ -19,7 +20,12 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 from models_llm_config import SaveLlmConfigParams  # extracted; keeps file under 300 lines
 
 
+# SDL: save_llm_config returns a config-save receipt whose runtime keys are
+# {saved, tenant_defaults_updated, config} (or {reset} / {override, model}).
+# LLMConfigReceipt mirrors every observed key verbatim
+# (I-EXT-RECORD-FIELD-NAMING-SYMMETRIC).
 @chat.function("save_llm_config", action_type="write", event="llm_config_saved",
+               data_model=LLMConfigReceipt,
                description="Save LLM provider/model config to Redis Config Store.")
 async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
     try:
@@ -234,8 +240,11 @@ async def fn_test_llm_connection(ctx, params: TestLlmParams) -> ActionResult:
         cfg = json.loads(raw)
         provider = params.provider or cfg.get("provider", "anthropic")
         model = params.model or cfg.get("model", "claude-haiku-4-5-20251001")
+        # SDL symmetry (I-EXT-RECORD-FIELD-NAMING-SYMMETRIC): every key here is a
+        # field on LLMTestResultRecord — ``success``/``model``/``provider`` are
+        # declared fields and ``status`` is the core sdl.Entity field.
         return ActionResult.success(
-            data={"provider": provider, "model": model, "status": "ok"},
+            data={"success": True, "provider": provider, "model": model, "status": "ok"},
             summary=f"Connection to {provider}/{model} appears configured",
         )
     except Exception as e:

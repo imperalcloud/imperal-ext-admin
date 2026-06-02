@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _gw_request, _resolve_user_by_email, _resolve_role_by_name
 from models_records import (
-    AuditLogResponse, CompareRolesResponse, EffectiveScopesResponse, PermissionCheckResponse,
+    AuditLogResponse, BulkRoleAssignReceipt, CompareRolesResponse,
+    EffectiveScopesResponse, PermissionCheckResponse,
 )
 
 
@@ -66,9 +67,18 @@ async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     scopes = result.get("scopes", result) if isinstance(result, dict) else result
-    lines = [f"{s.get('scope', s.get('name', '?'))} [{s.get('source', '?')}]" if isinstance(s, dict) else str(s) for s in (scopes if isinstance(scopes, list) else [])]
-    return ActionResult.success(data={"user_id": ref, "effective_scopes": result, "formatted": "\n".join(lines) or "No scopes"},
-                                summary=f"Effective scopes for {ref}")
+    scope_list = scopes if isinstance(scopes, list) else []
+    names = [
+        (s.get("scope") or s.get("name") or "") if isinstance(s, dict) else str(s)
+        for s in scope_list
+    ]
+    lines = [
+        f"{s.get('scope', s.get('name', '?'))} [{s.get('source', '?')}]" if isinstance(s, dict) else str(s)
+        for s in scope_list
+    ]
+    return ActionResult.success(
+        data={"user_id": ref, "effective_scopes": names, "formatted": "\n".join(lines) or "No scopes"},
+        summary=f"Effective scopes for {ref}")
 
 
 @chat.function("check_permission", action_type="read", data_model=PermissionCheckResponse, description="Check if user has a specific scope. YES/NO.")
@@ -110,7 +120,7 @@ async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
         summary=f"{r1['name']} vs {r2['name']}: {len(common)} common, {len(only1)}+{len(only2)} unique")
 
 
-@chat.function("bulk_assign_role", action_type="write", event="roles_assigned", description="Assign a role to multiple users. Max 100.")
+@chat.function("bulk_assign_role", action_type="write", event="roles_assigned", data_model=BulkRoleAssignReceipt, description="Assign a role to multiple users. Max 100.")
 async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult:
     target_role = await _resolve_role_by_name(params.role)
     if not target_role:
@@ -157,5 +167,5 @@ async def fn_audit_log(ctx, params: AuditLogParams) -> ActionResult:
     if not isinstance(entries, list): entries = []
     display, total = entries[:50], len(entries)
     return ActionResult.success(
-        data={"entries": display, "total": total, "showing": len(display), "truncated": total > 50, "hours": params.hours},
+        data={"items": display, "total": total, "showing": len(display), "truncated": total > 50, "hours": params.hours},
         summary=f"{len(display)} entries" + (f" (of {total})" if total > 50 else "") + f" from last {params.hours}h")

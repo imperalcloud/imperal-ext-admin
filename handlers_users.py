@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app import chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams, _resolve_user_by_email
 from models_records import (
     UserListResponse,
+    UserRecord,
 )
 
 
@@ -102,6 +103,7 @@ async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
 
 
 @chat.function("create_user", action_type="write", event="user_created",
+               data_model=UserRecord,
                description="Create a new user with email, password, and role.")
 async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
     result = await _gw_request("POST", "/v1/users", {
@@ -112,14 +114,18 @@ async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
     drift = _verify_write_reflected(result, {"email": params.email, "role": params.role})
     if drift:
         return ActionResult.error(f"User creation did not reflect — {drift}")
+    # SDL: return the created user as a canonical UserRecord entity (id=imperal_id,
+    # title=display name, kind="user"); the _sdl_canon validator fills core fields
+    # from the gateway dict. NO legacy {"user": ...} wrapper.
     return ActionResult.success(
-        data={"user": result},
+        data=result,
         summary=f"User {params.email} created with role {params.role}",
     refresh_panels=["tools"],
     )
 
 
 @chat.function("update_user", action_type="write", event="user_updated",
+               data_model=UserRecord,
                description="Update user role, scopes, attributes, or status.")
 async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
     data: dict = {}
@@ -133,33 +139,51 @@ async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
     drift = _verify_write_reflected(result, data)
     if drift:
         return ActionResult.error(f"Update did not take effect — {drift}")
+    # SDL: return the updated user as a canonical UserRecord entity (the gateway
+    # PATCH echoes the full user dict; _sdl_canon fills id/title/kind). NO legacy
+    # {"user": ...} wrapper.
     return ActionResult.success(
-        data={"user": result},
+        data=result,
         summary=f"User {params.user_id} updated",
     refresh_panels=["tools"],
     )
 
 
 @chat.function("deactivate_user", action_type="destructive", event="user_deactivated",
+               data_model=UserRecord,
                description="Deactivate user (can reactivate later).")
 async def fn_deactivate_user(ctx, params: UserIdParams) -> ActionResult:
     result = await _gw_request("DELETE", f"/v1/users/{params.user_id}")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    # SDL: return the (now-inactive) user as a canonical UserRecord entity. The
+    # gateway may echo the user dict or an empty body — anchor the canonical id on
+    # the targeted imperal_id so the entity always resolves. NO {"deactivated":...}
+    # wrapper; the "deactivated" fact lives in the summary for ICNLI narration.
+    data = dict(result) if isinstance(result, dict) else {}
+    data.setdefault("imperal_id", params.user_id)
+    data.setdefault("is_active", False)
     return ActionResult.success(
-        data={"deactivated": result},
+        data=data,
         summary=f"User {params.user_id} deactivated",
     )
 
 
 @chat.function("hard_delete_user", action_type="destructive", event="user_deleted",
+               data_model=UserRecord,
                description="PERMANENT delete. Cannot be undone.")
 async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
     result = await _gw_request("DELETE", f"/v1/users/{params.user_id}?permanent=true")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    # SDL: return the deleted user as a canonical UserRecord entity keyed on the
+    # targeted imperal_id (the gateway returns an empty/confirmation body on a
+    # permanent delete). NO {"deleted": ...} wrapper; the permanence fact lives in
+    # the summary for ICNLI narration.
+    data = dict(result) if isinstance(result, dict) else {}
+    data.setdefault("imperal_id", params.user_id)
     return ActionResult.success(
-        data={"deleted": result},
+        data=data,
         summary=f"User {params.user_id} permanently deleted",
     refresh_panels=["tools"],
     )
@@ -173,7 +197,8 @@ async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
                    "the CALLER's own conversation (available to any user). With a user_id or email "
                    "it resets THAT user (ADMIN only). Use when a user says 'clear my history', "
                    "'start over', 'reset my chat', or an admin asks to reset a specific user. "
-                   "Confirmation is required before it runs."))
+                   "Confirmation is required before it runs."),
+               data_model=UserRecord)
 async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
     self_uid = getattr(ctx.user, "imperal_id", "") or ""
     target = (params.user_id or "").strip()
@@ -199,18 +224,24 @@ async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
         return ActionResult.error(result["error"])
 
     whose = "your" if target == self_uid else f"{target}'s"
+    summary = (
+        f"Reset {whose} conversation: {result.get('redis_keys_deleted', 0)} key(s) cleared, "
+        f"session {'restarted' if result.get('workflow_terminated') else 'was not running'}."
+    )
+    # SDL: return the affected user as a canonical UserRecord entity keyed on the
+    # reset target's imperal_id; the reset receipt scalars (redis_keys_deleted,
+    # workflow_terminated) are not user fields, so they are surfaced in the summary
+    # for ICNLI narration rather than as silently-ignored extra data keys.
     return ActionResult.success(
-        data=result,
-        summary=(
-            f"Reset {whose} conversation: {result.get('redis_keys_deleted', 0)} key(s) cleared, "
-            f"session {'restarted' if result.get('workflow_terminated') else 'was not running'}."
-        ),
+        data={"imperal_id": target},
+        summary=summary,
     )
 
 
 # ─── Limits ───────────────────────────────────────────────────────────── #
 
 @chat.function("update_user_limits", action_type="write", event="user_updated",
+               data_model=UserRecord,
                description="Update individual limit overrides for a user.")
 async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionResult:
     # Fetch current user to merge attributes
@@ -239,9 +270,13 @@ async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionRe
                                {"attributes": existing})
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    # SDL: return the user as a canonical UserRecord entity (id=imperal_id) carrying
+    # the merged attribute set the limits live in — both `imperal_id` and
+    # `attributes` are real UserRecord fields, so the shape is field-symmetric. NO
+    # legacy {user_id, limits} wrapper; the applied-limits delta is in the summary.
     return ActionResult.success(
-        data={"user_id": params.user_id, "limits": updates},
-        summary=f"Limits updated for {params.user_id}",
+        data={"imperal_id": params.user_id, "attributes": existing},
+        summary=f"Limits updated for {params.user_id}: {updates}" if updates else f"Limits updated for {params.user_id}",
     refresh_panels=["tools"],
     )
 
@@ -249,6 +284,7 @@ async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionRe
 # ─── Attributes (ABAC) ───────────────────────────────────────────────── #
 
 @chat.function("set_user_attribute", action_type="write", event="user_updated",
+               data_model=UserRecord,
                description="Set a single attribute key-value on a user.")
 async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionResult:
     if not params.attr_key.strip():
@@ -262,14 +298,18 @@ async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionRe
                                {"attributes": attrs})
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    # SDL: return the user as a canonical UserRecord entity (id=imperal_id) carrying
+    # the updated `attributes` map — field-symmetric (both are UserRecord fields).
+    # NO legacy {user_id, key, value} wrapper; the set key/value is in the summary.
     return ActionResult.success(
-        data={"user_id": params.user_id, "key": params.attr_key, "value": params.attr_value},
+        data={"imperal_id": params.user_id, "attributes": attrs},
         summary=f"Attribute '{params.attr_key}' set on {params.user_id}",
     refresh_panels=["tools"],
     )
 
 
 @chat.function("remove_user_attribute", action_type="write", event="user_updated",
+               data_model=UserRecord,
                description="Remove an attribute key from a user.")
 async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> ActionResult:
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
@@ -283,8 +323,11 @@ async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> Ac
                                {"attributes": attrs})
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
+    # SDL: return the user as a canonical UserRecord entity (id=imperal_id) carrying
+    # the remaining `attributes` map after removal — field-symmetric. NO legacy
+    # {user_id, removed} wrapper; the removed key is named in the summary.
     return ActionResult.success(
-        data={"user_id": params.user_id, "removed": params.attr_key},
+        data={"imperal_id": params.user_id, "attributes": attrs},
         summary=f"Attribute '{params.attr_key}' removed from {params.user_id}",
     refresh_panels=["tools"],
     )

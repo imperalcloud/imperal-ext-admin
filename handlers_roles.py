@@ -1,13 +1,13 @@
 """Admin · Role & scope management handlers."""
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _gw_request, _resolve_role_by_name, EmptyParams
 from models_records import (
-    RoleListResponse, ScopeListResponse,
+    RoleListResponse, RoleActionReceipt, ScopeListResponse, ScopeRecord,
 )
 
 
@@ -64,11 +64,12 @@ async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
     roles = await _gw_request("GET", "/v1/roles")
     if not isinstance(roles, list):
         return ActionResult.error("Failed to fetch roles")
-    return ActionResult.success(data={"roles": roles, "total": len(roles)},
+    return ActionResult.success(data={"items": roles, "total": len(roles)},
                                 summary=f"{len(roles)} roles found")
 
 
 @chat.function("create_role", action_type="write", event="role_created",
+               data_model=RoleActionReceipt,
                description="Create a new role with name and default scopes.")
 async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
     result = await _gw_request("POST", "/v1/roles", {
@@ -83,6 +84,7 @@ async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
 
 
 @chat.function("delete_role", action_type="destructive", event="role_deleted",
+               data_model=RoleActionReceipt,
                description="Delete a role by ID or name.")
 async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
     role_id = params.role_id
@@ -107,6 +109,7 @@ async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
 
 
 @chat.function("update_role", action_type="write", event="role_updated",
+               data_model=RoleActionReceipt,
                description="Update role scopes, limits, or display name. Can cascade.")
 async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
     role_id = params.role_id
@@ -153,11 +156,12 @@ async def fn_list_scopes(ctx, params: ListScopesParams) -> ActionResult:
     scopes = await _gw_request("GET", f"/v1/scopes{qs}")
     if not isinstance(scopes, list):
         return ActionResult.error("Failed to list scopes")
-    return ActionResult.success(data={"scopes": scopes, "total": len(scopes)},
+    return ActionResult.success(data={"items": scopes, "total": len(scopes)},
                                 summary=f"{len(scopes)} scopes found")
 
 
 @chat.function("create_scope", action_type="write", event="scope_created",
+               data_model=ScopeRecord,
                description="Create a scope in resource:action format.")
 async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
     name = f"{params.resource}:{params.action}"
@@ -172,8 +176,11 @@ async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
 
 
 @chat.function("delete_scope", action_type="destructive", event="scope_deleted",
+               data_model=ScopeRecord,
                description="Delete a scope by name or ID.")
 async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:
+    scope_id: Any = params.scope_id
+    scope_name = params.scope_name
     if params.scope_id:
         result = await _gw_request("DELETE", f"/v1/scopes/{params.scope_id}")
     elif params.scope_name:
@@ -187,10 +194,13 @@ async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:
         )
         if not match:
             return ActionResult.error(f"Scope '{params.scope_name}' not found")
-        result = await _gw_request("DELETE", f"/v1/scopes/{match.get('id')}")
+        scope_id = match.get("id")
+        result = await _gw_request("DELETE", f"/v1/scopes/{scope_id}")
     else:
         return ActionResult.error("scope_name or scope_id required")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
-    return ActionResult.success(data={"deleted": True},
-                                summary=f"Scope '{params.scope_name or params.scope_id}' deleted", refresh_panels=["tools"])
+    handle = scope_name or (str(scope_id) if scope_id is not None else "")
+    return ActionResult.success(
+        data={"id": scope_id, "name": handle, "scope": handle, "deleted": True},
+        summary=f"Scope '{scope_name or scope_id}' deleted", refresh_panels=["tools"])

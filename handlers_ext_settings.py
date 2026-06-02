@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app import (
     chat, ActionResult, _registry_get, _registry_put, _resolve_app_id,
 )
+from models_records import ExtSettingsReceipt
 
 
 # ── Models ─────────────────────────────────────────────────────────── #
@@ -91,12 +92,18 @@ def _bool_from_str(val: str) -> bool:
 
 
 async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
-    """PUT one settings section to Registry."""
+    """PUT one settings section to Registry.
+
+    Returns an ExtSettingsReceipt-shaped entity (id=app_id, kind="extension"):
+    data keys {app_id, updated} mirror the receipt fields (federal
+    I-EXT-RECORD-FIELD-NAMING-SYMMETRIC); the section name stays in the summary
+    string rather than as a non-symmetric data key.
+    """
     aid = await _resolve_app_id(app_id)
     r = await _registry_put(f"/v1/apps/{aid}/settings", {section: data})
     if r.status_code == 200:
         return ActionResult.success(
-            data={"app_id": aid, "section": section, "updated": True},
+            data={"app_id": aid, "updated": True},
             summary=f"{section} settings saved for {aid}",
         )
     return ActionResult.error(f"Save failed: HTTP {r.status_code}")
@@ -107,6 +114,7 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
 @chat.function(
     "save_ext_general", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension general settings.",
 )
 async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
@@ -119,6 +127,7 @@ async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
 @chat.function(
     "save_ext_models", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension AI model settings.",
 )
 async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
@@ -147,6 +156,7 @@ async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
 @chat.function(
     "save_ext_persona", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension persona settings.",
 )
 async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
@@ -163,6 +173,7 @@ async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
 @chat.function(
     "save_ext_alerts", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension alert settings.",
 )
 async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
@@ -176,6 +187,7 @@ async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
 @chat.function(
     "save_ext_router", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension router settings.",
 )
 async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
@@ -189,6 +201,7 @@ async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
 @chat.function(
     "save_ext_session", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension session settings.",
 )
 async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
@@ -203,6 +216,7 @@ async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
 @chat.function(
     "save_ext_context", action_type="write",
     event="extension_configured",
+    data_model=ExtSettingsReceipt,
     description="Save extension context settings.",
 )
 async def fn_save_ext_context(ctx, params: SaveContextParams) -> ActionResult:
@@ -219,6 +233,7 @@ async def fn_save_ext_context(ctx, params: SaveContextParams) -> ActionResult:
 @chat.function(
     "save_ext_skeleton", action_type="write",
     event="skeleton_updated",
+    data_model=ExtSettingsReceipt,
     description="Save extension skeleton section settings.",
 )
 async def fn_save_ext_skeleton(ctx, params: SaveSkeletonParams) -> ActionResult:

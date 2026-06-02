@@ -12,6 +12,7 @@ from app import (EmptyParams,
 )
 from models_records import (
     AccessPolicyRecord, ExtensionConfigRecord, ExtensionUsersResponse, ExtensionsListResponse,
+    ExtSettingsReceipt,
 )
 
 
@@ -67,7 +68,19 @@ async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
     apps = r.json()
     if not isinstance(apps, list):
         return ActionResult.error("Invalid response from registry")
-    return ActionResult.success(data={"extensions": apps, "total": len(apps)}, summary=f"{len(apps)} active extensions")
+    # SDL entity-list (NO legacy {extensions} wrapper): each app is a canonical
+    # SDL entity (id=app_id, title=display_name/name, kind="extension"); registry
+    # fields kept verbatim. Conforms to sdl.EntityList[ExtensionRecord].
+    items = []
+    for _a in apps:
+        if not isinstance(_a, dict):
+            continue
+        _it = dict(_a)
+        _it["id"] = _a.get("app_id") or _a.get("id") or ""
+        _it.setdefault("title", _a.get("display_name") or _a.get("name") or _a.get("app_id") or "")
+        _it.setdefault("kind", "extension")
+        items.append(_it)
+    return ActionResult.success(data={"items": items, "total": len(items)}, summary=f"{len(items)} active extensions")
 
 
 @chat.function("get_extension_config", action_type="read", data_model=ExtensionConfigRecord, description="Get full extension config.")
@@ -80,7 +93,7 @@ async def fn_get_extension_config(ctx, params: AppIdParams) -> ActionResult:
     return ActionResult.success(data={"app_id": aid, "config": r.json()}, summary=f"Config for {aid}")
 
 
-@chat.function("update_extension_config", action_type="write", event="extension_configured", description="Update extension config.")
+@chat.function("update_extension_config", action_type="write", event="extension_configured", data_model=ExtSettingsReceipt, description="Update extension config.")
 async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -92,7 +105,7 @@ async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> Acti
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
-@chat.function("update_skeleton_ttl", action_type="write", event="skeleton_updated", description="Update skeleton refresh TTL.")
+@chat.function("update_skeleton_ttl", action_type="write", event="skeleton_updated", data_model=ExtSettingsReceipt, description="Update skeleton refresh TTL.")
 async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -103,7 +116,7 @@ async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> Action
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
-@chat.function("suspend_extension", action_type="destructive", event="extension_suspended", description="Suspend an extension.")
+@chat.function("suspend_extension", action_type="destructive", event="extension_suspended", data_model=ExtSettingsReceipt, description="Suspend an extension.")
 async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     r = await _registry_patch(f"/v1/apps/{aid}", {"status": "suspended"})
@@ -116,7 +129,7 @@ async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
     return ActionResult.success(data={"app_id": aid}, summary=f"{aid} suspend sent (unverified)")
 
 
-@chat.function("activate_extension", action_type="write", event="extension_activated", description="Activate a suspended extension.")
+@chat.function("activate_extension", action_type="write", event="extension_activated", data_model=ExtSettingsReceipt, description="Activate a suspended extension.")
 async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     r = await _registry_get(f"/v1/apps/{aid}")
@@ -142,6 +155,7 @@ async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
 @chat.function(
     "list_user_extensions",
     action_type="read",
+    data_model=ExtensionsListResponse,
     description=(
         "List the calling user's installed extensions when called with no "
         "user_id/email (self-service mode — used by 'what extensions do I "
@@ -171,10 +185,22 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
     exts = result if isinstance(result, list) else result.get("extensions", [])
-    return ActionResult.success(data={"user_id": ref, "extensions": exts, "total": len(exts)}, summary=f"{len(exts)} extensions for {ref}")
+    # SDL entity-list (NO legacy {extensions} wrapper): canonical extension
+    # entities; the target user_id stays in the summary string. Conforms to
+    # sdl.EntityList[ExtensionRecord].
+    items = []
+    for _e in exts:
+        if not isinstance(_e, dict):
+            continue
+        _it = dict(_e)
+        _it["id"] = _e.get("app_id") or _e.get("id") or ""
+        _it.setdefault("title", _e.get("display_name") or _e.get("name") or _e.get("app_id") or "")
+        _it.setdefault("kind", "extension")
+        items.append(_it)
+    return ActionResult.success(data={"items": items, "total": len(items)}, summary=f"{len(items)} extensions for {ref}")
 
 
-@chat.function("set_access_policy", action_type="write", event="access_policy_set", description="Set extension access policy.")
+@chat.function("set_access_policy", action_type="write", event="access_policy_set", data_model=ExtSettingsReceipt, description="Set extension access policy.")
 async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -231,11 +257,29 @@ async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
     users = result if isinstance(result, list) else result.get("users", [])
     granted = sum(1 for u in users if u.get("access") == "granted")
     denied = sum(1 for u in users if u.get("access") == "denied")
-    return ActionResult.success(data={"app_id": aid, "users": users, "total": len(users), "granted": granted, "denied": denied},
+    # SDL entity-list (NO legacy {users,app_id,granted,denied} wrapper): each is a
+    # canonical SDL user entity (id=imperal_id, title=display name, kind="user");
+    # the gateway "access" (granted/denied) marker is kept verbatim per item but
+    # the COUNTS and target app_id stay in the summary string (per the
+    # ExtensionUsersResponse contract). Conforms to sdl.EntityList[UserRecord].
+    items = []
+    for _u in users:
+        if not isinstance(_u, dict):
+            continue
+        _it = dict(_u)
+        _it["id"] = _u.get("imperal_id") or _u.get("id") or ""
+        _it.setdefault(
+            "title",
+            _u.get("display_name") or _u.get("full_name")
+            or _u.get("email") or _u.get("imperal_id") or "",
+        )
+        _it.setdefault("kind", "user")
+        items.append(_it)
+    return ActionResult.success(data={"items": items, "total": len(items)},
                                 summary=f"{granted} granted, {denied} denied for {aid}")
 
 
-@chat.function("deny_extension", action_type="destructive", event="extension_denied", description="Add role/user to denied list.")
+@chat.function("deny_extension", action_type="destructive", event="extension_denied", data_model=ExtSettingsReceipt, description="Add role/user to denied list.")
 async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to deny")
@@ -262,7 +306,7 @@ async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
     return ActionResult.success(data={"app_id": aid, "denied": added}, summary=f"Denied {', '.join(added)} from {aid}", refresh_panels=["tools"])
 
 
-@chat.function("allow_extension", action_type="write", event="extension_allowed", description="Remove role/user from denied list.")
+@chat.function("allow_extension", action_type="write", event="extension_allowed", data_model=ExtSettingsReceipt, description="Remove role/user from denied list.")
 async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to allow")

@@ -122,8 +122,9 @@ async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
         } for p in plans]
 
         return ActionResult.success(
-            data={"plans": plan_summary, "plans_count": len(plans),
-                  "wallets_active": wallet_count, "stream_events_total": stream_len},
+            data={"items": plan_summary, "total": len(plans),
+                  "plans_count": len(plans), "wallets_active": wallet_count,
+                  "stream_events_total": stream_len},
             summary=f"{len(plans)} plans, {wallet_count} wallets, {stream_len} stream events",
         )
     except Exception as e:
@@ -152,7 +153,8 @@ async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
 
         wallets.sort(key=lambda w: w["balance"], reverse=True)
         return ActionResult.success(
-            data={"wallets": wallets, "total_users": len(wallets),
+            data={"items": wallets, "total": len(wallets),
+                  "total_users": len(wallets),
                   "total_tokens_in_circulation": total},
             summary=f"{len(wallets)} wallets, {total} total tokens",
         )
@@ -193,6 +195,7 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
 
 
 @chat.function("adjust_balance", action_type="write", event="billing_adjusted",
+               data_model=UserBalanceRecord,
                description="Credit or deduct tokens. Positive=credit, negative=deduct.")
 async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
     if params.amount == 0:
@@ -228,10 +231,10 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
 
         verb = "credited" if params.amount > 0 else "deducted"
         return ActionResult.success(
-            data={"user_id": target_id, "adjustment": params.amount,
-                  "new_balance": int(new_bal), "reason": params.reason},
+            data={"user_id": target_id, "balance": int(new_bal),
+                  "adjustment": params.amount, "reason": params.reason},
             summary=f"{verb} {abs(params.amount)} tokens -> balance: {new_bal}",
-        refresh_panels=["tools"],
+            refresh_panels=["tools"],
         )
     except Exception as e:
         log.error("adjust_balance failed: %s", e)

@@ -6,6 +6,7 @@ import logging
 from pydantic import BaseModel
 
 from app import chat, ActionResult
+from models_records import PaymentConfigRecord, PaymentTestResultRecord
 
 log = logging.getLogger("admin")
 
@@ -17,6 +18,7 @@ class EmptyParams(BaseModel):
 @chat.function(
     "payment_config_get",
     action_type="read",
+    data_model=PaymentConfigRecord,
     description="Get current payment provider configuration.",
 )
 async def fn_payment_config_get(ctx, params: EmptyParams) -> ActionResult:
@@ -49,6 +51,7 @@ async def fn_payment_config_get(ctx, params: EmptyParams) -> ActionResult:
 @chat.function(
     "payment_test_connection",
     action_type="read",
+    data_model=PaymentTestResultRecord,
     description="Test Stripe API connection with current keys.",
 )
 async def fn_payment_test_connection(ctx, params: EmptyParams) -> ActionResult:
