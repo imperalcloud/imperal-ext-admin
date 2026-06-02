@@ -56,9 +56,11 @@ class RemoveUserAttributeParams(BaseModel):
 
 
 class ResetConvParams(BaseModel):
-    """Reset a user's conversation. Omit both fields to reset YOURSELF."""
-    user_id: str = Field(default="", description="imperal_id of the user to reset (admin only; omit to reset yourself)")
-    email: str   = Field(default="", description="email of the user to reset (admin only; omit to reset yourself)")
+    """Reset (clear) a specific user's conversation. A target is REQUIRED — pass
+    user_id or email; the tool NEVER silently defaults to the caller (for a
+    genuine self-reset the kernel passes the caller's own imperal_id)."""
+    user_id: str = Field(default="", description="imperal_id of the user to reset (admin only for another user)")
+    email: str   = Field(default="", description="email of the user to reset (admin only for another user)")
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #
@@ -157,10 +159,14 @@ async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
         target = await _resolve_user_by_email(params.email) or ""
         if not target:
             return ActionResult.error(f"User '{params.email}' not found.")
+    # SAFETY (2026-06-02): never silently default an unresolved target to the
+    # caller — a phantom/lost target once turned "clear THESE users' history"
+    # into "clear MY history". A target is REQUIRED; the kernel passes the
+    # caller's own id explicitly for a genuine self-reset.
     if not target:
-        target = self_uid
-    if not target:
-        return ActionResult.error("Could not determine which user to reset.")
+        return ActionResult.error(
+            "Specify which user to reset — provide a user_id or email."
+        )
 
     # Cross-user reset is admin-only; self-reset is allowed for everyone.
     if target != self_uid and getattr(ctx.user, "role", "") != "admin":
