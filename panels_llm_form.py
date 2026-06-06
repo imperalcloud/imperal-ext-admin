@@ -1,12 +1,21 @@
 """Admin · LLM Config Form builder.
 
-Builds the interactive Form for save_llm_config.
-Imported by panels_llm.py — separate file for 300L rule.
+Builds the interactive Form for save_llm_config. Imported by panels_llm.py —
+separate file for the 300L convention.
 
-Structure matches React LLMConfigTab:
-1. Default Provider — provider + model + API key + base URL + test
-2. Per-Purpose Models — routing/execution/navigate selects
-3. Failover — enable toggle + provider + model + API key + test
+Layout — seven clearly-labelled categories (admin reads top → bottom):
+  1. 🔌 Provider & Connection   — default provider/model/key/base-url + test
+  2. 🔁 Failover                — fallback provider when primary is down
+  3. 🧠 Per-Purpose Models      — override the model for each kernel LLM purpose
+  4. 🎛 Per-Purpose AI Params   — temperature/top_p/penalties per purpose
+  5. 📏 Per-Purpose Token Budgets — max_tokens cap per purpose (cost ceiling)
+  6. Token Budget Controls      — kernel-internal char/window/depth knobs (TBC)
+  7. 🚩 Feature Flags           — kernel LLM feature toggles
+
+Every control's `param_name` maps 1:1 to a key the kernel actually reads
+(verified against the live resolve-cascade — see _TOKEN_BUDGETS note). No dead
+knobs: per-purpose max_tokens are read dynamically via
+`config_resolver.resolve → cascade("max_tokens") → f"{purpose}_max_tokens"`.
 """
 from __future__ import annotations
 
@@ -42,7 +51,7 @@ _MODELS = {
     "google": ["gemini-2.5-pro", "gemini-2.5-flash"],
 }
 
-ALL_MODELS: list[dict] = [{"value": "", "label": "\u2014 Same as default \u2014"}]
+ALL_MODELS: list[dict] = [{"value": "", "label": "— Same as default —"}]
 for _prov, _models in _MODELS.items():
     for _m in _models:
         ALL_MODELS.append({"value": _m, "label": f"{_m} ({_prov})"})
@@ -54,20 +63,71 @@ for _prov, _models in _MODELS.items():
         PROVIDER_MODELS.append({"value": _m, "label": f"{_m} ({_prov})"})
 
 
-def _purpose_description(key: str) -> str:
-    """React-matching purpose descriptions."""
-    return {
-        "routing": "Intent detection & hub routing \u2014 fast/cheap",
-        "execution": "Tool use & task execution \u2014 accurate",
-        "navigate": "Conversational replies & navigation",
-        "chain_narrative": "Chain narrator that weaves multi-step results into final user response",
-        "judge": "Quality judge for narration verification",
-        # Federalization 2026-05-19 \u2014 Sprint 2 #26+
-        "conversational": "Chitchat / empty-apps fallback responses",
-        "step_reclassify": "Two-Phase Sprint 1 per-step LLM (binds args from prior step data)",
-        "tool_picker": "Chain executor disambiguation LLM (action_plan=null fallback)",
-        "action_narrator": "Action data narrator (post-tool prose)",
-    }.get(key, "")
+# ── Per-purpose catalogue ───────────────────────────────────────────────────
+# (key, label, what-it-drives). `key` is the kernel LLM purpose; the model
+# Select writes `{key}_model` and the AI-param inputs write `purpose_{key}_*`.
+# Order = the order the purposes fire across a typical turn.
+_PURPOSE_MODELS: list[tuple[str, str, str]] = [
+    ("routing", "Routing · Intent Classifier",
+     "Runs on EVERY user turn — detects intent, picks apps, plans the chain. "
+     "The brain's first pass; a fast model here is cheapest (cost × every message)."),
+    ("execution", "Execution · Tool Dispatch",
+     "Drives extension tool-use and automation actions (purpose=execution). "
+     "Favour an accurate model — it decides what actually runs."),
+    ("navigate", "Navigate · Clarify & Offer",
+     "Navigator prose: clarifying questions and proactive offers. Recognised "
+     "override slot — inherits the default model when left blank."),
+    ("chain_narrative", "Chain Narrator",
+     "Weaves multi-step chain results into the final user-facing reply "
+     "(purpose=chain_narrative)."),
+    ("judge", "Judge · Anti-Fabrication",
+     "Federal Gate-6 judge — reviews narrator output for fabricated "
+     "entities/IDs before it reaches the user (purpose=judge)."),
+    ("conversational", "Conversational · Chitchat",
+     "Free-form chat and the empty-apps fallback reply (purpose=conversational)."),
+    ("step_reclassify", "Step Reclassify · Two-Phase",
+     "Per-step re-classifier that binds args from prior-step data before each "
+     "write/destructive step. Default model: Claude Sonnet."),
+    ("tool_picker", "Tool Picker · Chain Disambiguation",
+     "Picks the tool when a chain step has no explicit action_plan "
+     "(disambiguation fallback)."),
+    ("action_narrator", "Action Narrator",
+     "Turns post-action tool output into user-facing prose."),
+]
+
+# (param_name, label, default-hint, description). max_tokens cap per purpose.
+# READ PATH (verified live): config_resolver.resolve() builds
+# LLMConfig(max_tokens=cascade("max_tokens")); cascade pulls per_purpose_cfg =
+# _extract_per_purpose_admin(store, purpose) which reads store[f"{purpose}_max_tokens"].
+# So every row below is a live control. Blank = inherit quality_ceiling_tokens.
+_TOKEN_BUDGETS: list[tuple[str, str, str, str]] = [
+    ("routing_max_tokens", "Routing (Classifier)", "4096",
+     "Cap for the every-turn classifier — must fit the whole chain/action-plan "
+     "JSON. Raise to 8000+ for reliable 10-step plans."),
+    ("execution_max_tokens", "Execution (Tool Dispatch)", "inherit",
+     "Cap for extension-dispatch / automation execution calls."),
+    ("navigate_max_tokens", "Navigate (Clarify & Offer)", "inherit",
+     "Cap for navigator clarify / offer prose."),
+    ("chain_narrative_max_tokens", "Chain Narrator", "8000",
+     "Cap for the multi-step narrator — large so long mail bodies and 10-step "
+     "summaries aren't truncated."),
+    ("judge_max_tokens", "Judge (Anti-Fab)", "4096",
+     "Cap for the anti-fabrication judge pass (purpose=judge)."),
+    ("conversational_max_tokens", "Conversational (Chitchat)", "4096",
+     "Cap for chitchat / empty-apps fallback replies."),
+    ("step_reclassify_max_tokens", "Step Reclassify (Sonnet)", "8000",
+     "Cap for the per-step reclassifier — large so long mail.body synthesis "
+     "from tool JSON isn't truncated mid-emit."),
+    ("tool_picker_max_tokens", "Tool Picker", "1024",
+     "Cap for the chain-disambiguation tool pick."),
+    ("chain_arg_refs_max_tokens", "Chain $REF Formatter", "2000",
+     "Cap for the $REF→markdown formatter (renders content-shaped fields "
+     "like mail.body / notes.content_text)."),
+    ("semantic_verifier_max_tokens", "Semantic Verifier", "128",
+     "Cap for the binary post-action yes/no schema-validity check (tiny by design)."),
+    ("action_narrator_max_tokens", "Action Narrator", "1024",
+     "Cap for post-tool prose narration."),
+]
 
 
 def build_llm_form(
@@ -85,7 +145,7 @@ def build_llm_form(
     available_providers: list[str] | None = None,
     tenant_defaults: dict | None = None,
     purpose_ai_params: dict | None = None,
-    # Federalization 2026-05-19 \u2014 new per-purpose model overrides.
+    # Federalization 2026-05-19 — new per-purpose model overrides.
     # Empty default = inherit global `model`. Caller fetches from
     # imperal:config:llm flat-keys (cfg.get("conversational_model"), etc.).
     conversational_model: str = "",
@@ -93,7 +153,7 @@ def build_llm_form(
     tool_picker_model: str = "",
     action_narrator_model: str = "",
 ) -> object:
-    """Full save_llm_config Form matching React LLMConfigTab."""
+    """Full save_llm_config Form — seven categories (see module docstring)."""
 
     # Filter providers by availability
     if available_providers:
@@ -185,33 +245,46 @@ def build_llm_form(
         _purpose_ai = purpose_ai_params
     else:
         _purpose_ai = (_td.get("purpose_ai_params") or {}) if isinstance(_td, dict) else {}
-    for _p in ("routing", "execution", "navigate", "chain_narrative", "judge",
-               "conversational", "step_reclassify", "tool_picker", "action_narrator"):
+    for _p, _label, _desc in _PURPOSE_MODELS:
         _slot = _purpose_ai.get(_p) or {}
         for _k in ("temperature", "top_p", "presence_penalty", "frequency_penalty"):
             _v = _slot.get(_k)
             defaults[f"purpose_{_p}_{_k}"] = "" if _v is None else str(_v)
 
-    # Per-purpose children with descriptions + LCU-4 AI param row
-    purpose_children: list = []
-    for key, label in [("routing", "Routing"), ("execution", "Execution"),
-                       ("navigate", "Navigate"),
-                       ("chain_narrative", "Chain Narrator"),
-                       ("judge", "Judge"),
-                       # Federalization 2026-05-19
-                       ("conversational", "Conversational"),
-                       ("step_reclassify", "Step Reclassify (Two-Phase Sprint 1)"),
-                       ("tool_picker", "Tool Picker (Chain Disambiguation)"),
-                       ("action_narrator", "Action Narrator")]:
-        val = defaults[f"{key}_model"]
-        # AI param caption row + 4 inputs (LCU-4, 2026-04-30).
-        # Empty string means "inherit" — kernel cascade falls through to
-        # global / provider default. Numeric strings are parsed by save handler.
-        ai_row = [
-            ui.Text(
-                "AI params (leave blank to inherit; per-extension > per-purpose > global)",
-                variant="caption",
+    # ── Category 3: Per-Purpose Models ───────────────────────────
+    model_children: list = [
+        ui.Text(
+            "Override the model used for each kernel LLM purpose. Leave on "
+            "“Same as default” to inherit the provider/model above.",
+            variant="caption",
+        ),
+    ]
+    for key, label, desc in _PURPOSE_MODELS:
+        model_children.extend([
+            ui.Stack([
+                ui.Text(label, variant="body"),
+                ui.Text(desc, variant="caption"),
+            ], gap=0),
+            ui.Select(
+                options=ALL_MODELS,
+                value=defaults[f"{key}_model"],
+                param_name=f"{key}_model",
+                placeholder="Same as default",
             ),
+            ui.Divider(),
+        ])
+
+    # ── Category 4: Per-Purpose AI Parameters ────────────────────
+    aiparam_children: list = [
+        ui.Text(
+            "Fine-tune sampling per purpose. Leave blank to inherit "
+            "(per-extension > per-purpose > global > provider default).",
+            variant="caption",
+        ),
+    ]
+    for key, label, _desc in _PURPOSE_MODELS:
+        aiparam_children.extend([
+            ui.Text(label, variant="body"),
             ui.Stack([
                 ui.Stack([
                     ui.Text("Temperature (0.0 – 2.0)", variant="caption"),
@@ -246,20 +319,29 @@ def build_llm_form(
                     ),
                 ], gap=0),
             ], direction="h", gap=1, wrap=True),
-        ]
-        purpose_children.extend([
+            ui.Divider(),
+        ])
+
+    # ── Category 5: Per-Purpose Token Budgets (max_tokens) ───────
+    budget_children: list = [
+        ui.Text(
+            "max_tokens cap for each LLM purpose. Lower = cheaper but risks "
+            "truncated output; higher = reliable long output (mail body, 10-step "
+            "plan) at more cost. Blank = inherit the global quality_ceiling_tokens.",
+            variant="caption",
+        ),
+    ]
+    for pname, label, hint, desc in _TOKEN_BUDGETS:
+        budget_children.extend([
             ui.Stack([
                 ui.Text(label, variant="body"),
-                ui.Text(_purpose_description(key), variant="caption"),
+                ui.Text(desc, variant="caption"),
             ], gap=0),
-            ui.Select(
-                options=ALL_MODELS,
-                value=val,
-                param_name=f"{key}_model",
-                placeholder="Same as default",
+            ui.Input(
+                placeholder=f"{hint} (default)",
+                param_name=pname,
+                value=str(defaults[pname]),
             ),
-            *ai_row,
-            ui.Divider(),
         ])
 
     return ui.Form(
@@ -267,8 +349,13 @@ def build_llm_form(
         submit_label="Save LLM Config",
         defaults=defaults,
         children=[
-            # ── Default Provider ──────────────────────────────────
-            ui.Section(title="Default Provider", children=[
+            # ── 1 · Provider & Connection ─────────────────────────
+            ui.Section(title="\U0001f50c Provider & Connection", children=[
+                ui.Text(
+                    "The default LLM used everywhere unless a per-purpose or "
+                    "per-extension override applies.",
+                    variant="caption",
+                ),
                 ui.Text("Provider", variant="caption"),
                 ui.Select(
                     options=provider_opts, value=provider,
@@ -281,7 +368,7 @@ def build_llm_form(
                 ),
                 ui.Text("API Key", variant="caption"),
                 ui.Input(
-                    placeholder="sk-\u2026  (leave blank to keep current)",
+                    placeholder="sk-…  (leave blank to keep current)",
                     param_name="api_key", value="",
                 ),
                 ui.Text("Base URL (custom providers only)", variant="caption"),
@@ -296,121 +383,11 @@ def build_llm_form(
                 ),
             ]),
 
-            # ── Per-Purpose Models ────────────────────────────────
-            ui.Section(title="Per-Purpose Models", collapsible=True,
-                       children=purpose_children),
-
-            # ── Per-Purpose Token Budgets ─────────────────────────
-            # Federalization 2026-05-19 (Sprint 2 fix #26+). Each kernel
-            # LLM purpose has admin-tunable max_tokens cap. NULL = inherit
-            # quality_ceiling_tokens. Replaces previously hardcoded values.
-            ui.Section(title="Per-Purpose Token Budgets (max_tokens)",
-                       collapsible=True, children=[
+            # ── 2 · Failover ──────────────────────────────────────
+            ui.Section(title="\U0001f501 Failover", collapsible=True, children=[
                 ui.Text(
-                    "max_tokens cap for each LLM purpose. Lower = cheaper but truncates output. "
-                    "Higher = reliable long-output (mail body, 10-step chain plan, etc.) but more cost. "
-                    "Empty = inherit quality_ceiling_tokens global cap.",
-                    variant="caption",
-                ),
-                ui.Text("Routing (Classifier)", variant="caption"),
-                ui.Input(
-                    placeholder="4096 (default)",
-                    param_name="routing_max_tokens",
-                    value=str(defaults["routing_max_tokens"]),
-                ),
-                ui.Text("Execution (Extension dispatch)", variant="caption"),
-                ui.Input(
-                    placeholder="4096", param_name="execution_max_tokens",
-                    value=str(defaults["execution_max_tokens"]),
-                ),
-                ui.Text("Navigate (Hub navigator)", variant="caption"),
-                ui.Input(
-                    placeholder="4096", param_name="navigate_max_tokens",
-                    value=str(defaults["navigate_max_tokens"]),
-                ),
-                ui.Text("Chain Narrator", variant="caption"),
-                ui.Input(
-                    placeholder="8000", param_name="chain_narrative_max_tokens",
-                    value=str(defaults["chain_narrative_max_tokens"]),
-                ),
-                ui.Text("Judge (anti-fab Gate 6)", variant="caption"),
-                ui.Input(
-                    placeholder="4096", param_name="judge_max_tokens",
-                    value=str(defaults["judge_max_tokens"]),
-                ),
-                ui.Text("Conversational (chitchat)", variant="caption"),
-                ui.Input(
-                    placeholder="4096", param_name="conversational_max_tokens",
-                    value=str(defaults["conversational_max_tokens"]),
-                ),
-                ui.Text("Step Reclassify (Two-Phase Sprint 1, Sonnet)",
-                        variant="caption"),
-                ui.Input(
-                    placeholder="8000", param_name="step_reclassify_max_tokens",
-                    value=str(defaults["step_reclassify_max_tokens"]),
-                ),
-                ui.Text("Tool Picker (chain disambiguation)", variant="caption"),
-                ui.Input(
-                    placeholder="1024", param_name="tool_picker_max_tokens",
-                    value=str(defaults["tool_picker_max_tokens"]),
-                ),
-                ui.Text("Chain $REF Formatter (BUG-M markdown narration)",
-                        variant="caption"),
-                ui.Input(
-                    placeholder="2000", param_name="chain_arg_refs_max_tokens",
-                    value=str(defaults["chain_arg_refs_max_tokens"]),
-                ),
-                ui.Text("Semantic Verifier (binary post-action check)",
-                        variant="caption"),
-                ui.Input(
-                    placeholder="128", param_name="semantic_verifier_max_tokens",
-                    value=str(defaults["semantic_verifier_max_tokens"]),
-                ),
-                ui.Text("Action Narrator (post-tool prose)", variant="caption"),
-                ui.Input(
-                    placeholder="1024", param_name="action_narrator_max_tokens",
-                    value=str(defaults["action_narrator_max_tokens"]),
-                ),
-            ]),
-
-            # ── Feature Flags ─────────────────────────────────────
-            # Federalization 2026-05-19 — env-only flags moved to admin Panel.
-            ui.Section(title="Feature Flags (Kernel)", collapsible=True,
-                       children=[
-                ui.Text(
-                    "Toggle kernel-side LLM features that were previously env-var-only. "
-                    "Changes apply within 60s (config cache TTL) — no worker restart needed.",
-                    variant="caption",
-                ),
-                ui.Toggle(
-                    label="Step Reclassify (Two-Phase Sprint 1)",
-                    value=bool(defaults["step_reclassify_enabled"]),
-                    param_name="step_reclassify_enabled",
-                ),
-                ui.Text(
-                    "When ON: each write/destructive chain step runs through a "
-                    "focused Sonnet LLM that binds args from prior step results before "
-                    "dispatch. Replaces legacy _apply_target_hint_post_ref + "
-                    "_verify_user_named_container_intent path. Default ON (Sprint 2 prod).",
-                    variant="caption",
-                ),
-                ui.Toggle(
-                    label="Prose Judge (Federal Gate 6 anti-fabrication)",
-                    value=bool(defaults["judge_enabled"]),
-                    param_name="judge_enabled",
-                ),
-                ui.Text(
-                    "When ON: every narrator output is reviewed by a judge LLM that "
-                    "flags fabricated entities/IDs. Default OFF (opt-in). Higher cost "
-                    "per chat turn.",
-                    variant="caption",
-                ),
-            ]),
-
-            # ── Failover ──────────────────────────────────────────
-            ui.Section(title="Failover", collapsible=True, children=[
-                ui.Text(
-                    "Fallback provider when primary is unavailable",
+                    "Fallback provider used automatically when the primary is "
+                    "unavailable or returns an error.",
                     variant="caption",
                 ),
                 ui.Toggle(
@@ -434,7 +411,7 @@ def build_llm_form(
                 ),
                 ui.Text("Failover API Key", variant="caption"),
                 ui.Input(
-                    placeholder="sk-\u2026  (leave blank to keep current)",
+                    placeholder="sk-…  (leave blank to keep current)",
                     param_name="failover_api_key", value="",
                 ),
                 ui.Button(
@@ -444,6 +421,52 @@ def build_llm_form(
                 ),
             ]),
 
+            # ── 3 · Per-Purpose Models ────────────────────────────
+            ui.Section(title="\U0001f9e0 Per-Purpose Models", collapsible=True,
+                       children=model_children),
+
+            # ── 4 · Per-Purpose AI Parameters ─────────────────────
+            ui.Section(title="\U0001f39b Per-Purpose AI Parameters",
+                       collapsible=True, children=aiparam_children),
+
+            # ── 5 · Per-Purpose Token Budgets ─────────────────────
+            ui.Section(title="\U0001f4cf Per-Purpose Token Budgets (max_tokens)",
+                       collapsible=True, children=budget_children),
+
+            # ── 6 · Token Budget Controls (TBC) ───────────────────
             build_tbc_section(defaults),
+
+            # ── 7 · Feature Flags ─────────────────────────────────
+            ui.Section(title="\U0001f6a9 Feature Flags (Kernel)", collapsible=True,
+                       children=[
+                ui.Text(
+                    "Kernel-side LLM features that were previously env-var-only. "
+                    "Changes apply within 60s (config cache TTL) — no worker "
+                    "restart needed.",
+                    variant="caption",
+                ),
+                ui.Toggle(
+                    label="Step Reclassify (Two-Phase Sprint 1)",
+                    value=bool(defaults["step_reclassify_enabled"]),
+                    param_name="step_reclassify_enabled",
+                ),
+                ui.Text(
+                    "When ON: each write/destructive chain step runs through a "
+                    "focused Sonnet LLM that binds args from prior step results "
+                    "before dispatch. Default ON (Sprint 2 prod).",
+                    variant="caption",
+                ),
+                ui.Toggle(
+                    label="Prose Judge (Federal Gate 6 anti-fabrication)",
+                    value=bool(defaults["judge_enabled"]),
+                    param_name="judge_enabled",
+                ),
+                ui.Text(
+                    "When ON: every narrator output is reviewed by a judge LLM "
+                    "that flags fabricated entities/IDs. Default OFF (opt-in). "
+                    "Higher cost per chat turn.",
+                    variant="caption",
+                ),
+            ]),
         ],
     )
