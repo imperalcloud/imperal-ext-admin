@@ -107,9 +107,18 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             _provider_key = f"{_purpose}_provider"
             _model_val = updates.get(_model_key, "")
             if _model_val and not updates.get(_provider_key):
+                # Admin set the model but left provider empty → infer provider.
                 _inferred = _model_to_provider.get(_model_val, "")
                 if _inferred:
                     updates[_provider_key] = _inferred
+            elif not str(getattr(params, _model_key, "") or "").strip():
+                # "Same as default" (empty) submission → CLEAR the stored
+                # override so this purpose inherits the global model. The generic
+                # updates loop skips empty values, so without this an override
+                # could be SET but never cleared (the value silently persisted).
+                # 2026-06-06: fixes "per-purpose → default doesn't save".
+                current.pop(_model_key, None)
+                current.pop(_provider_key, None)
 
         # ── LCU-4 per-purpose AI params (2026-04-30) ──────────────
         # Form sends flat `purpose_{name}_{param}` strings; kernel cascade
