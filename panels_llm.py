@@ -16,6 +16,7 @@ from panels_sections import (
     _cached, _fetch_llm_usage, _fetch_extensions, _fmt_tokens, _fmt_latency,
 )
 from panels_llm_form import build_llm_form
+from panels_llm_models import fetch_model_catalog
 
 log = logging.getLogger("admin")
 
@@ -130,11 +131,12 @@ def _build_overrides(overrides: dict, extensions: list[dict]) -> list:
 
 async def build_llm(ctx, run_test: str = "", **kwargs):
     """Build LLM Config panel. run_test='main'|'failover' triggers inline test."""
-    cfg, usage, extensions, tenant_defaults = await asyncio.gather(
+    cfg, usage, extensions, tenant_defaults, model_catalog = await asyncio.gather(
         _fetch_llm_config(),
         _fetch_llm_usage(),
         _fetch_extensions(),
         _fetch_tenant_defaults(),
+        fetch_model_catalog(),
     )
 
     provider = cfg.get("provider", "anthropic")
@@ -190,6 +192,8 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             step_reclassify_model=step_reclassify,
             tool_picker_model=tool_picker,
             action_narrator_model=action_narrator,
+            # Live model catalogue from the provider APIs (no hardcoded list).
+            model_catalog=model_catalog,
         ),
         ui.Divider(),
         ui.Section(

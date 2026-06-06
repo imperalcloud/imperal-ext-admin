@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from imperal_sdk import ui
 from panels_llm_form_tbc import build_tbc_section
+from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 
 _PROVIDERS = [
     {"value": "anthropic", "label": "Anthropic"},
@@ -29,38 +30,9 @@ _PROVIDERS = [
     {"value": "custom", "label": "Custom (OpenAI-compatible)"},
 ]
 
-_MODELS = {
-    "anthropic": [
-        "claude-opus-4-7",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5-20251001",
-        "claude-sonnet-4-20250514",
-        "claude-opus-4-20250514",
-    ],
-    "openai": [
-        "gpt-5",
-        "gpt-5-mini",
-        "gpt-5-nano",
-        "o3",
-        "gpt-4.1",
-        "gpt-4.1-mini",
-        "gpt-4.1-nano",
-        "gpt-4o",
-        "gpt-4o-mini",
-    ],
-    "google": ["gemini-2.5-pro", "gemini-2.5-flash"],
-}
-
-ALL_MODELS: list[dict] = [{"value": "", "label": "— Same as default —"}]
-for _prov, _models in _MODELS.items():
-    for _m in _models:
-        ALL_MODELS.append({"value": _m, "label": f"{_m} ({_prov})"})
-
-# Full model list (without "same as default") for default provider + failover
-PROVIDER_MODELS: list[dict] = []
-for _prov, _models in _MODELS.items():
-    for _m in _models:
-        PROVIDER_MODELS.append({"value": _m, "label": f"{_m} ({_prov})"})
+# Model dropdown options are built per-render inside build_llm_form() from the
+# live catalogue passed via model_catalog= (fetched from the provider APIs in
+# panels_llm_models.fetch_model_catalog). No hardcoded model list lives here.
 
 
 # ── Per-purpose catalogue ───────────────────────────────────────────────────
@@ -152,6 +124,9 @@ def build_llm_form(
     step_reclassify_model: str = "",
     tool_picker_model: str = "",
     action_narrator_model: str = "",
+    # Live model catalogue fetched from the provider APIs (panels_llm_models.
+    # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
+    model_catalog: dict | None = None,
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -164,6 +139,9 @@ def build_llm_form(
         ]
     else:
         provider_opts = _PROVIDERS
+
+    # Model dropdown options from the live catalogue (fallback iff none supplied).
+    _all_models, _provider_models = catalog_to_options(model_catalog or FALLBACK_CATALOG)
 
     _td = tenant_defaults or {}
     defaults = {
@@ -266,7 +244,7 @@ def build_llm_form(
                 ui.Text(desc, variant="caption"),
             ], gap=0),
             ui.Select(
-                options=ALL_MODELS,
+                options=_all_models,
                 value=defaults[f"{key}_model"],
                 param_name=f"{key}_model",
                 placeholder="Same as default",
@@ -363,7 +341,7 @@ def build_llm_form(
                 ),
                 ui.Text("Model", variant="caption"),
                 ui.Select(
-                    options=PROVIDER_MODELS if PROVIDER_MODELS else ALL_MODELS,
+                    options=_provider_models,
                     value=model, param_name="model",
                 ),
                 ui.Text("API Key", variant="caption"),
@@ -404,7 +382,7 @@ def build_llm_form(
                 ),
                 ui.Text("Failover Model", variant="caption"),
                 ui.Select(
-                    options=PROVIDER_MODELS if PROVIDER_MODELS else ALL_MODELS,
+                    options=_provider_models,
                     value=failover_model,
                     param_name="failover_model",
                     placeholder="Select failover model",

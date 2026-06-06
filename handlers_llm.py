@@ -89,17 +89,13 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             val = getattr(params, field)
             if val is not None and val != "":
                 updates[field] = val
-        # Sprint 2 hotfix (2026-04-28): per-purpose Model Select uses ALL_MODELS
-        # (cross-provider). If admin picks e.g. claude-sonnet for execution while
-        # global provider is openai, the resolver pairs incompatible model+provider
-        # → 404 from API. Auto-infer per-purpose provider from model name when
-        # admin set the model but left provider empty. Mirrors the same _MODELS
-        # mapping used by panels_llm_form.py to populate the dropdown.
-        from panels_llm_form import _MODELS as _MODEL_TO_PROVIDER_TABLE
-        _model_to_provider: dict[str, str] = {}
-        for _prov, _models in _MODEL_TO_PROVIDER_TABLE.items():
-            for _m in _models:
-                _model_to_provider[_m] = _prov
+        # Sprint 2 hotfix (2026-04-28): per-purpose Model Select is cross-provider.
+        # If admin picks e.g. claude-sonnet for execution while the global provider
+        # is openai, the resolver would pair incompatible model+provider → 404 from
+        # API. Auto-infer the per-purpose provider from the model id (prefix-based,
+        # via panels_llm_models.provider_for_model — works for ANY model the live
+        # catalogue surfaces, no hardcoded model→provider table).
+        from panels_llm_models import provider_for_model
         for _purpose in ("routing", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 2026-05-19 — new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
@@ -108,7 +104,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             _model_val = updates.get(_model_key, "")
             if _model_val and not updates.get(_provider_key):
                 # Admin set the model but left provider empty → infer provider.
-                _inferred = _model_to_provider.get(_model_val, "")
+                _inferred = provider_for_model(_model_val)
                 if _inferred:
                     updates[_provider_key] = _inferred
             elif not str(getattr(params, _model_key, "") or "").strip():
