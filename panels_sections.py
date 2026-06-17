@@ -102,15 +102,55 @@ async def _fetch_roles() -> list[dict]:
 
 
 async def _fetch_extensions_raw() -> list[dict]:
+    """Cross-store view of every app: merge the Registry (`/v1/apps`), the
+    Marketplace store (`developer_apps` via `/v1/admin/apps`), and the on-disk
+    `/opt/extensions/<id>` tree. Each returned app carries a ``stores`` list so
+    the panel can show exactly WHERE it lives — these three stores can drift."""
+    reg_list: list = []
+    dev_list: list = []
     try:
         r = await _registry_get("/v1/apps?status=active")
-        if r.status_code == 200:
-            apps = r.json()
-            return apps if isinstance(apps, list) else []
-        return []
+        if r.status_code == 200 and isinstance(r.json(), list):
+            reg_list = r.json()
     except Exception as e:
-        log.warning("Panel: fetch extensions failed: %s", e)
-        return []
+        log.warning("Panel: registry fetch failed: %s", e)
+    try:
+        d = await _gw_request("GET", "/v1/admin/apps")
+        if isinstance(d, list):
+            dev_list = d
+    except Exception as e:
+        log.warning("Panel: developer_apps fetch failed: %s", e)
+
+    merged: dict[str, dict] = {}
+    for a in reg_list:
+        aid = a.get("app_id") or a.get("id")
+        if not aid:
+            continue
+        m = merged.setdefault(aid, {"app_id": aid, "stores": []})
+        m.update({k: v for k, v in a.items() if v not in (None, "")})
+        m["app_id"] = aid
+        m["registry_status"] = a.get("status")
+        if "Registry" not in m["stores"]:
+            m["stores"].append("Registry")
+    for a in dev_list:
+        aid = a.get("app_id")
+        if not aid:
+            continue
+        m = merged.setdefault(aid, {"app_id": aid, "stores": []})
+        for k, v in a.items():
+            if v not in (None, "") and (k not in m or m.get(k) in (None, "")):
+                m[k] = v
+        m["app_id"] = aid
+        m["marketplace_status"] = a.get("status")
+        if "Marketplace" not in m["stores"]:
+            m["stores"].append("Marketplace")
+    for aid, m in merged.items():
+        try:
+            if os.path.isdir(f"/opt/extensions/{aid}"):
+                m["stores"].append("Disk")
+        except Exception:
+            pass
+    return sorted(merged.values(), key=lambda x: x.get("app_id", ""))
 
 
 async def _fetch_extensions() -> list[dict]:

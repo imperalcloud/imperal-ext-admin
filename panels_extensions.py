@@ -212,6 +212,9 @@ async def build_extensions(ctx: Any, category_filter: str = "",
         display_name = app.get("display_name") or app.get("name") or app_id
         uc = user_counts.get(app_id)
         parts: list[str] = []
+        stores = app.get("stores") or []
+        if stores:
+            parts.append("+".join(stores))
         if uc is not None:
             parts.append(f"{uc} users")
         # Tools count from app registration (may be 0 — actual tools in Settings > Tools)

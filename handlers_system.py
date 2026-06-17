@@ -189,7 +189,7 @@ from imperal_sdk import ui
 # migration policy, Declarative-UI panel builders are exempt from the
 # sdl.Entity / sdl.EntityList contract; forcing an entity model here would
 # misrepresent UI primitives as data records.
-@chat.function("get_panel_data", action_type="read",
+@chat.function("get_panel_data", action_type="read", ui_builder=True,
                description="Get panel Declarative UI data for admin extension.")
 async def fn_get_panel_data(ctx, params: EmptyParams) -> ActionResult:
     """Build admin dashboard UI by calling the shared admin_stats fetcher."""
