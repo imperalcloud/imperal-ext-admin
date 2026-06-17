@@ -139,6 +139,12 @@ def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> 
             label="Manage Users", variant="ghost",
             on_click=ui.Call("__panel__tools", section="ext_users", app_id=app_id),
         ),
+        ui.Button(
+            label="Purge", variant="danger",
+            on_click=ui.Call("purge_app", app_id=app_id, confirm_name=app_id, force=True,
+                             confirm=(f"Permanently purge '{app_id}' from the ENTIRE system "
+                                      "(files, DB, Redis, Registry, marketplace). This CANNOT be undone.")),
+        ),
     ], direction="h", gap=2))
     return nodes
 

@@ -58,6 +58,13 @@ class DenyAllowParams(BaseModel):
     user: str   = Field(default="", description="User email or imperal_id")
 
 
+class PurgeAppParams(BaseModel):
+    """Permanently purge an app from the ENTIRE system. Admin-only, irreversible."""
+    app_id: str       = Field(description="Exact app_id to purge")
+    confirm_name: str = Field(description="Must exactly equal app_id to confirm the purge")
+    force: bool       = Field(default=False, description="Purge even if the app is still active")
+
+
 # ─── Extension Management ─────────────────────────────────────────────── #
 
 @chat.function("list_extensions", action_type="read", data_model=ExtensionsListResponse, description="List all active extensions.")
@@ -332,3 +339,46 @@ async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
     await _invalidate_extension_caches(user_id=uid if params.user else None)
     if uid and params.user: await _signal_session_refresh(uid)
     return ActionResult.success(data={"app_id": aid, "removed": removed}, summary=f"Allowed {', '.join(removed)} for {aid}", refresh_panels=["tools"])
+
+
+@chat.function("purge_app", action_type="destructive",
+               description=("Permanently purge ANY app from the ENTIRE system — files on the worker, "
+                            "every DB row, Redis caches, the Registry entry, and the marketplace listing. "
+                            "Admin-only. Pass confirm_name equal to the EXACT app_id. Set force=true to purge "
+                            "an app that is still active. THIS CANNOT BE UNDONE."),
+               data_model=ExtSettingsReceipt)
+async def fn_purge_app(ctx, params: PurgeAppParams) -> ActionResult:
+    import os as _os, shutil as _shutil, re as _re
+    aid = (params.app_id or "").strip()
+    if not aid:
+        return ActionResult.error("app_id is required")
+    if params.confirm_name != aid:
+        return ActionResult.error(f"Confirmation failed. Type '{aid}' exactly to confirm the purge.")
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}[a-z0-9]", aid):
+        return ActionResult.error(f"Invalid app_id format: {aid!r}")
+
+    # 1. Remove the extension directory on THIS worker first, so the Registry
+    #    catalog-reload signal fired by the gateway purge re-walks a tree that no
+    #    longer contains the app (otherwise the app would be re-indexed).
+    fs_note = ""
+    ext_dir = f"/opt/extensions/{aid}"
+    if _os.path.isdir(ext_dir):
+        try:
+            _shutil.rmtree(ext_dir, ignore_errors=False)
+        except Exception as e:
+            fs_note = f" (worker directory cleanup failed: {e} — manual rm -rf {ext_dir} required)"
+
+    # 2. Gateway admin purge — DB cascade + Registry HARD delete + per-user Redis/Temporal cleanup.
+    result = await _gw_request("DELETE", f"/v1/admin/apps/{aid}",
+                               {"confirm_name": aid, "force": bool(params.force)})
+    if isinstance(result, dict) and result.get("error"):
+        return ActionResult.error(f"Purge failed at gateway: {result['error']}{fs_note}")
+
+    purged = result.get("installs_purged") if isinstance(result, dict) else None
+    extra = f" Cleared install state for {purged} user(s)." if purged is not None else ""
+    return ActionResult.success(
+        data={"app_id": aid, "status": "deleted", "verified": True,
+              "removed": ["files", "db", "redis", "registry", "marketplace"]},
+        summary=f"App '{aid}' permanently purged from the entire system.{extra}{fs_note}",
+        refresh_panels=["extensions", "dashboard"],
+    )

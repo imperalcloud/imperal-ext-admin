@@ -56,6 +56,9 @@ async def _gw_request(method, path, data=None):
     c = _get_http()
     if method.upper() in ("POST", "PUT", "PATCH"):
         r = await getattr(c, method.lower())(path, json=data)
+    elif method.upper() == "DELETE" and data is not None:
+        # DELETE-with-body (e.g. admin app purge confirm payload)
+        r = await c.request("DELETE", path, json=data)
     else:
         r = await getattr(c, method.lower())(path)
     # Federal: never call r.json() blindly. Auth-gw may return 4xx/5xx
