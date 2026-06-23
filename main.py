@@ -26,6 +26,8 @@ import handlers_system         # noqa: F401
 import handlers_llm            # noqa: F401
 import handlers_pricing        # noqa: F401  # Sprint 4 LLM rate CRUD
 import panels_pricing          # noqa: F401  # Sprint 4 LLM Pricing panel
+import handlers_system_pricing  # noqa: F401  # System Pricing: fee + credit-rate write handlers
+import panels_system_pricing    # noqa: F401  # System Pricing panel
 import handlers_billing        # noqa: F401
 import handlers_payment        # noqa: F401
 import handlers_developer      # noqa: F401
