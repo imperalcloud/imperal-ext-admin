@@ -230,3 +230,39 @@ class LLMModelRateReceipt(sdl.Entity):
             data.setdefault("title", data.get("model_id") or "llm_model_rate")
             data.setdefault("kind", "llmmodelrate")
         return data
+
+
+# --- system pricing ---
+
+class PlatformFeeReceipt(sdl.Entity):
+    """Receipt for save_platform_fees (kind='platformfee').
+    Mirrors handler return keys verbatim: {economy, standard, premium, action}."""
+    economy: Optional[int] = None
+    standard: Optional[int] = None
+    premium: Optional[int] = None
+    action: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("id") or "platform_fees"
+            data.setdefault("title", "Platform Fees")
+            data.setdefault("kind", "platformfee")
+        return data
+
+
+class TokenRateReceipt(sdl.Entity):
+    """Receipt for save_token_rate (kind='tokenrate').
+    Mirrors handler return keys verbatim: {token_rate, action}."""
+    token_rate: Optional[int] = None
+    action: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("id") or "token_rate"
+            data.setdefault("title", "Credit Rate")
+            data.setdefault("kind", "tokenrate")
+        return data

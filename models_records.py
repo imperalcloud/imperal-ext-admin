@@ -41,7 +41,8 @@ re-exports EVERYTHING so handlers keep importing ``from models_records import
                              RuleRecord, AdminRulesListResponse, RuleActionReceipt,
                              ConfirmationPolicyResponse, UserConfirmationResponse,
                              TaskLimitResponse, LLMTestResultRecord,
-                             LLMConfigReceipt, LLMModelRateReceipt
+                             LLMConfigReceipt, LLMModelRateReceipt,
+                             PlatformFeeReceipt, TokenRateReceipt
 """
 from __future__ import annotations
 
@@ -98,6 +99,8 @@ from models_system import (  # noqa: F401
     LLMTestResultRecord,
     LLMConfigReceipt,
     LLMModelRateReceipt,
+    PlatformFeeReceipt,
+    TokenRateReceipt,
 )
 
 __all__ = [
@@ -124,4 +127,6 @@ __all__ = [
     "AdminRulesListResponse", "RuleActionReceipt", "ConfirmationPolicyResponse",
     "UserConfirmationResponse", "TaskLimitResponse", "LLMTestResultRecord",
     "LLMConfigReceipt", "LLMModelRateReceipt",
+    # system pricing
+    "PlatformFeeReceipt", "TokenRateReceipt",
 ]
