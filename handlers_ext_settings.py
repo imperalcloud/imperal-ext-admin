@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app import (
     chat, ActionResult, _registry_get, _registry_put, _resolve_app_id,
+    AUTH_GW, AUTH_SERVICE_TOKEN,
 )
 from models_records import ExtSettingsReceipt
 
@@ -118,10 +119,30 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
     description="Save extension general settings.",
 )
 async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
-    return await _save_section(params.app_id, "general", {
+    result = await _save_section(params.app_id, "general", {
         "display_name": params.display_name,
         "status": params.status,
     })
+    # SINGLE SOURCE OF TRUTH: mirror the rename into developer_apps — the table
+    # BOTH the marketplace and the panel sidebar read — so renaming here changes
+    # the name everywhere, not just in the Registry-backed sidebar. Best-effort:
+    # the Registry write above stays authoritative for this handler's result.
+    if params.display_name and AUTH_GW and AUTH_SERVICE_TOKEN:
+        try:
+            import httpx
+            aid = await _resolve_app_id(params.app_id)
+            async with httpx.AsyncClient(timeout=10.0) as c:
+                await c.post(
+                    f"{AUTH_GW}/v1/admin/apps/{aid}/metadata",
+                    headers={
+                        "X-Service-Token": AUTH_SERVICE_TOKEN,
+                        "Content-Type": "application/json",
+                    },
+                    json={"display_name": params.display_name},
+                )
+        except Exception:
+            pass
+    return result
 
 
 @chat.function(
