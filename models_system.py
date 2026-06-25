@@ -266,3 +266,21 @@ class TokenRateReceipt(sdl.Entity):
             data.setdefault("title", "Credit Rate")
             data.setdefault("kind", "tokenrate")
         return data
+
+
+class CategoryDefaultsReceipt(sdl.Entity):
+    """Receipt for save_category_defaults (kind='categorydefaults').
+    Mirrors handler return keys verbatim: {read, write, destructive, action}."""
+    read: Optional[int] = None
+    write: Optional[int] = None
+    destructive: Optional[int] = None
+    action: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("id") or "category_defaults"
+            data.setdefault("title", "Default Function Prices")
+            data.setdefault("kind", "categorydefaults")
+        return data

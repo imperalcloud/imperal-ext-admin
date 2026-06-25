@@ -18,6 +18,7 @@ log = logging.getLogger("admin")
 
 _DEFAULT_FEES = {"economy": 60, "standard": 250, "premium": 2200}
 _DEFAULT_RATE = 1000
+_DEFAULT_CATS = {"read": 1, "write": 5, "destructive": 10}
 
 
 async def _get(path: str) -> dict:
@@ -41,6 +42,7 @@ async def _get(path: str) -> dict:
 async def build_system_pricing(ctx, **kwargs):
     fees = await _get("/v1/internal/billing/platform-fees") or {}
     rate = await _get("/v1/internal/billing/token-rate") or {}
+    cats = await _get("/v1/internal/billing/category-defaults") or {}
 
     fees_form = ui.Form(
         action="save_platform_fees",
@@ -79,8 +81,40 @@ async def build_system_pricing(ctx, **kwargs):
         ],
     )
 
+    cats_form = ui.Form(
+        action="save_category_defaults",
+        submit_label="Save Default Function Prices",
+        defaults={
+            "read": int(cats.get("read", _DEFAULT_CATS["read"])),
+            "write": int(cats.get("write", _DEFAULT_CATS["write"])),
+            "destructive": int(cats.get("destructive", _DEFAULT_CATS["destructive"])),
+        },
+        children=[
+            ui.Section(title="Default base price per action (credits)", children=[
+                ui.Text(
+                    "The base price charged for an extension function when its developer "
+                    "has NOT set an explicit per-function price. Picked by the action's type. "
+                    "This is the function's own fee (the developer earns their revenue share of "
+                    "it); the platform fee above is added on top separately. Applies within ~1 min.",
+                    variant="caption"),
+                ui.Text("Read actions (view/list/search)", variant="caption"),
+                ui.Input(param_name="read", placeholder="e.g. 1"),
+                ui.Text("Write actions (create/update)", variant="caption"),
+                ui.Input(param_name="write", placeholder="e.g. 5"),
+                ui.Text("Destructive actions (delete/remove)", variant="caption"),
+                ui.Input(param_name="destructive", placeholder="e.g. 10"),
+            ]),
+        ],
+    )
+
     return ui.Stack(children=[
         ui.Header("System Pricing", level=3),
-        ui.Card(title="Platform Fee by Tier", content=fees_form),
+        ui.Text(
+            "Every paid action costs base price + platform fee. The base price is the "
+            "extension function's own fee (shared with its developer); the platform fee is "
+            "Imperal's LLM-resale markup (kept in full). Set the global defaults here.",
+            variant="caption"),
+        ui.Card(title="Platform Fee by Tier (LLM resale — Imperal keeps 100%)", content=fees_form),
+        ui.Card(title="Default Function Prices (base fee — dev revenue-shared)", content=cats_form),
         ui.Card(title="Credit Rate", content=rate_form),
     ], direction="v", gap=2)

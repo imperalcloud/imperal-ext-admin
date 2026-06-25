@@ -101,6 +101,7 @@ from models_system import (  # noqa: F401
     LLMModelRateReceipt,
     PlatformFeeReceipt,
     TokenRateReceipt,
+    CategoryDefaultsReceipt,
 )
 
 __all__ = [
@@ -128,5 +129,5 @@ __all__ = [
     "UserConfirmationResponse", "TaskLimitResponse", "LLMTestResultRecord",
     "LLMConfigReceipt", "LLMModelRateReceipt",
     # system pricing
-    "PlatformFeeReceipt", "TokenRateReceipt",
+    "PlatformFeeReceipt", "TokenRateReceipt", "CategoryDefaultsReceipt",
 ]

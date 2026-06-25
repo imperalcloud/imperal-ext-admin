@@ -14,7 +14,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _verify_write_reflected
-from models_records import PlatformFeeReceipt, TokenRateReceipt
+from models_records import PlatformFeeReceipt, TokenRateReceipt, CategoryDefaultsReceipt
 
 log = logging.getLogger("admin")
 
@@ -90,5 +90,42 @@ async def fn_save_token_rate(ctx, params: SaveTokenRateParams) -> ActionResult:
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Credit rate saved: $1 = {params.token_rate} credits. Applies within ~1 min.",
+        refresh_panels=["tools"],
+    )
+
+
+class SaveCategoryDefaultsParams(BaseModel):
+    read: int = Field(..., ge=0, le=100_000, description="Default base price for READ actions (credits)")
+    write: int = Field(..., ge=0, le=100_000, description="Default base price for WRITE actions (credits)")
+    destructive: int = Field(..., ge=0, le=100_000, description="Default base price for DESTRUCTIVE actions (credits)")
+
+
+@chat.function("save_category_defaults", action_type="write",
+               event="category_defaults_saved", data_model=CategoryDefaultsReceipt,
+               description="Save the default per-action base prices (read/write/destructive) charged when "
+                           "an extension function has no explicit price, to the billing config.")
+async def fn_save_category_defaults(ctx, params: SaveCategoryDefaultsParams) -> ActionResult:
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/category-defaults"
+    body = {"read": params.read, "write": params.write, "destructive": params.destructive}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.put(url, json=body, headers={
+                "X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx),
+            })
+    except Exception as e:
+        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
+    if resp.status_code == 403:
+        return ActionResult.error("admin role required to change default function prices")
+    if resp.status_code != 200:
+        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
+    drift = _verify_write_reflected(resp.json(), body)
+    if drift:
+        return ActionResult.error(drift)
+    return ActionResult.success(
+        data={**body, "action": "saved"},
+        summary=f"Default function prices saved (read {params.read} / write {params.write} / "
+                f"destructive {params.destructive} cr). Applies within ~1 min.",
         refresh_panels=["tools"],
     )
