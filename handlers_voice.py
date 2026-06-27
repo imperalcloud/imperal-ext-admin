@@ -122,13 +122,6 @@ async def fn_set_role_voice(ctx, params: SetRoleVoiceParams) -> ActionResult:
     role = next((r for r in roles if r.get("id") == params.role_id), None)
     if not role:
         return ActionResult.error(f"Role {params.role_id} not found")
-    if role.get("is_system"):
-        rn = role.get("display_name") or role.get("name") or params.role_id
-        return ActionResult.error(
-            f"'{rn}' is a system role — its scopes are protected against tampering (anti-lockout), "
-            f"so voice can't be toggled per role here. Admins already have voice via the * wildcard, "
-            f"and the built-in 'user' role's access is fixed. To turn voice off for EVERYONE use the "
-            f"global master-switch; to control a specific group, toggle a custom (non-system) role.")
     scopes = set(role.get("default_scopes", []) or [])
     if params.enabled:
         scopes.add(VOICE_SCOPE)
