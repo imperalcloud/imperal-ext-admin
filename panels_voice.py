@@ -84,20 +84,28 @@ async def build_voice(ctx, **kwargs):
 
     # ── Per-role access (voice:use) ──────────────────────────────────────
     access_children = [
-        ui.Text("Grant or revoke voice (the voice:use scope) for a whole role/group. "
+        ui.Text("Grant or revoke voice (the voice:use scope) for a whole CUSTOM role/group. "
+                "System roles (admin / user) are protected — admins already have voice via the * "
+                "wildcard, and to turn voice off for everyone use the master-switch above. "
                 "For a single user, grant voice:use to them in the Users panel.",
                 variant="caption"),
     ]
     if roles:
         for r in roles:
             rid = r.get("id")
+            is_system = bool(r.get("is_system"))
             has = VOICE_SCOPE in (r.get("default_scopes") or [])
             rname = r.get("display_name") or r.get("name") or str(rid)
-            access_children.append(ui.Button(
-                label=f"{rname}: {'Disable' if has else 'Enable'} voice  ({'ON' if has else 'off'})",
-                variant=("danger" if has else "primary"),
-                on_click=ui.Call("set_role_voice", role_id=rid, enabled=(not has)),
-            ))
+            if is_system:
+                access_children.append(ui.Text(
+                    f"🔒 {rname} — system role (voice {'on' if (has or rname.lower() == 'admin') else 'managed'}; "
+                    "not per-role editable)", variant="caption"))
+            else:
+                access_children.append(ui.Button(
+                    label=f"{rname}: {'Disable' if has else 'Enable'} voice  ({'ON' if has else 'off'})",
+                    variant=("danger" if has else "primary"),
+                    on_click=ui.Call("set_role_voice", role_id=rid, enabled=(not has)),
+                ))
     else:
         access_children.append(ui.Text("No roles found.", variant="caption"))
 
