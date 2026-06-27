@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.2.1",
+  "sdk_version": "5.7.3",
   "app_id": "admin",
   "version": "5.7.1",
   "name": "Admin",
@@ -7320,6 +7320,225 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "purge_app",
+      "description": "Permanently purge ANY app from the ENTIRE system — files on the worker, every DB row, Redis caches, the Registry entry, and the marketplace listing. Admin-only. Pass confirm_name equal to the EXACT app_id. Set force=true to purge an app that is still active. THIS CANNOT BE UNDONE.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Permanently purge an app from the ENTIRE system. Admin-only, irreversible.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id to purge",
+            "title": "App Id",
+            "type": "string"
+          },
+          "confirm_name": {
+            "description": "Must exactly equal app_id to confirm the purge",
+            "title": "Confirm Name",
+            "type": "string"
+          },
+          "force": {
+            "default": false,
+            "description": "Purge even if the app is still active",
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "app_id",
+          "confirm_name"
+        ],
+        "title": "PurgeAppParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt entity for extension write tools that return a small confirmation\npayload keyed by app_id (update_extension_config, update_skeleton_ttl,\nsuspend/activate_extension, set_access_policy, deny/allow_extension,\nsave_ext_* receipts) — kind='extension'. Keeps every observed receipt key\nverbatim so panels/$REF read the same data. Reuse this rather than inventing\na per-verb receipt.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "App Id"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated"
+          },
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ttl"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Previous"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Verified"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy"
+          },
+          "denied": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Denied"
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Removed"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ExtSettingsReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "save_ext_general",
       "description": "Save extension general settings.",
       "action_type": "write",
@@ -12745,6 +12964,615 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "save_platform_fees",
+      "description": "Save per-tier platform fees (economy/standard/premium) to the billing config.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "economy": {
+            "description": "Economy tier platform fee (credits)",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Economy",
+            "type": "integer"
+          },
+          "standard": {
+            "description": "Standard tier platform fee (credits)",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Standard",
+            "type": "integer"
+          },
+          "premium": {
+            "description": "Premium tier platform fee (credits)",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Premium",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "economy",
+          "standard",
+          "premium"
+        ],
+        "title": "SavePlatformFeesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt for save_platform_fees (kind='platformfee').\nMirrors handler return keys verbatim: {economy, standard, premium, action}.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "economy": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Economy"
+          },
+          "standard": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Standard"
+          },
+          "premium": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Premium"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PlatformFeeReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "platform_fees_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_token_rate",
+      "description": "Save the $-to-credit conversion rate (credits per $1) to the billing config.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "token_rate": {
+            "description": "Credits per $1 (e.g. 1000)",
+            "maximum": 1000000,
+            "minimum": 1,
+            "title": "Token Rate",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token_rate"
+        ],
+        "title": "SaveTokenRateParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt for save_token_rate (kind='tokenrate').\nMirrors handler return keys verbatim: {token_rate, action}.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "token_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Token Rate"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "TokenRateReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "token_rate_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_category_defaults",
+      "description": "Save the default per-action base prices (read/write/destructive) charged when an extension function has no explicit price, to the billing config.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "read": {
+            "description": "Default base price for READ actions (credits)",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Read",
+            "type": "integer"
+          },
+          "write": {
+            "description": "Default base price for WRITE actions (credits)",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Write",
+            "type": "integer"
+          },
+          "destructive": {
+            "description": "Default base price for DESTRUCTIVE actions (credits)",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Destructive",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "read",
+          "write",
+          "destructive"
+        ],
+        "title": "SaveCategoryDefaultsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt for save_category_defaults (kind='categorydefaults').\nMirrors handler return keys verbatim: {read, write, destructive, action}.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "read": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Read"
+          },
+          "write": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Write"
+          },
+          "destructive": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destructive"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "CategoryDefaultsReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "category_defaults_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_voice_costs",
+      "description": "Save the per-action voice costs (STT transcription + TTS spoken reply) to the billing config.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "stt": {
+            "description": "Credits charged per voice transcription (STT)",
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Stt",
+            "type": "integer"
+          },
+          "speak": {
+            "description": "Credits charged per spoken reply synthesis (TTS)",
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Speak",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stt",
+          "speak"
+        ],
+        "title": "SaveVoiceCostsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "voice_costs_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_voice_enabled",
+      "description": "Turn the entire voice feature ON or OFF platform-wide (off hides the mic for everyone).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "enabled": {
+            "description": "Global voice master-switch (off = no voice anywhere; mic hidden)",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SaveVoiceEnabledParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "voice_enabled_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_role_voice",
+      "description": "Grant or revoke voice access (the voice:use scope) for an entire role/group.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "role_id": {
+            "description": "Role id",
+            "title": "Role Id",
+            "type": "integer"
+          },
+          "enabled": {
+            "description": "Grant (true) or revoke (false) voice:use for this role",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "role_id",
+          "enabled"
+        ],
+        "title": "SetRoleVoiceParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "role_voice_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "billing_overview",
       "description": "Show billing plans, pricing tiers, and platform summary.",
       "action_type": "read",
@@ -14569,5 +15397,19 @@
     "on_install": {
       "signature": "(ctx)"
     }
-  }
+  },
+  "panels": [
+    {
+      "panel_id": "sidebar",
+      "slot": "left",
+      "title": "Administration",
+      "tree": {}
+    },
+    {
+      "panel_id": "tools",
+      "slot": "center",
+      "title": "Dashboard",
+      "tree": {}
+    }
+  ]
 }
