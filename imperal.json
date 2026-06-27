@@ -13573,6 +13573,50 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "set_role_connectors",
+      "description": "Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "role_id": {
+            "description": "Role id (UUID)",
+            "title": "Role Id",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Grant (true) or revoke (false) connectors:use for this role",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "role_id",
+          "enabled"
+        ],
+        "title": "SetRoleConnectorsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "role_connectors_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "billing_overview",
       "description": "Show billing plans, pricing tiers, and platform summary.",
       "action_type": "read",

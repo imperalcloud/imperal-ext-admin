@@ -107,6 +107,34 @@ async def fn_save_voice_enabled(ctx, params: SaveVoiceEnabledParams) -> ActionRe
 
 # ── Per-role voice access (voice:use scope on default_scopes) ─────────────
 
+CONNECTORS_SCOPE = "connectors:use"
+
+
+async def _toggle_role_scope(role_id: str, scope: str, enabled: bool, label: str) -> ActionResult:
+    """Grant/revoke a feature scope on a role's default_scopes (cascades to members)."""
+    roles = await _gw_request("GET", "/v1/roles")
+    if not isinstance(roles, list):
+        return ActionResult.error("Failed to fetch roles")
+    role = next((r for r in roles if r.get("id") == role_id), None)
+    if not role:
+        return ActionResult.error(f"Role {role_id} not found")
+    scopes = set(role.get("default_scopes", []) or [])
+    if enabled:
+        scopes.add(scope)
+    else:
+        scopes.discard(scope)
+    result = await _gw_request("PATCH", f"/v1/roles/{role_id}?cascade=true",
+                               {"default_scopes": sorted(scopes)})
+    if isinstance(result, dict) and "error" in result:
+        return ActionResult.error(result["error"])
+    rname = role.get("display_name") or role.get("name") or role_id
+    return ActionResult.success(
+        data={"role_id": role_id, "scope": scope, "enabled": enabled, "action": "saved"},
+        summary=f"{label} {'enabled' if enabled else 'disabled'} for role '{rname}'.",
+        refresh_panels=["tools"],
+    )
+
+
 class SetRoleVoiceParams(BaseModel):
     role_id: str = Field(..., description="Role id (UUID)")
     enabled: bool = Field(..., description="Grant (true) or revoke (false) voice:use for this role")
@@ -116,24 +144,16 @@ class SetRoleVoiceParams(BaseModel):
                event="role_voice_set", data_model=_Receipt,
                description="Grant or revoke voice access (the voice:use scope) for an entire role/group.")
 async def fn_set_role_voice(ctx, params: SetRoleVoiceParams) -> ActionResult:
-    roles = await _gw_request("GET", "/v1/roles")
-    if not isinstance(roles, list):
-        return ActionResult.error("Failed to fetch roles")
-    role = next((r for r in roles if r.get("id") == params.role_id), None)
-    if not role:
-        return ActionResult.error(f"Role {params.role_id} not found")
-    scopes = set(role.get("default_scopes", []) or [])
-    if params.enabled:
-        scopes.add(VOICE_SCOPE)
-    else:
-        scopes.discard(VOICE_SCOPE)
-    result = await _gw_request("PATCH", f"/v1/roles/{params.role_id}?cascade=true",
-                               {"default_scopes": sorted(scopes)})
-    if isinstance(result, dict) and "error" in result:
-        return ActionResult.error(result["error"])
-    rname = role.get("display_name") or role.get("name") or params.role_id
-    return ActionResult.success(
-        data={"role_id": params.role_id, "voice": params.enabled, "action": "saved"},
-        summary=f"Voice {'enabled' if params.enabled else 'disabled'} for role '{rname}'.",
-        refresh_panels=["tools"],
-    )
+    return await _toggle_role_scope(params.role_id, VOICE_SCOPE, params.enabled, "Voice")
+
+
+class SetRoleConnectorsParams(BaseModel):
+    role_id: str = Field(..., description="Role id (UUID)")
+    enabled: bool = Field(..., description="Grant (true) or revoke (false) connectors:use for this role")
+
+
+@chat.function("set_role_connectors", action_type="write",
+               event="role_connectors_set", data_model=_Receipt,
+               description="Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.")
+async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> ActionResult:
+    return await _toggle_role_scope(params.role_id, CONNECTORS_SCOPE, params.enabled, "Connector access")

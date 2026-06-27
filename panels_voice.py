@@ -18,6 +18,7 @@ log = logging.getLogger("admin")
 
 _DEFAULT_COSTS = {"stt": 20, "speak": 15}
 VOICE_SCOPE = "voice:use"
+CONNECTORS_SCOPE = "connectors:use"
 
 
 async def _get(path: str) -> dict:
@@ -107,11 +108,35 @@ async def build_voice(ctx, **kwargs):
         content=ui.Stack(direction="v", gap=1, children=access_children),
     )
 
+    # ── Per-role connector access (connectors:use) ───────────────────────
+    conn_children = [
+        ui.Text("Grant or revoke messenger-connector access (the connectors:use scope) for any "
+                "role/group. Same model as voice — the '*' wildcard does not grant it, so this "
+                "toggle is authoritative for everyone, admins included.", variant="caption"),
+    ]
+    if roles:
+        for r in roles:
+            rid = r.get("id")
+            has = CONNECTORS_SCOPE in (r.get("default_scopes") or [])
+            rname = r.get("display_name") or r.get("name") or str(rid)
+            conn_children.append(ui.Button(
+                label=f"{rname}: {'Disable' if has else 'Enable'} connectors  ({'ON' if has else 'off'})",
+                variant=("danger" if has else "primary"),
+                on_click=ui.Call("set_role_connectors", role_id=rid, enabled=(not has)),
+            ))
+    else:
+        conn_children.append(ui.Text("No roles found.", variant="caption"))
+    conn_card = ui.Card(
+        title="Connector access by role (Telegram / Discord)",
+        content=ui.Stack(direction="v", gap=1, children=conn_children),
+    )
+
     return ui.Stack(direction="v", gap=2, children=[
-        ui.Header("Voice", level=3),
-        ui.Text("Control voice pricing, the global on/off, and which groups can use voice.",
-                variant="caption"),
+        ui.Header("Voice & Connectors", level=3),
+        ui.Text("Control voice pricing, the global on/off, and which groups can use voice and "
+                "the messenger connectors.", variant="caption"),
         ui.Card(title="Voice Pricing (Imperal OpenAI cost — STT + TTS)", content=costs_form),
         master_card,
         access_card,
+        conn_card,
     ])
