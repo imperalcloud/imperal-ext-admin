@@ -42,6 +42,7 @@ from panels_developer import build_app_review
 from panels_payouts import build_payouts
 from panels_pricing import build_pricing
 from panels_system_pricing import build_system_pricing
+from panels_voice import build_voice
 
 log = logging.getLogger("admin")
 
@@ -59,6 +60,7 @@ _SECTIONS = [
     {"id": "llm",        "label": "LLM Config",  "icon": "Brain"},
     {"id": "pricing",        "label": "LLM Pricing",    "icon": "Tag"},
     {"id": "system_pricing", "label": "System Pricing", "icon": "Coins"},
+    {"id": "voice",          "label": "Voice",          "icon": "Mic"},
     {"id": "app_review",     "label": "App Review",     "icon": "ClipboardCheck"},
     {"id": "payouts",    "label": "Payouts",     "icon": "Banknote"},
     {"id": "payment",    "label": "Payment",     "icon": "CreditCard"},
@@ -118,6 +120,7 @@ _BUILDERS = {
     "llm":               build_llm,
     "pricing":           build_pricing,
     "system_pricing":    build_system_pricing,
+    "voice":             build_voice,
     "ext_settings":      build_ext_settings,
     "ext_access_policy": build_ext_access_policy,
     "ext_users":         build_ext_users,
