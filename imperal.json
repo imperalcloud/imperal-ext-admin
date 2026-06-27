@@ -13538,9 +13538,9 @@
       "params_schema": {
         "properties": {
           "role_id": {
-            "description": "Role id",
+            "description": "Role id (UUID)",
             "title": "Role Id",
-            "type": "integer"
+            "type": "string"
           },
           "enabled": {
             "description": "Grant (true) or revoke (false) voice:use for this role",

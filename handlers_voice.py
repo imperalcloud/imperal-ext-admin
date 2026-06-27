@@ -108,7 +108,7 @@ async def fn_save_voice_enabled(ctx, params: SaveVoiceEnabledParams) -> ActionRe
 # ── Per-role voice access (voice:use scope on default_scopes) ─────────────
 
 class SetRoleVoiceParams(BaseModel):
-    role_id: int = Field(..., description="Role id")
+    role_id: str = Field(..., description="Role id (UUID)")
     enabled: bool = Field(..., description="Grant (true) or revoke (false) voice:use for this role")
 
 
