@@ -13617,6 +13617,57 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "set_plan_feature",
+      "description": "Enable or disable a feature (voice or connectors) for an entire subscription plan.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "plan_id": {
+            "description": "Plan id",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "feature": {
+            "description": "Feature: 'voice' or 'connectors'",
+            "pattern": "^(voice|connectors)$",
+            "title": "Feature",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enable (true) or disable (false) the feature for this plan",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plan_id",
+          "feature",
+          "enabled"
+        ],
+        "title": "SetPlanFeatureParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "plan_feature_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "billing_overview",
       "description": "Show billing plans, pricing tiers, and platform summary.",
       "action_type": "read",

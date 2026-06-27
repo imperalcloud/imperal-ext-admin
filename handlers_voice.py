@@ -157,3 +157,35 @@ class SetRoleConnectorsParams(BaseModel):
                description="Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.")
 async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> ActionResult:
     return await _toggle_role_scope(params.role_id, CONNECTORS_SCOPE, params.enabled, "Connector access")
+
+
+# ── Per-plan feature access (Plan.features voice/connectors) ──────────────
+
+class SetPlanFeatureParams(BaseModel):
+    plan_id: str = Field(..., description="Plan id")
+    feature: str = Field(..., pattern="^(voice|connectors)$", description="Feature: 'voice' or 'connectors'")
+    enabled: bool = Field(..., description="Enable (true) or disable (false) the feature for this plan")
+
+
+@chat.function("set_plan_feature", action_type="write",
+               event="plan_feature_set", data_model=_Receipt,
+               description="Enable or disable a feature (voice or connectors) for an entire subscription plan.")
+async def fn_set_plan_feature(ctx, params: SetPlanFeatureParams) -> ActionResult:
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    body = {"plan_id": params.plan_id, "feature": params.feature, "enabled": bool(params.enabled)}
+    try:
+        resp = await _put_billing("/v1/internal/billing/plan-feature", body, _acting(ctx))
+    except Exception as e:
+        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
+    if resp.status_code == 403:
+        return ActionResult.error("admin role required to change plan features")
+    if resp.status_code == 404:
+        return ActionResult.error("plan not found")
+    if resp.status_code != 200:
+        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
+    return ActionResult.success(
+        data={**body, "action": "saved"},
+        summary=f"{params.feature} {'enabled' if params.enabled else 'disabled'} for the plan. Applies within ~1 min.",
+        refresh_panels=["tools"],
+    )

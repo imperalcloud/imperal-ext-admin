@@ -45,6 +45,8 @@ async def build_voice(ctx, **kwargs):
     enabled = bool(master.get("enabled", True))
     roles = await _gw_request("GET", "/v1/roles")
     roles = roles if isinstance(roles, list) else []
+    plans = await _get("/v1/billing/plans")
+    plans = plans if isinstance(plans, list) else []
 
     # ── Pricing ──────────────────────────────────────────────────────────
     costs_form = ui.Form(
@@ -131,12 +133,43 @@ async def build_voice(ctx, **kwargs):
         content=ui.Stack(direction="v", gap=1, children=conn_children),
     )
 
+    # ── Per-plan access (Plan.features voice/connectors) ─────────────────
+    plan_children = [
+        ui.Text("Enable voice / connectors per subscription plan. Additive (OR) with the "
+                "role and per-user toggles — a user gets a feature if their PLAN, role, or a "
+                "personal grant allows it.", variant="caption"),
+    ]
+    if plans:
+        for p in plans:
+            pid = p.get("id")
+            pname = p.get("name") or str(pid)
+            feats = p.get("features") or {}
+            has_v = bool(feats.get("voice"))
+            has_c = bool(feats.get("connectors"))
+            plan_children.append(ui.Button(
+                label=f"{pname} · voice: {'Disable' if has_v else 'Enable'}  ({'ON' if has_v else 'off'})",
+                variant=("danger" if has_v else "primary"),
+                on_click=ui.Call("set_plan_feature", plan_id=pid, feature="voice", enabled=(not has_v)),
+            ))
+            plan_children.append(ui.Button(
+                label=f"{pname} · connectors: {'Disable' if has_c else 'Enable'}  ({'ON' if has_c else 'off'})",
+                variant=("danger" if has_c else "primary"),
+                on_click=ui.Call("set_plan_feature", plan_id=pid, feature="connectors", enabled=(not has_c)),
+            ))
+    else:
+        plan_children.append(ui.Text("No plans found.", variant="caption"))
+    plan_card = ui.Card(
+        title="Access by plan (voice / connectors)",
+        content=ui.Stack(direction="v", gap=1, children=plan_children),
+    )
+
     return ui.Stack(direction="v", gap=2, children=[
         ui.Header("Voice & Connectors", level=3),
-        ui.Text("Control voice pricing, the global on/off, and which groups can use voice and "
-                "the messenger connectors.", variant="caption"),
+        ui.Text("Control voice pricing, the global on/off, and which plans / groups / users can "
+                "use voice and the messenger connectors.", variant="caption"),
         ui.Card(title="Voice Pricing (Imperal OpenAI cost — STT + TTS)", content=costs_form),
         master_card,
+        plan_card,
         access_card,
         conn_card,
     ])
