@@ -14885,7 +14885,7 @@
     },
     {
       "name": "payment_config_get",
-      "description": "Get current payment provider configuration.",
+      "description": "Get the real Stripe configuration from the billing gateway.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -14896,7 +14896,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "payment_config_get return shape — a single payment-config entity\n(kind='paymentconfig').\n\nField names match the REAL runtime keys verbatim (verified vs\nhandlers_payment.fn_payment_config_get): {configured, enabled, mode,\nhas_publishable_key, has_webhook_secret}. id = title = 'payment_config'.",
+        "description": "payment_config_get return shape — a single payment-config entity\n(kind='paymentconfig').\n\nField names match the REAL runtime keys verbatim (verified vs\nhandlers_payment.fn_payment_config_get). id = title = 'payment_config'.",
         "properties": {
           "id": {
             "anyOf": [
@@ -14988,9 +14988,7 @@
           },
           "mode": {
             "anyOf": [
-              {
-                "type": "string"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -14998,7 +14996,7 @@
             "default": null,
             "title": "Mode"
           },
-          "has_publishable_key": {
+          "source": {
             "anyOf": [
               {},
               {
@@ -15006,7 +15004,27 @@
               }
             ],
             "default": null,
-            "title": "Has Publishable Key"
+            "title": "Source"
+          },
+          "secret_key_masked": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Secret Key Masked"
+          },
+          "publishable_key_masked": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Publishable Key Masked"
           },
           "has_webhook_secret": {
             "anyOf": [
@@ -15017,6 +15035,46 @@
             ],
             "default": null,
             "title": "Has Webhook Secret"
+          },
+          "account": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Account"
+          },
+          "balance": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Balance"
+          },
+          "webhook": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Webhook"
+          },
+          "recent_payments": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recent Payments"
           }
         },
         "required": [
@@ -15035,7 +15093,7 @@
     },
     {
       "name": "payment_test_connection",
-      "description": "Test Stripe API connection with current keys.",
+      "description": "Test Stripe API connection via the billing gateway (real active key).",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -15158,6 +15216,233 @@
         "x-sdl": "entity"
       },
       "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "payment_config_save",
+      "description": "Update Stripe keys via the billing gateway (validates, auto-manages webhook, applies instantly).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "secret_key": {
+            "default": "",
+            "description": "New Stripe secret key (sk_…). Blank = keep current.",
+            "title": "Secret Key",
+            "type": "string"
+          },
+          "publishable_key": {
+            "default": "",
+            "description": "New Stripe publishable key (pk_…). Blank = keep current.",
+            "title": "Publishable Key",
+            "type": "string"
+          },
+          "webhook_secret": {
+            "default": "",
+            "description": "Optional whsec_…; blank = auto-manage the live webhook.",
+            "title": "Webhook Secret",
+            "type": "string"
+          }
+        },
+        "title": "SaveStripeKeysParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "payment_config_get return shape — a single payment-config entity\n(kind='paymentconfig').\n\nField names match the REAL runtime keys verbatim (verified vs\nhandlers_payment.fn_payment_config_get). id = title = 'payment_config'.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "configured": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Configured"
+          },
+          "enabled": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "mode": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mode"
+          },
+          "source": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source"
+          },
+          "secret_key_masked": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Secret Key Masked"
+          },
+          "publishable_key_masked": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Publishable Key Masked"
+          },
+          "has_webhook_secret": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has Webhook Secret"
+          },
+          "account": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Account"
+          },
+          "balance": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Balance"
+          },
+          "webhook": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Webhook"
+          },
+          "recent_payments": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recent Payments"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PaymentConfigRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "payment_config_saved",
       "background": false,
       "long_running": false,
       "scopes": [],
