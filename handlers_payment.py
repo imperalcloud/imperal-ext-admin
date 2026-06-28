@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import httpx
 from pydantic import BaseModel, Field
-from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _verify_write_reflected
+from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN
 from models_records import PaymentConfigRecord, PaymentTestResultRecord
 
 log = logging.getLogger("admin")
