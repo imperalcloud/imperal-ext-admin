@@ -100,13 +100,18 @@ class PaymentConfigRecord(sdl.Entity):
     (kind='paymentconfig').
 
     Field names match the REAL runtime keys verbatim (verified vs
-    handlers_payment.fn_payment_config_get): {configured, enabled, mode,
-    has_publishable_key, has_webhook_secret}. id = title = 'payment_config'."""
+    handlers_payment.fn_payment_config_get). id = title = 'payment_config'."""
     configured: Optional[Any] = None
     enabled: Optional[Any] = None
-    mode: Optional[str] = None
-    has_publishable_key: Optional[Any] = None
+    mode: Optional[Any] = None
+    source: Optional[Any] = None
+    secret_key_masked: Optional[Any] = None
+    publishable_key_masked: Optional[Any] = None
     has_webhook_secret: Optional[Any] = None
+    account: Optional[Any] = None
+    balance: Optional[Any] = None
+    webhook: Optional[Any] = None
+    recent_payments: Optional[Any] = None
 
     @model_validator(mode="before")
     @classmethod
