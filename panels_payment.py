@@ -1,104 +1,78 @@
-"""Admin · Payment settings panel section."""
+"""Admin · Payment settings panel — real Stripe state + key management."""
 from __future__ import annotations
-
 import logging
-import os
-
+import httpx
 from imperal_sdk import ui
+from app import AUTH_GW, AUTH_SERVICE_TOKEN
 
 log = logging.getLogger("admin")
 
-
-def _test_stripe_connection() -> tuple[bool, str]:
-    """Test Stripe API connection. Returns (success, message)."""
+async def _get_config(acting: str) -> dict:
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return {}
     try:
-        import stripe
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
-        if not stripe.api_key:
-            return False, "STRIPE_SECRET_KEY not set"
-        balance = stripe.Balance.retrieve()
-        available = balance.available[0] if balance.available else None
-        currency = getattr(available, "currency", "?") if available else "?"
-        return True, f"Connected! Currency: {currency}"
+        async with httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.get(f"{AUTH_GW.rstrip('/')}/v1/internal/billing/stripe-config",
+                            headers={"X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": acting})
+        return r.json() if r.status_code == 200 else {}
     except Exception as e:
-        return False, f"Failed: {type(e).__name__}: {e}"
-
+        log.warning("payment _get_config error: %s", e); return {}
 
 async def build_payment(ctx, **kwargs):
-    """Payment provider settings — Stripe keys, tiers, status."""
-    stripe_enabled = os.getenv("STRIPE_ENABLED", "false").lower() == "true"
-    has_secret = bool(os.getenv("STRIPE_SECRET_KEY", ""))
-    has_pubkey = bool(os.getenv("STRIPE_PUBLISHABLE_KEY", ""))
-    has_webhook = bool(os.getenv("STRIPE_WEBHOOK_SECRET", ""))
+    acting = str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
+    d = await _get_config(acting)
+    mode = d.get("mode", "unset")
+    acct = d.get("account") or {}
+    bal = d.get("balance") or {}
+    wh = d.get("webhook") or {}
 
-    # Status
-    if stripe_enabled and has_secret:
-        status_badge = ui.Badge("Active", color="green")
-    elif has_secret:
-        status_badge = ui.Badge("Keys Set (disabled)", color="yellow")
-    else:
-        status_badge = ui.Badge("Not Configured", color="red")
-
-    mode = "test" if "test" in os.getenv("STRIPE_SECRET_KEY", "") else "live"
+    status_badge = (ui.Badge("Active", color="green") if d.get("enabled") and d.get("configured")
+                    else ui.Badge("Keys Set (disabled)", color="yellow") if d.get("configured")
+                    else ui.Badge("Not Configured", color="red"))
 
     children = [
         ui.Header("Payment Provider", level=3),
         ui.Stack(direction="h", gap=2, children=[
-            ui.Text("Provider: Stripe", variant="body"),
-            status_badge,
-            ui.Badge(f"Mode: {mode}", color="blue" if mode == "test" else "green"),
+            ui.Text("Provider: Stripe", variant="body"), status_badge,
+            ui.Badge(f"Mode: {mode}", color="green" if mode == "live" else "blue"),
+            ui.Badge(f"Source: {d.get('source','?')}", color="gray"),
         ]),
-
         ui.Divider(),
-        ui.Header("Configuration", level=4),
+        ui.Header("Live status", level=4),
         ui.KeyValue(items=[
-            {"key": "Stripe Enabled", "value": str(stripe_enabled)},
-            {"key": "Secret Key", "value": "Set" if has_secret else "Missing"},
-            {"key": "Publishable Key", "value": "Set" if has_pubkey else "Missing"},
-            {"key": "Webhook Secret", "value": "Set" if has_webhook else "Missing"},
-            {"key": "Webhook URL", "value": "https://auth.imperal.io/v1/webhooks/stripe"},
+            {"key": "Account", "value": acct.get("id", "—")},
+            {"key": "Charges enabled", "value": str(acct.get("charges_enabled", "—"))},
+            {"key": "Payouts enabled", "value": str(acct.get("payouts_enabled", "—"))},
+            {"key": "Balance", "value": f"{bal.get('amount','—')} {bal.get('currency','')}".strip()},
+            {"key": "Webhook", "value": ("healthy" if wh.get("healthy") and wh.get("events_ok")
+                                          else "needs attention") + f" ({wh.get('endpoint_id','—')})"},
         ]),
-
-        ui.Alert(
-            title="Configuration",
-            message="Stripe keys are configured via environment variables on Auth Gateway. "
-                    "Use 'Test Connection' to verify keys work.",
-            type="info",
-        ),
-
-        ui.Button(
-            label="Test Connection", icon="Zap", variant="secondary",
-            on_click=ui.Call("__panel__tools", section="payment", test="1"),
-        ),
-    ]
-
-    # Show test result inline when test=1 param is passed
-    if kwargs.get("test") == "1":
-        ok, msg = _test_stripe_connection()
-        children.append(ui.Alert(
-            title="Connection Test",
-            message=msg,
-            type="success" if ok else "error",
-        ))
-
-    children.extend([
         ui.Divider(),
-        ui.Header("Top-Up Tiers", level=4),
-        ui.DataTable(
-            columns=[
-                ui.DataColumn(key="tokens", label="Tokens", width=100),
-                ui.DataColumn(key="price", label="Price", width=100),
-            ],
-            rows=[
-                {"tokens": "5,000", "price": "$5"},
-                {"tokens": "20,000", "price": "$20"},
-                {"tokens": "50,000", "price": "$50"},
-            ],
-        ),
-        ui.Text(
-            "Tiers are currently hardcoded. Admin-configurable tiers via unified_config coming soon.",
-            variant="caption",
-        ),
-    ])
-
+        ui.Header("Configuration (masked)", level=4),
+        ui.KeyValue(items=[
+            {"key": "Secret Key", "value": d.get("secret_key_masked") or "Missing"},
+            {"key": "Publishable Key", "value": d.get("publishable_key_masked") or "Missing"},
+            {"key": "Webhook Secret", "value": "Set" if d.get("webhook_secret_set") else "Missing"},
+            {"key": "Webhook URL", "value": (wh.get("url") or "https://auth.imperal.io/v1/webhooks/stripe")},
+        ]),
+        ui.Button(label="Test Connection", icon="Zap", variant="secondary",
+                  on_click=ui.Call("payment_test_connection")),
+        ui.Divider(),
+        ui.Header("Change keys", level=4),
+        ui.Alert(title="How it works",
+                 message="Paste new sk_/pk_ and Apply. The system validates the key, detects "
+                         "test/live, auto-creates/verifies the live webhook, stores everything "
+                         "encrypted in Vault, and applies instantly — no restart. Leave a field "
+                         "blank to keep its current value.", type="info"),
+        ui.Form(action="payment_config_save", submit_label="Apply", defaults={}, children=[
+            ui.Section(title="Stripe keys", children=[
+                ui.Text("Secret key (sk_…)", variant="caption"),
+                ui.Password(param_name="secret_key", placeholder="sk_live_… (blank = keep)"),
+                ui.Text("Publishable key (pk_…)", variant="caption"),
+                ui.Password(param_name="publishable_key", placeholder="pk_live_… (blank = keep)"),
+                ui.Text("Webhook secret (optional — blank = auto-manage)", variant="caption"),
+                ui.Password(param_name="webhook_secret", placeholder="whsec_… (optional)"),
+            ]),
+        ]),
+    ]
     return ui.Stack(children=children, gap=2)
