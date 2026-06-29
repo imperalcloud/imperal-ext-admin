@@ -84,6 +84,13 @@ class UserBalanceRecord(sdl.Entity):
     held: Optional[int] = None
     holds: Optional[list[dict]] = None
     holds_total: Optional[int] = None
+    # Subscription truth, enriched from the gateway (the canonical billing read —
+    # same source the panel + the user's own billing extension show). The Redis
+    # wallet alone has no plan/renewal, so get_user_balance now joins them in.
+    status: Optional[str] = None
+    expires_at: Optional[str] = None
+    cancel_at_period_end: Optional[bool] = None
+    included_tokens: Optional[int] = None
     # adjust_balance receipt keys (this model is its data_model). The handler
     # returns {user_id, balance, adjustment, reason}; ``adjustment``/``reason``
     # were previously dropped. ``new_balance`` is an additive alias kept for

@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.7.3",
+  "sdk_version": "5.8.0",
   "app_id": "admin",
   "version": "5.7.1",
   "name": "Admin",
@@ -14082,6 +14082,42 @@
                 "default": null,
                 "title": "Holds Total"
               },
+              "expires_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Expires At"
+              },
+              "cancel_at_period_end": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Cancel At Period End"
+              },
+              "included_tokens": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Included Tokens"
+              },
               "adjustment": {
                 "anyOf": [
                   {},
@@ -14188,7 +14224,7 @@
     },
     {
       "name": "get_user_balance",
-      "description": "Get token balance for a specific user including active holds.",
+      "description": "Get a user's full billing state: token balance + active holds AND their subscription plan, status and renewal date (the canonical billing read — same truth the admin panel and the user's own billing extension show).",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -14390,6 +14426,42 @@
             ],
             "default": null,
             "title": "Holds Total"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "cancel_at_period_end": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cancel At Period End"
+          },
+          "included_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Included Tokens"
           },
           "adjustment": {
             "anyOf": [
@@ -14654,6 +14726,42 @@
             ],
             "default": null,
             "title": "Holds Total"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "cancel_at_period_end": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cancel At Period End"
+          },
+          "included_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Included Tokens"
           },
           "adjustment": {
             "anyOf": [

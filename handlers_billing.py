@@ -11,7 +11,7 @@ import httpx
 import redis.asyncio as aioredis
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, AUTH_GW, EmptyParams, _resolve_user_by_email
+from app import chat, ActionResult, AUTH_GW, EmptyParams, _resolve_user_by_email, _gw_request
 from models_records import (
     BillingHealthResponse, BillingOverviewResponse, UserBalanceRecord, UserBalancesResponse,
 )
@@ -165,7 +165,7 @@ async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("get_user_balance", action_type="read",
                data_model=UserBalanceRecord,
-               description="Get token balance for a specific user including active holds.")
+               description="Get a user's full billing state: token balance + active holds AND their subscription plan, status and renewal date (the canonical billing read — same truth the admin panel and the user's own billing extension show).")
 async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
     target_id, err = await _normalize_to_imperal_id(params.user_id)
     if err:
@@ -184,10 +184,32 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
             await r.aclose()
 
         total_held = sum(h["held"] for h in holds)
+
+        # Join the canonical subscription/plan from the gateway. The Redis wallet
+        # alone carries no plan/renewal — without this an admin reading a user's
+        # balance saw tokens only and assumed "no plan" even when the user has an
+        # active paid subscription (the panel reads this same gateway source).
+        sub = await _gw_request("GET", f"/v1/billing/internal/subscription/{target_id}")
+        bl = await _gw_request("GET", f"/v1/billing/internal/balance/{target_id}")
+        sub = sub if isinstance(sub, dict) and "error" not in sub else {}
+        bl = bl if isinstance(bl, dict) and "error" not in bl else {}
+        plan = sub.get("plan") or bl.get("plan") or "free"
+        status = sub.get("status")
+        expires = sub.get("expires_at")
+        cancel = bool(sub.get("cancel_at_period_end"))
+        cap = int(bl.get("cap") or 0)
+        included = int(bl.get("included_tokens") or 0)
+
+        renew_txt = f" · renews {str(expires)[:10]}" if expires else ""
         return ActionResult.success(
             data={"user_id": target_id, "balance": bal,
-                  "available": bal - total_held, "holds": holds, "holds_total": total_held},
-            summary=f"Balance: {bal} tokens ({len(holds)} holds, {total_held} held)",
+                  "available": bal - total_held, "holds": holds, "holds_total": total_held,
+                  "plan": plan, "status": status, "expires_at": expires,
+                  "cancel_at_period_end": cancel, "cap": cap, "included_tokens": included},
+            summary=f"{plan} plan · balance {bal:,} tokens"
+                    + (f" / {cap:,} cap" if cap else "")
+                    + (f" · {len(holds)} holds ({total_held} held)" if holds else "")
+                    + renew_txt,
         )
     except Exception as e:
         log.error("get_user_balance failed: %s", e)
