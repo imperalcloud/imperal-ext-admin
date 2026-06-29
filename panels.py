@@ -38,6 +38,7 @@ from panels_ext_settings import build_ext_settings
 from panels_ext_access_policy import build_ext_access_policy
 from panels_ext_users import build_ext_users
 from panels_payment import build_payment
+from panels_email import build_email
 from panels_developer import build_app_review
 from panels_payouts import build_payouts
 from panels_pricing import build_pricing
@@ -56,6 +57,7 @@ _SECTIONS = [
     {"id": "roles",      "label": "Roles",       "icon": "Shield"},
     {"id": "scopes",     "label": "Scopes",      "icon": "Key"},
     {"id": "audit",      "label": "Audit Log",   "icon": "FileText"},
+    {"id": "email",      "label": "Email",       "icon": "Mail"},
     {"id": "system",     "label": "System",      "icon": "Settings"},
     {"id": "llm",        "label": "LLM Config",  "icon": "Brain"},
     {"id": "pricing",        "label": "LLM Pricing",    "icon": "Tag"},
@@ -116,6 +118,7 @@ _BUILDERS = {
     "roles":             build_roles,
     "scopes":            build_scopes,
     "audit":             build_audit,
+    "email":             build_email,
     "system":            build_system,
     "llm":               build_llm,
     "pricing":           build_pricing,
