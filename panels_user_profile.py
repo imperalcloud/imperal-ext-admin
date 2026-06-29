@@ -39,6 +39,22 @@ async def _fetch_effective_scopes(user_id: str) -> list[str]:
     )
 
 
+async def _fetch_user_billing(user_id: str) -> tuple[dict, dict]:
+    """Subscription (plan/status/renewal) + wallet for a user. Both gateway
+    endpoints key on the canonical imperal_id — same truth the user's own
+    billing extension reads. Best-effort: never breaks the profile editor."""
+    async def _sub():
+        return await _gw_request("GET", f"/v1/billing/internal/subscription/{user_id}")
+
+    async def _bal():
+        return await _gw_request("GET", f"/v1/billing/internal/balance/{user_id}")
+
+    sub, bal = await asyncio.gather(_sub(), _bal())
+    sub = sub if isinstance(sub, dict) and "error" not in sub else {}
+    bal = bal if isinstance(bal, dict) and "error" not in bal else {}
+    return sub, bal
+
+
 def _role_default(roles, role_name, field, fallback) -> str:
     r = next((r for r in roles if r.get("name") == role_name), None)
     if r and r.get(field) is not None:
@@ -57,10 +73,12 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     if not isinstance(user, dict) or "error" in user:
         return ui.Alert(message=f"User {user_id} not found", type="error")
 
-    roles, all_scopes, extensions, user_exts, effective = await asyncio.gather(
+    roles, all_scopes, extensions, user_exts, effective, billing = await asyncio.gather(
         _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
         _fetch_user_extensions(user_id), _fetch_effective_scopes(user_id),
+        _fetch_user_billing(user_id),
     )
+    sub_data, bal_data = billing
 
     email = user.get("email", "?")
     role = user.get("role", "user")
@@ -122,6 +140,28 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             ],
         ),
     ]
+
+    # ── Subscription & Billing ─────────────────────────────────────
+    # Sourced from the gateway billing endpoints (keyed by imperal_id) so the
+    # admin sees the user's REAL plan + renewal date + wallet — the same truth
+    # the user's own billing extension reads.
+    plan = (sub_data.get("plan") or bal_data.get("plan") or "free")
+    sub_status = (sub_data.get("status") or "unknown")
+    expires = sub_data.get("expires_at")
+    cancel = bool(sub_data.get("cancel_at_period_end"))
+    balance = int(bal_data.get("balance") or 0)
+    cap = int(bal_data.get("cap") or 0)
+    renew_key = "Cancels on" if cancel else "Renews"
+    billing_items = [
+        {"key": "Plan", "value": str(plan).upper()},
+        {"key": "Status", "value": str(sub_status)},
+        {"key": renew_key, "value": str(expires) if expires else "—"},
+        {"key": "Token balance",
+         "value": (f"{balance:,} / {cap:,}" if cap else f"{balance:,}")},
+    ]
+    nodes.insert(4, ui.Section(title="Subscription & Billing", children=[
+        ui.KeyValue(items=billing_items, columns=2),
+    ]))
 
     # ── Effective Scopes (role + user combined) ────────────────────
     if effective:
