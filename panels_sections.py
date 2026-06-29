@@ -150,6 +150,14 @@ async def _fetch_extensions_raw() -> list[dict]:
                 m["stores"].append("Disk")
         except Exception:
             pass
+        # Status badge = LIFECYCLE truth. developer_apps.status (marketplace) is the
+        # SINGLE SOURCE OF TRUTH for the lifecycle state — active / suspended /
+        # draft / pending_review. The Registry status is only 2-state usability, so
+        # reading it made a drafted app wrongly show "Active" (Registry stays active
+        # on a soft draft). Fall back to Registry only for non-marketplace/system
+        # apps that aren't in developer_apps.
+        m["status"] = (m.get("marketplace_status") or m.get("registry_status")
+                       or m.get("status") or "unknown")
     return sorted(merged.values(), key=lambda x: x.get("app_id", ""))
 
 

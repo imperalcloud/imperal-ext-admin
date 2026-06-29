@@ -56,9 +56,12 @@ async def _fetch_access_policy(app_id: str, tenant_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _status_badge(app: dict) -> ui.Badge:
-    status = app.get("status", "unknown")
-    color = "green" if status == "active" else ("red" if status == "suspended" else "gray")
-    return ui.Badge(label=status.capitalize(), color=color)
+    status = str(app.get("status", "unknown"))
+    color = ("green" if status == "active"
+             else "red" if status == "suspended"
+             else "orange" if status in ("draft", "pending_review")
+             else "gray")
+    return ui.Badge(label=status.replace("_", " ").title(), color=color)
 
 
 def _build_tools_section(app: dict) -> list:
