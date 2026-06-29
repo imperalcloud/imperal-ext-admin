@@ -33,5 +33,6 @@ import panels_voice            # noqa: F401  # Voice panel
 import handlers_billing        # noqa: F401
 import handlers_payment        # noqa: F401
 import handlers_developer      # noqa: F401
+import handlers_admin_reads    # noqa: F401  # Webbee read-gaps: payments/cards/limits/agencies/pending-apps/pending-payouts
 import skeleton                # noqa: F401
 import panels                  # noqa: F401

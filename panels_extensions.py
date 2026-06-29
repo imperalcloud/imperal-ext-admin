@@ -126,10 +126,14 @@ def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> 
 
     nodes.append(ui.Stack(children=[
         ui.Button(
-            label="Suspend" if is_active else "Activate",
+            label="Suspend" if is_active else "Restore",
             variant="danger" if is_active else "primary",
             on_click=ui.Call("suspend_extension" if is_active else "activate_extension",
                              app_id=app_id),
+        ),
+        ui.Button(
+            label="To draft", variant="ghost",
+            on_click=ui.Call("draft_extension", app_id=app_id),
         ),
         ui.Button(
             label="Settings", variant="primary",

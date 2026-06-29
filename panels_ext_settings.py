@@ -63,7 +63,6 @@ def _build_general(app_id: str, data: dict) -> list:
             defaults={
                 "app_id": app_id,
                 "display_name": gen.get("display_name", ""),
-                "status": gen.get("status", "active"),
             },
             children=[
                 ui.Text("Display Name", variant="caption"),
@@ -72,15 +71,9 @@ def _build_general(app_id: str, data: dict) -> list:
                     value=gen.get("display_name", ""),
                     placeholder="Extension display name",
                 ),
-                ui.Text("Status", variant="caption"),
-                ui.Select(
-                    param_name="status",
-                    value=gen.get("status", "active"),
-                    options=[
-                        {"value": "active", "label": "Active"},
-                        {"value": "suspended", "label": "Suspended"},
-                    ],
-                ),
+                ui.Text("Marketplace status (active / suspended / draft) is managed "
+                        "by the app's lifecycle buttons — single source of truth, "
+                        "not edited here.", variant="caption"),
             ],
         ),
         ui.Divider(),

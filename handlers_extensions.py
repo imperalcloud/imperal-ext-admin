@@ -123,38 +123,37 @@ async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> Action
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
-@chat.function("suspend_extension", action_type="destructive", event="extension_suspended", data_model=ExtSettingsReceipt, description="Suspend an extension.")
+async def _set_app_lifecycle(aid: str, status: str, verb: str, note: str) -> ActionResult:
+    """Single source of truth for an app's marketplace lifecycle. Calls the ONE
+    gateway mutator (/v1/admin/apps/{id}/status) which keeps developer_apps (the
+    store) AND the Registry (usability) coherent — no 'in store but unusable'
+    divergence. Replaces the old direct-Registry PATCH (wrong system)."""
+    r = await _gw_request("POST", f"/v1/admin/apps/{aid}/status", {"status": status})
+    if isinstance(r, dict) and r.get("error"):
+        return ActionResult.error(f"Failed: {r['error']}")
+    await _invalidate_extension_caches()
+    return ActionResult.success(
+        data={"app_id": aid, "status": status},
+        summary=f"{aid} {verb} — {note}", refresh_panels=["tools"],
+    )
+
+
+@chat.function("suspend_extension", action_type="destructive", event="extension_suspended", data_model=ExtSettingsReceipt, description="Suspend a marketplace app — pull it OFF the marketplace AND disable it for users (full kill). One source of truth: developer_apps + Registry synced.")
 async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
-    r = await _registry_patch(f"/v1/apps/{aid}", {"status": "suspended"})
-    if r.status_code != 200:
-        return ActionResult.error(f"Failed: HTTP {r.status_code}")
-    v = await _registry_get(f"/v1/apps/{aid}")
-    if v.status_code == 200 and v.json().get("status") == "suspended":
-        await _invalidate_extension_caches()
-        return ActionResult.success(data={"app_id": aid, "status": "suspended", "verified": True}, summary=f"{aid} suspended", refresh_panels=["tools"])
-    return ActionResult.success(data={"app_id": aid}, summary=f"{aid} suspend sent (unverified)")
+    return await _set_app_lifecycle(aid, "suspended", "suspended", "off marketplace + disabled for users")
 
 
-@chat.function("activate_extension", action_type="write", event="extension_activated", data_model=ExtSettingsReceipt, description="Activate a suspended extension.")
+@chat.function("activate_extension", action_type="write", event="extension_activated", data_model=ExtSettingsReceipt, description="Restore an app to ACTIVE — back on the marketplace AND usable. Admin override: takes effect immediately (no review).")
 async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
-    r = await _registry_get(f"/v1/apps/{aid}")
-    if r.status_code == 404:
-        return ActionResult.error(f"'{aid}' not found. Must be registered first.")
-    cur = r.json().get("status", "unknown")
-    if cur == "active":
-        return ActionResult.success(data={"app_id": aid, "status": "active"}, summary=f"{aid} already active", refresh_panels=["tools"])
-    if cur == "deleted":
-        return ActionResult.error(f"'{aid}' was deleted. Must be re-registered.")
-    r = await _registry_patch(f"/v1/apps/{aid}", {"status": "active"})
-    if r.status_code != 200:
-        return ActionResult.error(f"Failed: HTTP {r.status_code}")
-    v = await _registry_get(f"/v1/apps/{aid}")
-    if v.status_code == 200 and v.json().get("status") == "active":
-        await _invalidate_extension_caches()
-        return ActionResult.success(data={"app_id": aid, "status": "active", "previous": cur}, summary=f"{aid} activated (was {cur})")
-    return ActionResult.success(data={"app_id": aid}, summary=f"{aid} activate sent (unverified)")
+    return await _set_app_lifecycle(aid, "active", "restored", "live on the marketplace again")
+
+
+@chat.function("draft_extension", action_type="destructive", event="extension_drafted", data_model=ExtSettingsReceipt, description="Send an app back to DRAFT — off the marketplace for rework. Existing users keep using it; needs re-submit + approve to relist. Softer than suspend.")
+async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
+    aid = await _resolve_app_id(params.app_id, include_all=True)
+    return await _set_app_lifecycle(aid, "draft", "sent to draft", "off marketplace for rework (existing users keep it)")
 
 
 # ─── Access Policy Handlers ───────────────────────────────────────────── #

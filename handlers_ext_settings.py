@@ -119,9 +119,11 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
     description="Save extension general settings.",
 )
 async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
+    # Status is NOT written here — marketplace lifecycle (active/suspended/draft)
+    # has a single source of truth: the gateway status mutator behind the app's
+    # Suspend/Restore/To-draft buttons. (params.status kept for back-compat, ignored.)
     result = await _save_section(params.app_id, "general", {
         "display_name": params.display_name,
-        "status": params.status,
     })
     # SINGLE SOURCE OF TRUTH: mirror the rename into developer_apps — the table
     # BOTH the marketplace and the panel sidebar read — so renaming here changes
