@@ -138,6 +138,10 @@ async def _build_edit(case: str) -> object:
                  message="Leave a field blank to use the branded built-in default. "
                          "Placeholders like {plan}, {name}, {renews}, {days_left}, {last4} are filled at send time.",
                  type="info"),
+        ui.Section(title="Built-in default — what a blank field sends", children=[
+            ui.KeyValue(items=[{"key": "Default subject", "value": default_subject or "—"}], columns=1),
+            ui.Code(content=(t.get("default_text_preview") or "(no preview available)"), language="text"),
+        ]),
         ui.Form(action="email_save_template", submit_label="Save template",
                 defaults={"case": case,
                           "subject": t.get("subject") or "",
@@ -176,31 +180,54 @@ async def _build_log(kwargs: dict) -> object:
     tpls = await _fetch("/v1/internal/email/templates")
     cases = [t.get("case", "") for t in (tpls.get("items", []) if isinstance(tpls, dict) else [])]
 
+    try:
+        offset = max(0, int(kwargs.get("email_offset", 0)))
+    except (TypeError, ValueError):
+        offset = 0
+    _PAGE = 200
     q = []
     if case_filter:
         q.append(f"case={case_filter}")
     if status_filter:
         q.append(f"status={status_filter}")
-    q.append("limit=200")
+    q.append(f"limit={_PAGE}")
+    q.append(f"offset={offset}")
     res = await _fetch("/v1/internal/email/log?" + "&".join(q))
     entries = res.get("items", []) if isinstance(res, dict) else []
+    more = len(entries) == _PAGE
 
+    # Changing a filter resets to page 1 (email_offset=0).
     filter_bar = ui.Stack(direction="h", gap=2, children=[
         ui.Select(param_name="email_case", value=case_filter,
                   options=[{"value": "", "label": "All cases"}] + [{"value": c, "label": _label(c)} for c in cases],
-                  on_change=ui.Call("__panel__tools", section="email", email_view="log", email_status=status_filter)),
+                  on_change=ui.Call("__panel__tools", section="email", email_view="log", email_status=status_filter, email_offset=0)),
         ui.Select(param_name="email_status", value=status_filter,
                   options=[{"value": "", "label": "All statuses"}] + [
                       {"value": s, "label": s} for s in ("sent", "failed", "skipped_disabled", "skipped_dedup")],
-                  on_change=ui.Call("__panel__tools", section="email", email_view="log", email_case=case_filter)),
+                  on_change=ui.Call("__panel__tools", section="email", email_view="log", email_case=case_filter, email_offset=0)),
     ])
+
+    def _pager():
+        btns = []
+        if offset > 0:
+            btns.append(ui.Button(label="← Newer", variant="ghost",
+                        on_click=ui.Call("__panel__tools", section="email", email_view="log",
+                                         email_case=case_filter, email_status=status_filter,
+                                         email_offset=max(0, offset - _PAGE))))
+        if more:
+            btns.append(ui.Button(label="Older →", variant="ghost",
+                        on_click=ui.Call("__panel__tools", section="email", email_view="log",
+                                         email_case=case_filter, email_status=status_filter,
+                                         email_offset=offset + _PAGE)))
+        return ui.Stack(direction="h", gap=2, children=btns) if btns else ui.Text("", variant="caption")
 
     if isinstance(res, dict) and "error" in res:
         return ui.Stack(gap=2, children=[ui.Header("Email", level=3), _nav("log"), filter_bar,
                                          ui.Alert(title="Gateway error", message=res["error"], type="error")])
     if not entries:
+        msg = "No more entries — you've reached the end." if offset > 0 else "No email log entries match."
         return ui.Stack(gap=2, children=[ui.Header("Email", level=3), _nav("log"), filter_bar,
-                                         ui.Empty(message="No email log entries match.", icon="Mail")])
+                                         ui.Empty(message=msg, icon="Mail"), _pager()])
 
     rows = []
     for e in entries:
@@ -224,12 +251,15 @@ async def _build_log(kwargs: dict) -> object:
             ], columns=1)],
         ))
 
+    caption = (f"showing {offset + 1}–{offset + len(entries)} (newest first)"
+               + ("  ·  more older entries below" if more else "  ·  end of log"))
     return ui.Stack(gap=2, children=[
         ui.Header("Email", level=3),
         _nav("log"),
         filter_bar,
-        ui.Text(f"{len(entries)} entries (newest first)", variant="caption"),
+        ui.Text(caption, variant="caption"),
         ui.List(items=rows, searchable=True),
+        _pager(),
     ])
 
 

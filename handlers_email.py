@@ -31,7 +31,8 @@ class _LogQuery(BaseModel):
     case: str = Field("", description="Filter by case (e.g. renewal_success). Blank = all cases.")
     status: str = Field("", description="Filter by status: sent | failed | skipped_disabled | skipped_dedup. Blank = all.")
     user_id: str = Field("", description="Filter by recipient imperal_id. Blank = all.")
-    limit: int = Field(50, description="Max rows to return (1–200).")
+    limit: int = Field(50, description="Max rows to return (1–200), newest first.")
+    offset: int = Field(0, description="Skip this many newest rows — page older entries (the log is append-only and never deleted).")
 
 
 class _CaseParam(BaseModel):
@@ -68,10 +69,18 @@ async def fn_email_list_log(ctx, params: _LogQuery) -> ActionResult:
         q.append(f"status={params.status}")
     if params.user_id:
         q.append(f"user_id={params.user_id}")
-    q.append(f"limit={max(1, min(params.limit, 200))}")
+    limit = max(1, min(params.limit, 200))
+    offset = max(0, params.offset)
+    q.append(f"limit={limit}")
+    q.append(f"offset={offset}")
     items = _aslist(await _gw_request("GET", "/v1/internal/email/log?" + "&".join(q)))
-    return ActionResult.success(data={"items": items, "total": len(items)},
-                                summary=f"{len(items)} email log entr(ies)")
+    # `total` here is the page size, NOT the grand total (the durable log has no
+    # cheap count); report it honestly so the count is never mistaken for the all-time total.
+    more = len(items) == limit
+    return ActionResult.success(
+        data={"items": items, "total": len(items)},
+        summary=(f"{len(items)} email log entr(ies) (newest first, offset {offset}"
+                 + ("; more older entries exist — raise offset to page" if more else "") + ")"))
 
 
 @chat.function("email_list_templates", action_type="read", data_model=EmailTemplatesResponse,
@@ -95,7 +104,7 @@ async def fn_email_get_template(ctx, params: _CaseParam) -> ActionResult:
 
 @chat.function("email_save_template", action_type="write", event="email_template_saved",
                data_model=EmailTemplateSaved,
-               description="Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged.")
+               description="Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged. To ONLY enable/disable a case without touching its template, use email_toggle_case instead.")
 async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResult:
     # Only send fields the caller actually provided — None = leave unchanged.
     # This lets the LLM toggle `enabled` without wiping a custom body.
@@ -115,7 +124,7 @@ async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResu
     if drift:
         return ActionResult.error(drift)
     return ActionResult.success(data=r, summary=f"Saved template '{params.case}' (enabled={r.get('enabled')}).",
-                                refresh_panels=["email"])
+                                refresh_panels=["tools"])
 
 
 @chat.function("email_toggle_case", action_type="write", event="email_case_toggled",
@@ -130,7 +139,7 @@ async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
     if drift:
         return ActionResult.error(drift)
     return ActionResult.success(data=r, summary=f"Case '{params.case}' {'enabled' if params.enabled else 'disabled'}.",
-                                refresh_panels=["email"])
+                                refresh_panels=["tools"])
 
 
 @chat.function("email_send_test", action_type="write", event="email_test_sent",
@@ -146,5 +155,5 @@ async def fn_email_send_test(ctx, params: _TestParams) -> ActionResult:
     return ActionResult.success(
         data=r,
         summary=(f"Test '{params.case}' sent to {params.to}." if st == "sent"
-                 else f"Test '{params.case}' → {st} (not sent)."),
-        refresh_panels=["email"])
+                 else f"Test '{params.case}' → {st}: {r.get('error') or 'see log'}"),
+        refresh_panels=["tools"])

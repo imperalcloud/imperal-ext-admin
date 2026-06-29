@@ -17347,8 +17347,14 @@
           },
           "limit": {
             "default": 50,
-            "description": "Max rows to return (1–200).",
+            "description": "Max rows to return (1–200), newest first.",
             "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Skip this many newest rows — page older entries (the log is append-only and never deleted).",
+            "title": "Offset",
             "type": "integer"
           }
         },
@@ -18063,7 +18069,7 @@
     },
     {
       "name": "email_save_template",
-      "description": "Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged.",
+      "description": "Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged. To ONLY enable/disable a case without touching its template, use email_toggle_case instead.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [],
