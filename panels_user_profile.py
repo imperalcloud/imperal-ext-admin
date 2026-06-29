@@ -16,6 +16,7 @@ from panels_sections import (
     _fetch_roles, _fetch_extensions, _fetch_user_extensions,
     _fetch_scope_names, _cached,
 )
+from panels_user_profile_info import build_info_sections
 
 log = logging.getLogger("admin")
 
@@ -85,9 +86,6 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     is_active = user.get("is_active", True)
     scopes = user.get("scopes", [])
     attrs = user.get("attributes", {})
-    tenant = user.get("tenant_id", "default")
-    auth_method = user.get("auth_method", "password")
-    last_login = user.get("last_login", "Never")
 
     role_options = [
         {"value": r.get("name", ""),
@@ -101,16 +99,6 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             on_click=ui.Call("__panel__tools", section="management"),
         ),
         ui.Header(email, level=3, subtitle=user_id),
-
-        # ── Identity ──────────────────────────────────────────────
-        ui.Section(title="Identity", children=[
-            ui.KeyValue(items=[
-                {"key": "Imperal ID", "value": user_id},
-                {"key": "Tenant", "value": tenant},
-                {"key": "Auth Method", "value": auth_method},
-                {"key": "Last Login", "value": str(last_login) or "Never"},
-            ], columns=2),
-        ]),
 
         # ── Role & Status ─────────────────────────────────────────
         ui.Section(title="Role & Status", children=[
@@ -141,27 +129,11 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
         ),
     ]
 
-    # ── Subscription & Billing ─────────────────────────────────────
-    # Sourced from the gateway billing endpoints (keyed by imperal_id) so the
-    # admin sees the user's REAL plan + renewal date + wallet — the same truth
-    # the user's own billing extension reads.
-    plan = (sub_data.get("plan") or bal_data.get("plan") or "free")
-    sub_status = (sub_data.get("status") or "unknown")
-    expires = sub_data.get("expires_at")
-    cancel = bool(sub_data.get("cancel_at_period_end"))
-    balance = int(bal_data.get("balance") or 0)
-    cap = int(bal_data.get("cap") or 0)
-    renew_key = "Cancels on" if cancel else "Renews"
-    billing_items = [
-        {"key": "Plan", "value": str(plan).upper()},
-        {"key": "Status", "value": str(sub_status)},
-        {"key": renew_key, "value": str(expires) if expires else "—"},
-        {"key": "Token balance",
-         "value": (f"{balance:,} / {cap:,}" if cap else f"{balance:,}")},
-    ]
-    nodes.insert(4, ui.Section(title="Subscription & Billing", children=[
-        ui.KeyValue(items=billing_items, columns=2),
-    ]))
+    # ── Full read-only info, organized: Identity & Contact, Business /
+    #    Account Type, Billing Address, Subscription & Billing, Organization &
+    #    IDs, plus a collapsible raw dump so NO field is hidden. Inserted right
+    #    after the header, above the editable controls below.
+    nodes[2:2] = build_info_sections(user, sub_data, bal_data)
 
     # ── Effective Scopes (role + user combined) ────────────────────
     if effective:
@@ -215,12 +187,16 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     ))
 
     # ── Custom Attributes (ABAC) ───────────────────────────────────
-    display_attrs = {
-        k: v for k, v in attrs.items()
-        if k not in ("monthly_action_limit", "max_concurrent_tasks",
-                     "context_window", "confirmation_enabled",
-                     "confirmation_skip_read")
+    # Hide keys already shown in the organized sections above + the limit/
+    # confirmation keys that have their own controls — the catch-all then lists
+    # only genuinely-leftover attributes (nothing hidden, nothing duplicated).
+    _surfaced = {
+        "monthly_action_limit", "max_concurrent_tasks", "context_window",
+        "confirmation_enabled", "confirmation_skip_read",
+        "account_type", "billing", "company", "display_name", "full_name",
+        "email_verified", "email_verified_at", "stripe_customer_id", "auto_topup",
     }
+    display_attrs = {k: v for k, v in attrs.items() if k not in _surfaced}
     attr_children: list = []
     if display_attrs:
         attr_children.append(ui.KeyValue(
