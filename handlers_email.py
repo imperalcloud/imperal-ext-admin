@@ -117,7 +117,7 @@ async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResu
         body["enabled"] = params.enabled
     if len(body) == 1:
         return ActionResult.error("nothing to change — provide subject, body, or enabled")
-    r = await _gw_request("PUT", f"/v1/internal/email/templates/{params.case}", body)
+    r = await _gw_request("PUT", f"/v1/internal/email/templates/{params.case}", body, acting=_user_id(ctx))
     if isinstance(r, dict) and "error" in r:
         return ActionResult.error(r["error"])
     drift = _verify_write_reflected(r, {"enabled": params.enabled})
@@ -132,7 +132,8 @@ async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResu
                description="Enable or disable an email case WITHOUT touching its subject/body.")
 async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
     r = await _gw_request("PUT", f"/v1/internal/email/templates/{params.case}",
-                          {"enabled": params.enabled, "updated_by": _user_id(ctx) or "admin"})
+                          {"enabled": params.enabled, "updated_by": _user_id(ctx) or "admin"},
+                          acting=_user_id(ctx))
     if isinstance(r, dict) and "error" in r:
         return ActionResult.error(r["error"])
     drift = _verify_write_reflected(r, {"enabled": params.enabled})
@@ -148,7 +149,8 @@ async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
 async def fn_email_send_test(ctx, params: _TestParams) -> ActionResult:
     if "@" not in (params.to or ""):
         return ActionResult.error("provide a valid recipient email in `to`")
-    r = await _gw_request("POST", "/v1/internal/email/test", {"case": params.case, "to": params.to})
+    r = await _gw_request("POST", "/v1/internal/email/test", {"case": params.case, "to": params.to},
+                          acting=_user_id(ctx))
     if isinstance(r, dict) and "error" in r:
         return ActionResult.error(r["error"])
     st = r.get("status")

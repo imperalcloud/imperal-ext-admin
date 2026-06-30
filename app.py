@@ -52,15 +52,19 @@ def _get_http():
     return _http
 
 
-async def _gw_request(method, path, data=None):
+async def _gw_request(method, path, data=None, acting=None):
     c = _get_http()
+    # acting -> X-Acting-User (BFF pattern): lets gateway endpoints that
+    # defense-in-depth gate on admin role (e.g. email template-write / test-send)
+    # attribute + authorize the call. Omitted for pure backend reads.
+    extra = {"X-Acting-User": acting} if acting else None
     if method.upper() in ("POST", "PUT", "PATCH"):
-        r = await getattr(c, method.lower())(path, json=data)
+        r = await getattr(c, method.lower())(path, json=data, headers=extra)
     elif method.upper() == "DELETE" and data is not None:
         # DELETE-with-body (e.g. admin app purge confirm payload)
-        r = await c.request("DELETE", path, json=data)
+        r = await c.request("DELETE", path, json=data, headers=extra)
     else:
-        r = await getattr(c, method.lower())(path)
+        r = await getattr(c, method.lower())(path, headers=extra)
     # Federal: never call r.json() blindly. Auth-gw may return 4xx/5xx
     # with HTML body, empty body, or {"detail": "..."} — surface readable
     # error to ActionResult.error path instead of JSONDecodeError.
@@ -212,7 +216,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.9.0",
+    version="5.9.1",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
