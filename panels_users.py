@@ -197,7 +197,7 @@ async def build_users(ctx, role_filter: str = "",
             ),
             expandable=True,
             expanded_content=_build_user_summary(
-                u, user_ext_map.get(uid, []),
+                u, user_ext_map.get(uid, []), extensions,
             ),
             actions=[
                 ui.Button(
