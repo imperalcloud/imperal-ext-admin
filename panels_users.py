@@ -1,8 +1,11 @@
 """Admin · User management panel builder.
 
-Shows a filtered, searchable list of users with expandable cards.
-Per-user extensions fetched from Auth GW for accurate badges.
-Full profile editing available via section switch (panels_user_profile.py).
+Users page as a browse-first workspace:
+- searchable/filtered user list for quick navigation
+- compact read-only summaries in-place
+- explicit deep editing via dedicated profile page
+
+Avoid inline autosave here; deeper edits live in panels_user_profile.py.
 """
 from __future__ import annotations
 
@@ -15,9 +18,8 @@ from imperal_sdk import ui
 from panels_sections import (
     _fetch_users,
     _fetch_roles,
-    _fetch_extensions,
     _fetch_user_extensions,
-    _fetch_scope_names,
+    _fetch_extensions,
 )
 
 log = logging.getLogger("admin")
@@ -89,82 +91,35 @@ def _build_ext_badges(extensions: list[dict], user_exts: list[dict]) -> list:
     ]
 
 
-def _build_user_expanded(user: dict, role_options: list[dict],
-                         all_scopes: list[str],
-                         extensions: list[dict],
-                         user_exts: list[dict]) -> list:
-    """Build expanded_content for a single user ListItem."""
-    uid = user.get("imperal_id", user.get("id", ""))
-    role = user.get("role", "user")
-    is_active = user.get("is_active", True)
-    scopes = user.get("scopes", [])
+def _build_user_summary(user: dict, user_exts: list[dict], extensions: list[dict]) -> list:
+    """Compact read-only summary for the users list."""
     attrs = user.get("attributes", {})
     tenant = user.get("tenant_id", "default")
     auth_method = user.get("auth_method", "password")
     last_login = user.get("last_login", "Never")
-    confirmation = attrs.get("confirmation_enabled", "inherit from role")
+    scopes = user.get("scopes", [])
+    ext_count = len(user_exts or [])
 
     rows: list = [
-        ui.Section(title="Identity", children=[
-            ui.KeyValue(items=[
-                {"key": "Imperal ID", "value": uid},
-                {"key": "Tenant", "value": tenant},
-                {"key": "Auth Method", "value": auth_method},
-                {"key": "Last Login", "value": str(last_login) or "Never"},
-            ], columns=2),
-        ]),
-        ui.Section(title="Role & Status", children=[
-            ui.Stack([
-                ui.Select(
-                    options=role_options, value=role,
-                    param_name="role",
-                    on_change=ui.Call("update_user", user_id=uid),
-                ),
-                ui.Toggle(
-                    label="Active", value=is_active,
-                    param_name="is_active",
-                    on_change=ui.Call("update_user", user_id=uid),
-                ),
-            ], direction="h", gap=3),
-        ]),
-        ui.Text(f"User Scopes ({len(scopes)})", variant="caption"),
-        ui.TagInput(
-            values=scopes[:10], suggestions=all_scopes,
-            param_name="scopes", placeholder="Add scope...",
-            grouped_by=":",
-            on_change=ui.Call("update_user", user_id=uid),
-        ),
+        ui.KeyValue(items=[
+            {"key": "Tenant", "value": tenant},
+            {"key": "Auth", "value": auth_method},
+            {"key": "Last Login", "value": str(last_login) or "Never"},
+            {"key": "Direct Scopes", "value": str(len(scopes))},
+        ], columns=2),
     ]
 
     rows.extend(_build_limit_badges(attrs))
-    rows.extend(_build_ext_badges(extensions, user_exts))
 
+    confirmation = attrs.get("confirmation_enabled", "inherit from role")
     rows += [
         ui.Divider(),
-        ui.Text(f"Confirmation: {confirmation}", variant="caption"),
         ui.Stack([
-            ui.Button(
-                "Edit Profile",
-                variant="secondary",
-                on_click=ui.Call("__panel__tools",
-                                section="user_profile", user_id=uid),
-            ),
-            ui.Button(
-                "Deactivate" if is_active else "Activate",
-                variant="danger" if is_active else "primary",
-                on_click=ui.Call(
-                    "deactivate_user" if is_active else "update_user",
-                    user_id=uid,
-                    **({"is_active": True} if not is_active else {}),
-                ),
-            ),
-            ui.Button(
-                "Delete",
-                variant="danger",
-                on_click=ui.Call("hard_delete_user", user_id=uid),
-            ),
-        ], direction="h", gap=2),
+            ui.Badge(label=f"Extensions: {ext_count}", color="blue" if ext_count else "gray"),
+            ui.Badge(label=f"Confirmation: {confirmation}", color="gray"),
+        ], direction="h", gap=1, wrap=True),
     ]
+    rows.extend(_build_ext_badges(extensions, user_exts))
     return rows
 
 
@@ -172,10 +127,11 @@ def _build_user_expanded(user: dict, role_options: list[dict],
 
 
 async def build_users(ctx, role_filter: str = "",
-                      status_filter: str = "", **kwargs):
-    """User management: expandable cards with inline editing + filters."""
-    users, roles, all_scopes, extensions = await asyncio.gather(
-        _fetch_users(), _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
+                      status_filter: str = "", selected_user_id: str = "",
+                      **kwargs):
+    """User management: browse list with explicit profile editing."""
+    users, roles, extensions = await asyncio.gather(
+        _fetch_users(), _fetch_roles(), _fetch_extensions(),
     )
 
     if not users:
@@ -204,13 +160,14 @@ async def build_users(ctx, role_filter: str = "",
     _ext_results = await asyncio.gather(*[_fetch_user_extensions(uid) for uid in _uids])
     user_ext_map: dict[str, list[dict]] = dict(zip(_uids, _ext_results))
 
-    # Filter bar
+    # Build user list items (browse-first, no inline autosave editors)
     filter_bar = ui.Stack([
         ui.Select(
             options=[{"value": "", "label": "All Roles"}] + role_options,
             value=role_filter, param_name="role_filter",
             on_change=ui.Call("__panel__tools", section="management",
-                             status_filter=status_filter),
+                             status_filter=status_filter,
+                             selected_user_id=selected_user_id),
         ),
         ui.Select(
             options=[
@@ -220,11 +177,12 @@ async def build_users(ctx, role_filter: str = "",
             ],
             value=status_filter, param_name="status_filter",
             on_change=ui.Call("__panel__tools", section="management",
-                             role_filter=role_filter),
+                             role_filter=role_filter,
+                             selected_user_id=selected_user_id),
         ),
     ], direction="h", gap=2)
 
-    # Build user list items
+    # Build user list items (browse-first, no inline autosave editors)
     user_items = []
     for u in filtered:
         uid = u.get("imperal_id", u.get("id", ""))
@@ -238,10 +196,16 @@ async def build_users(ctx, role_filter: str = "",
                 color="green" if is_active else "red",
             ),
             expandable=True,
-            expanded_content=_build_user_expanded(
-                u, role_options, all_scopes, extensions,
-                user_ext_map.get(uid, []),
+            expanded_content=_build_user_summary(
+                u, user_ext_map.get(uid, []),
             ),
+            actions=[
+                ui.Button(
+                    "Open Profile",
+                    variant="secondary",
+                    on_click=ui.Call("__panel__tools", section="user_profile", user_id=uid),
+                ),
+            ],
         ))
 
     count = (f"{len(filtered)} of {len(users)} users"
@@ -249,20 +213,21 @@ async def build_users(ctx, role_filter: str = "",
 
     return ui.Stack(children=[
         ui.Header("User Management", level=3),
+        ui.Text("Browse users here; open a profile for explicit editing.", variant="caption"),
         filter_bar,
         ui.Text(count, variant="caption"),
-        ui.Accordion(sections=[{
-            "id": "create",
-            "title": "Create New User",
-            "children": [
-                ui.Form(action="create_user", submit_label="Create User",
-                        children=[
+        ui.Card(
+            title="Create New User",
+            content=ui.Form(action="create_user", submit_label="Create User",
+                children=[
                     ui.Input(placeholder="Email address", param_name="email"),
                     ui.Input(placeholder="Password", param_name="password"),
                     ui.Select(options=role_options, value="user",
                               param_name="role", placeholder="Select role"),
                 ]),
-            ],
-        }]),
-        ui.List(items=user_items, searchable=True),
+        ),
+        ui.Card(
+            title="Users",
+            content=ui.List(items=user_items, searchable=True),
+        ),
     ])

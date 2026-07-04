@@ -96,22 +96,29 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     nodes: list = [
         ui.Button(
             "\u2190 Back to Users", variant="ghost",
-            on_click=ui.Call("__panel__tools", section="management"),
+            on_click=ui.Call("__panel__tools", section="management", user_id=""),
         ),
         ui.Header(email, level=3, subtitle=user_id),
 
         # ── Role & Status ─────────────────────────────────────────
         ui.Section(title="Role & Status", children=[
-            ui.Text("Role", variant="caption"),
-            ui.Select(
-                options=role_options, value=role,
-                param_name="role",
-                on_change=ui.Call("update_user", user_id=user_id),
-            ),
-            ui.Toggle(
-                label="Account active", value=is_active,
-                param_name="is_active",
-                on_change=ui.Call("update_user", user_id=user_id),
+            ui.Form(
+                action="update_user",
+                submit_label="Save Role & Status",
+                defaults={"user_id": user_id},
+                children=[
+                    ui.Text("Role", variant="caption"),
+                    ui.Select(
+                        options=role_options,
+                        value=role,
+                        param_name="role",
+                    ),
+                    ui.Toggle(
+                        label="Account active",
+                        value=is_active,
+                        param_name="is_active",
+                    ),
+                ],
             ),
         ]),
 
@@ -119,11 +126,19 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
         ui.Section(
             title=f"User Scopes ({len(scopes)})",
             children=[
-                ui.TagInput(
-                    values=scopes, suggestions=all_scopes,
-                    param_name="scopes", placeholder="Add scope...",
-                    grouped_by=":",
-                    on_change=ui.Call("update_user", user_id=user_id),
+                ui.Form(
+                    action="update_user",
+                    submit_label="Save Scopes",
+                    defaults={"user_id": user_id},
+                    children=[
+                        ui.TagInput(
+                            values=scopes,
+                            suggestions=all_scopes,
+                            param_name="scopes",
+                            placeholder="Add scope...",
+                            grouped_by=":",
+                        ),
+                    ],
                 ),
             ],
         ),
@@ -268,4 +283,9 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             on_click=ui.Call("deactivate_user", user_id=user_id),
         ))
 
-    return ui.Stack(children=nodes)
+    return ui.Stack(children=[
+        ui.Card(
+            title="User Workspace",
+            content=ui.Stack(children=nodes, gap=2),
+        )
+    ])
