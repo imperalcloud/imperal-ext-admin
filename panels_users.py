@@ -205,6 +205,15 @@ async def build_users(ctx, role_filter: str = "",
                     variant="secondary",
                     on_click=ui.Call("__panel__tools", section="user_profile", user_id=uid),
                 ),
+                ui.Button(
+                    "Deactivate" if is_active else "Open",
+                    variant="ghost" if is_active else "secondary",
+                    on_click=(
+                        ui.Call("deactivate_user", user_id=uid)
+                        if is_active else
+                        ui.Call("__panel__tools", section="user_profile", user_id=uid)
+                    ),
+                ),
             ],
         ))
 

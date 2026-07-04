@@ -276,12 +276,28 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             ))
 
     # ── Danger Zone ────────────────────────────────────────────────
-    if is_active:
-        nodes.append(ui.Divider())
-        nodes.append(ui.Button(
-            "Deactivate User", variant="danger",
-            on_click=ui.Call("deactivate_user", user_id=user_id),
-        ))
+    nodes.append(ui.Section(
+        title="Danger Zone",
+        children=[
+            ui.Text(
+                "Destructive actions for this user account.",
+                variant="caption",
+            ),
+            ui.Stack([
+                ui.Button(
+                    "Deactivate User" if is_active else "User Already Inactive",
+                    variant="danger",
+                    disabled=not is_active,
+                    on_click=ui.Call("deactivate_user", user_id=user_id) if is_active else None,
+                ),
+                ui.Button(
+                    "Permanent Delete User",
+                    variant="danger",
+                    on_click=ui.Call("hard_delete_user", user_id=user_id),
+                ),
+            ], direction="h", gap=2, wrap=True),
+        ],
+    ))
 
     return ui.Stack(children=[
         ui.Card(
