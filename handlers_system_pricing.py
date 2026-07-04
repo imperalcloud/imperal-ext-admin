@@ -13,7 +13,7 @@ import logging
 import httpx
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _verify_write_reflected
+from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put_checked
 from models_records import PlatformFeeReceipt, TokenRateReceipt, CategoryDefaultsReceipt
 
 log = logging.getLogger("admin")
@@ -42,22 +42,14 @@ class SaveTokenRateParams(BaseModel):
 async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
-    url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/platform-fees"
-    body = {"economy": params.economy, "standard": params.standard, "premium": params.premium}
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.put(url, json=body, headers={
-                "X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx),
-            })
-    except Exception as e:
-        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
-    if resp.status_code == 403:
-        return ActionResult.error("admin role required to change platform fees")
-    if resp.status_code != 200:
-        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
-    drift = _verify_write_reflected(resp.json(), body)
-    if drift:
-        return ActionResult.error(drift)
+    payload, error = await _admin_put_checked(
+        "/v1/internal/billing/platform-fees",
+        body,
+        acting=_acting(ctx),
+        forbidden_message="admin role required to change platform fees",
+    )
+    if error:
+        return ActionResult.error(error)
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Platform fees saved (economy {params.economy} / standard {params.standard} / premium {params.premium} cr). Applies within ~1 min.",
@@ -71,22 +63,14 @@ async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionRe
 async def fn_save_token_rate(ctx, params: SaveTokenRateParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
-    url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/token-rate"
-    body = {"token_rate": params.token_rate}
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.put(url, json=body, headers={
-                "X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx),
-            })
-    except Exception as e:
-        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
-    if resp.status_code == 403:
-        return ActionResult.error("admin role required to change the credit rate")
-    if resp.status_code != 200:
-        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
-    drift = _verify_write_reflected(resp.json(), body)
-    if drift:
-        return ActionResult.error(drift)
+    payload, error = await _admin_put_checked(
+        "/v1/internal/billing/token-rate",
+        body,
+        acting=_acting(ctx),
+        forbidden_message="admin role required to change the credit rate",
+    )
+    if error:
+        return ActionResult.error(error)
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Credit rate saved: $1 = {params.token_rate} credits. Applies within ~1 min.",
@@ -107,22 +91,14 @@ class SaveCategoryDefaultsParams(BaseModel):
 async def fn_save_category_defaults(ctx, params: SaveCategoryDefaultsParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
-    url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/category-defaults"
-    body = {"read": params.read, "write": params.write, "destructive": params.destructive}
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.put(url, json=body, headers={
-                "X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx),
-            })
-    except Exception as e:
-        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
-    if resp.status_code == 403:
-        return ActionResult.error("admin role required to change default function prices")
-    if resp.status_code != 200:
-        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
-    drift = _verify_write_reflected(resp.json(), body)
-    if drift:
-        return ActionResult.error(drift)
+    payload, error = await _admin_put_checked(
+        "/v1/internal/billing/category-defaults",
+        body,
+        acting=_acting(ctx),
+        forbidden_message="admin role required to change default function prices",
+    )
+    if error:
+        return ActionResult.error(error)
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Default function prices saved (read {params.read} / write {params.write} / "

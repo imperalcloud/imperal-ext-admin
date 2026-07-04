@@ -1,5 +1,5 @@
 """
-Admin v5.2.6 — shared state.
+Admin v5.9.1 — shared state.
 
 Platform administration via Auth Gateway + Registry APIs.
 """
@@ -131,6 +131,34 @@ async def _registry_patch(path, data):
     async with httpx.AsyncClient(timeout=10) as c:
         return await c.patch(f"{REGISTRY_URL}{path}", json=data,
                              headers={"x-api-key": REGISTRY_KEY, "Content-Type": "application/json"})
+
+
+async def _admin_put(path: str, body: dict, acting: str = "", timeout: float = 5.0):
+    headers = {"X-Service-Token": AUTH_SERVICE_TOKEN}
+    if acting:
+        headers["X-Acting-User"] = acting
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        return await client.put(f"{AUTH_GW.rstrip('/')}{path}", json=body, headers=headers)
+
+
+async def _admin_put_checked(path: str, body: dict, acting: str = "", timeout: float = 5.0,
+                             forbidden_message: str = "admin role required") -> tuple[dict | None, str | None]:
+    try:
+        resp = await _admin_put(path, body, acting=acting, timeout=timeout)
+    except Exception as e:
+        return None, f"save HTTP error: {type(e).__name__}: {e}"
+    if resp.status_code == 403:
+        return None, forbidden_message
+    if resp.status_code != 200:
+        return None, f"save failed: status={resp.status_code} body={resp.text[:200]}"
+    try:
+        payload = resp.json()
+    except Exception as e:
+        return None, f"save failed: non-JSON response body={resp.text[:200]} :: {type(e).__name__}: {e}"
+    drift = _verify_write_reflected(payload, body)
+    if drift:
+        return None, drift
+    return payload, None
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

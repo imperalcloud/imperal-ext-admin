@@ -1,4 +1,7 @@
-"""Admin · Developer payouts panel — pending withdrawal requests."""
+"""Admin · Developer payouts panel — pending withdrawal requests.
+
+Rendered inside the center tools workspace.
+"""
 from __future__ import annotations
 
 import logging
@@ -11,9 +14,13 @@ log = logging.getLogger("admin")
 
 
 async def build_payouts(ctx, **kwargs) -> ui.Stack:
-    """Right panel: pending developer payout requests."""
+    """Pending developer payout requests with inline approve/reject actions."""
     row = kwargs.get("row")
-    stack_items = [ui.Header("Developer Payouts", level=2)]
+    selected_id = kwargs.get("selected_id") or kwargs.get("payout_id") or ""
+    stack_items = [
+        ui.Header("Developer Payouts", level=3,
+                  subtitle="Review pending developer withdrawal requests"),
+    ]
 
     try:
         result = await _gw_request("GET", "/v1/admin/payouts/pending")
@@ -29,7 +36,7 @@ async def build_payouts(ctx, **kwargs) -> ui.Stack:
     if not payouts:
         return ui.Stack(children=[
             *stack_items,
-            ui.Alert(title="No pending payouts", message="No developer payouts pending.", type="info"),
+            ui.Empty(message="No developer payouts pending.", icon="Banknote"),
         ])
 
     rows = []
@@ -60,22 +67,36 @@ async def build_payouts(ctx, **kwargs) -> ui.Stack:
     stack_items.append(table)
 
     # Detail actions when a row is selected
+    selected = None
     if isinstance(row, dict) and row.get("id"):
-        selected_id = row["id"]
-        selected_dev = row.get("developer", str(selected_id))
+        selected = row
+    elif selected_id:
+        selected = next((r for r in rows if str(r.get("id", "")) == str(selected_id)), None)
+
+    if isinstance(selected, dict) and selected.get("id"):
+        selected_id = selected["id"]
+        selected_dev = selected.get("developer", str(selected_id))
         stack_items.append(ui.Divider())
-        stack_items.append(ui.Text(f"Selected: **{selected_dev}** — {row.get('usd', '')} ({row.get('tokens', '')} tokens)"))
-        stack_items.append(ui.Row(children=[
-            ui.Button(
-                label="Approve Payout",
-                variant="primary",
-                on_click=ui.Call("review_payout", payout_id=selected_id, action="approve"),
-            ),
-            ui.Button(
-                label="Reject Payout",
-                variant="danger",
-                on_click=ui.Call("review_payout", payout_id=selected_id, action="reject"),
-            ),
+        stack_items.append(ui.Section(title="Selected payout", children=[
+            ui.KeyValue(items=[
+                {"key": "Developer", "value": selected_dev},
+                {"key": "Email", "value": selected.get("email", "—")},
+                {"key": "Amount", "value": selected.get("usd", "—")},
+                {"key": "Tokens", "value": selected.get("tokens", "—")},
+                {"key": "Requested", "value": selected.get("requested", "—")},
+            ], columns=2),
+            ui.Stack(direction="h", gap=2, children=[
+                ui.Button(
+                    label="Approve Payout",
+                    variant="primary",
+                    on_click=ui.Call("review_payout", payout_id=selected_id, action="approve"),
+                ),
+                ui.Button(
+                    label="Reject Payout",
+                    variant="danger",
+                    on_click=ui.Call("review_payout", payout_id=selected_id, action="reject"),
+                ),
+            ]),
         ]))
 
-    return ui.Stack(children=stack_items)
+    return ui.Stack(children=stack_items, gap=2)

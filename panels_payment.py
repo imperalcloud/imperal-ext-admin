@@ -1,22 +1,22 @@
-"""Admin · Payment settings panel — real Stripe state + key management."""
+"""Admin · Payment settings panel — real Stripe state + key management.
+
+Uses the same admin gateway contract as the payment tools and renders the
+current live/configured state plus key rotation form.
+"""
 from __future__ import annotations
 import logging
-import httpx
 from imperal_sdk import ui
-from app import AUTH_GW, AUTH_SERVICE_TOKEN
+from app import _gw_request
 
 log = logging.getLogger("admin")
 
 async def _get_config(acting: str) -> dict:
-    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
-        return {}
     try:
-        async with httpx.AsyncClient(timeout=8.0) as c:
-            r = await c.get(f"{AUTH_GW.rstrip('/')}/v1/internal/billing/stripe-config",
-                            headers={"X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": acting})
-        return r.json() if r.status_code == 200 else {}
+        result = await _gw_request("GET", "/v1/internal/billing/stripe-config", acting=acting)
+        return result if isinstance(result, dict) else {}
     except Exception as e:
-        log.warning("payment _get_config error: %s", e); return {}
+        log.warning("payment _get_config error: %s", e)
+        return {}
 
 async def build_payment(ctx, **kwargs):
     acting = str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
@@ -31,7 +31,8 @@ async def build_payment(ctx, **kwargs):
                     else ui.Badge("Not Configured", color="red"))
 
     children = [
-        ui.Header("Payment Provider", level=3),
+        ui.Header("Payment Provider", level=3,
+                  subtitle="Stripe configuration, health, and key rotation"),
         ui.Stack(direction="h", gap=2, children=[
             ui.Text("Provider: Stripe", variant="body"), status_badge,
             ui.Badge(f"Mode: {mode}", color="green" if mode == "live" else "blue"),

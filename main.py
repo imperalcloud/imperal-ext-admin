@@ -1,4 +1,4 @@
-"""Admin v5.2.6 · Platform administration for Imperal Cloud."""
+"""Admin v5.9.1 · Platform administration for Imperal Cloud."""
 from __future__ import annotations
 
 import sys, os

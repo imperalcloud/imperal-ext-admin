@@ -92,7 +92,7 @@ def _build_general(app_id: str, data: dict) -> list:
 def _build_tools(data: dict) -> list:
     tools = data.get("tools") or []
     if not tools:
-        return [ui.Empty(message="No tools registered", icon="wrench")]
+        return [ui.Empty(message="No tools registered", icon="Wrench")]
     items = []
     for t in tools:
         name = t.get("name", "Unknown")
@@ -124,7 +124,7 @@ def _build_tools(data: dict) -> list:
 def _build_keys(data: dict) -> list:
     keys = data.get("keys") or []
     if not keys:
-        return [ui.Empty(message="No API keys", icon="key")]
+        return [ui.Empty(message="No API keys", icon="Key")]
     return [ui.KeyValue(items=[
         {"key": "Prefix", "value": f"{k.get('prefix', '???')}..."},
         {"key": "Scope", "value": k.get("scope", "\u2014")},
@@ -191,7 +191,7 @@ async def build_ext_settings(ctx: Any, app_id: str = "",
 
     return ui.Stack(children=[
         _back_button(),
-        ui.Header(text=f"{display_name} \u2014 Settings", level=3, subtitle=app_id),
+        ui.Header(f"{display_name} — Settings", level=3, subtitle=app_id),
         _tab_bar(app_id, tab),
         ui.Divider(),
         *content,

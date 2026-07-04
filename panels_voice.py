@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import logging
 
-import httpx
 from imperal_sdk import ui
 
-from app import AUTH_GW, AUTH_SERVICE_TOKEN, _gw_request
+from app import _gw_request
 
 log = logging.getLogger("admin")
 
@@ -22,18 +21,9 @@ CONNECTORS_SCOPE = "connectors:use"
 
 
 async def _get(path: str) -> dict:
-    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
-        return {}
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                f"{AUTH_GW.rstrip('/')}{path}",
-                headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
-            )
-        if resp.status_code != 200:
-            log.warning("voice _get %s status=%s", path, resp.status_code)
-            return {}
-        return resp.json()
+        result = await _gw_request("GET", path)
+        return result if isinstance(result, dict) else {}
     except Exception as e:
         log.warning("voice _get %s error: %s: %s", path, type(e).__name__, e)
         return {}

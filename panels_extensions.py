@@ -166,7 +166,7 @@ async def build_extensions(ctx: Any, category_filter: str = "",
     if not extensions:
         return ui.Stack(children=[
             ui.Header(text="Extensions", level=3),
-            ui.Empty(message="No extensions registered", icon="puzzle"),
+            ui.Empty(message="No extensions registered", icon="Puzzle"),
         ], direction="v", gap=4)
 
     categories = sorted({e.get("category", "") for e in extensions if e.get("category")})

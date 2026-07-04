@@ -213,10 +213,10 @@ async def fn_get_panel_data(ctx, params: EmptyParams) -> ActionResult:
     # Right panel: dashboard widgets
     right = ui.Stack([
         ui.Grid([
-            ui.Stat(label="Users", value=stats.get("users_total", 0), icon="users", color="blue"),
-            ui.Stat(label="Active", value=stats.get("users_active", 0), icon="user-check", color="green"),
-            ui.Stat(label="Roles", value=stats.get("roles_count", 0), icon="shield", color="purple"),
-            ui.Stat(label="Extensions", value=stats.get("extensions_active", 0), icon="puzzle", color="cyan"),
+            ui.Stat(label="Users", value=stats.get("users_total", 0), icon="Users", color="blue"),
+            ui.Stat(label="Active", value=stats.get("users_active", 0), icon="UserCheck", color="green"),
+            ui.Stat(label="Roles", value=stats.get("roles_count", 0), icon="Shield", color="purple"),
+            ui.Stat(label="Extensions", value=stats.get("extensions_active", 0), icon="Puzzle", color="cyan"),
         ], columns=2),
         ui.Card(
             title="System Health",

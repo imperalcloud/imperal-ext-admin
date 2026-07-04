@@ -13,7 +13,11 @@ log = logging.getLogger("admin")
 async def build_app_review(ctx, **kwargs) -> ui.Stack:
     """Right panel: pending app submissions with approve/reject actions."""
     row = kwargs.get("row")
-    stack_items = [ui.Header("App Review", level=2)]
+    selected_id = kwargs.get("selected_id") or kwargs.get("app_id") or ""
+    stack_items = [
+        ui.Header("App Review", level=3,
+                  subtitle="Review pending developer submissions"),
+    ]
 
     try:
         pending = await _gw_request("GET", "/v1/admin/apps/pending")
@@ -29,7 +33,7 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
     if not apps:
         return ui.Stack(children=[
             *stack_items,
-            ui.Alert(title="No pending apps", message="No apps pending review.", type="info"),
+            ui.Empty(message="No apps pending review.", icon="ClipboardCheck"),
         ])
 
     # Build table rows
@@ -55,27 +59,42 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
             ui.DataColumn(key="submitted", label="Submitted"),
         ],
         rows=rows,
-        on_row_click=ui.Call("__panel__tools", section="app_review", app_id=""),
+        on_row_click=ui.Call("__panel__tools", section="app_review"),
     )
     stack_items.append(table)
 
     # Detail actions when a row is selected
+    selected = None
     if isinstance(row, dict) and row.get("app_id"):
-        selected_id = row["app_id"]
+        selected = row
+    elif selected_id:
+        selected = next((r for r in rows if str(r.get("app_id", "")) == str(selected_id)), None)
+
+    if isinstance(selected, dict) and selected.get("app_id"):
+        selected_id = selected["app_id"]
         stack_items.append(ui.Divider())
-        stack_items.append(ui.Text(f"Selected: {selected_id}"))
-        stack_items.append(ui.Stack(direction="h", gap=1, children=[
-            ui.Button(
-                label="Approve",
-                variant="primary",
-                on_click=ui.Call("review_app", app_id=selected_id, action="approve"),
-            ),
-            ui.Button(
-                label="Reject",
-                variant="danger",
-                on_click=ui.Call("review_app", app_id=selected_id, action="reject",
-                                  reason="Does not meet quality standards"),
-            ),
+        stack_items.append(ui.Section(title="Selected app", children=[
+            ui.KeyValue(items=[
+                {"key": "App ID", "value": selected_id},
+                {"key": "Name", "value": selected.get("name", "—")},
+                {"key": "Developer", "value": selected.get("developer", "—")},
+                {"key": "Category", "value": selected.get("category", "—")},
+                {"key": "Git URL", "value": selected.get("git_url", "—")},
+                {"key": "Submitted", "value": selected.get("submitted", "—")},
+            ], columns=2),
+            ui.Stack(direction="h", gap=1, children=[
+                ui.Button(
+                    label="Approve",
+                    variant="primary",
+                    on_click=ui.Call("review_app", app_id=selected_id, action="approve"),
+                ),
+                ui.Button(
+                    label="Reject",
+                    variant="danger",
+                    on_click=ui.Call("review_app", app_id=selected_id, action="reject",
+                                      reason="Does not meet quality standards"),
+                ),
+            ]),
         ]))
 
     return ui.Stack(children=stack_items)

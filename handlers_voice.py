@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import logging
 
-import httpx
 from pydantic import BaseModel, Field
 
 from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN,
-    _verify_write_reflected, _gw_request,
+    _verify_write_reflected, _gw_request, _admin_put_checked,
 )
 
 log = logging.getLogger("admin")
@@ -29,14 +28,6 @@ def _acting(ctx) -> str:
         return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
     except Exception:
         return ""
-
-
-async def _put_billing(path: str, body: dict, acting: str):
-    url = f"{AUTH_GW.rstrip('/')}{path}"
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        return await client.put(url, json=body, headers={
-            "X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": acting,
-        })
 
 
 class _Receipt(BaseModel):
@@ -57,17 +48,14 @@ async def fn_save_voice_costs(ctx, params: SaveVoiceCostsParams) -> ActionResult
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = {"stt": params.stt, "speak": params.speak}
-    try:
-        resp = await _put_billing("/v1/internal/billing/voice-costs", body, _acting(ctx))
-    except Exception as e:
-        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
-    if resp.status_code == 403:
-        return ActionResult.error("admin role required to change voice pricing")
-    if resp.status_code != 200:
-        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
-    drift = _verify_write_reflected(resp.json(), body)
-    if drift:
-        return ActionResult.error(drift)
+    payload, error = await _admin_put_checked(
+        "/v1/internal/billing/voice-costs",
+        body,
+        acting=_acting(ctx),
+        forbidden_message="admin role required to change voice pricing",
+    )
+    if error:
+        return ActionResult.error(error)
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Voice pricing saved (STT {params.stt} / TTS {params.speak} cr). Applies within ~1 min.",

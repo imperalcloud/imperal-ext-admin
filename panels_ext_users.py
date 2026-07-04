@@ -83,5 +83,5 @@ async def build_ext_users(ctx: Any, app_id: str = "", **kwargs) -> ui.Stack:
             ui.Stat(label="Total", value=str(len(sorted_users))),
         ], columns=3),
         ui.List(items=list_items, searchable=True) if list_items else
-        ui.Empty(message="No users found for this extension", icon="users"),
+        ui.Empty(message="No users found for this extension", icon="Users"),
     ], direction="v", gap=3)

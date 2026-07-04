@@ -30,7 +30,7 @@ def build_skeleton_tab(app_id: str, settings: dict) -> list:
     skel = settings.get("skeleton", {})
     sections = skel.get("sections") or []
     if not sections:
-        return [ui.Empty(message="No skeleton sections registered", icon="database")]
+        return [ui.Empty(message="No skeleton sections registered", icon="Database")]
 
     # Build defaults with current values for ALL fields
     defaults = {"app_id": app_id}
