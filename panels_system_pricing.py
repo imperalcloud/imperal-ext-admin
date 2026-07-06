@@ -19,6 +19,7 @@ log = logging.getLogger("admin")
 _DEFAULT_FEES = {"economy": 60, "standard": 250, "premium": 2200}
 _DEFAULT_RATE = 1000
 _DEFAULT_CATS = {"read": 1, "write": 5, "destructive": 10}
+_DEFAULT_CODING = {"markup": 3.0, "credits_per_dollar": 1000, "min_charge": 0, "grace_cap": 1000, "low_warn_threshold": 500}
 
 
 async def _get(path: str) -> dict:
@@ -43,6 +44,7 @@ async def build_system_pricing(ctx, **kwargs):
     fees = await _get("/v1/internal/billing/platform-fees") or {}
     rate = await _get("/v1/internal/billing/token-rate") or {}
     cats = await _get("/v1/internal/billing/category-defaults") or {}
+    coding = await _get("/v1/internal/billing/coding-pricing") or {}
 
     fees_form = ui.Form(
         action="save_platform_fees",
@@ -107,6 +109,35 @@ async def build_system_pricing(ctx, **kwargs):
         ],
     )
 
+    coding_form = ui.Form(
+        action="save_coding_pricing",
+        submit_label="Save Coding Pricing",
+        defaults={
+            "markup": float(coding.get("markup", _DEFAULT_CODING["markup"])),
+            "credits_per_dollar": int(coding.get("credits_per_dollar", _DEFAULT_CODING["credits_per_dollar"])),
+            "min_charge": int(coding.get("min_charge", _DEFAULT_CODING["min_charge"])),
+            "grace_cap": int(coding.get("grace_cap", _DEFAULT_CODING["grace_cap"])),
+            "low_warn_threshold": int(coding.get("low_warn_threshold", _DEFAULT_CODING["low_warn_threshold"])),
+        },
+        children=[
+            ui.Section(title="Coding agent (webbee-code terminal) pricing", children=[
+                ui.Text("Coding turns charge credits = real LLM cost x markup. grace_cap bounds the "
+                        "in-flight overdraft (server-capped at 20000); the user is warned below the "
+                        "low-balance threshold. Applies within ~1 min.", variant="caption"),
+                ui.Text("Markup (x real LLM cost)", variant="caption"),
+                ui.Input(param_name="markup", placeholder="e.g. 3.0"),
+                ui.Text("Credits per $1", variant="caption"),
+                ui.Input(param_name="credits_per_dollar", placeholder="e.g. 1000"),
+                ui.Text("Minimum charge per billed turn (credits)", variant="caption"),
+                ui.Input(param_name="min_charge", placeholder="e.g. 0"),
+                ui.Text("In-flight grace overdraft cap (credits)", variant="caption"),
+                ui.Input(param_name="grace_cap", placeholder="e.g. 1000"),
+                ui.Text("Low-balance warn threshold (credits)", variant="caption"),
+                ui.Input(param_name="low_warn_threshold", placeholder="e.g. 500"),
+            ]),
+        ],
+    )
+
     return ui.Stack(children=[
         ui.Header("System Pricing", level=3),
         ui.Text(
@@ -117,4 +148,5 @@ async def build_system_pricing(ctx, **kwargs):
         ui.Card(title="Platform Fee by Tier (LLM resale — Imperal keeps 100%)", content=fees_form),
         ui.Card(title="Default Function Prices (base fee — dev revenue-shared)", content=cats_form),
         ui.Card(title="Credit Rate", content=rate_form),
+        ui.Card(title="Coding Agent Pricing (webbee-code terminal)", content=coding_form),
     ], direction="v", gap=2)

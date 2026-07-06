@@ -14,7 +14,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put_checked
-from models_records import PlatformFeeReceipt, TokenRateReceipt, CategoryDefaultsReceipt
+from models_records import PlatformFeeReceipt, TokenRateReceipt, CategoryDefaultsReceipt, CodingPricingReceipt
 
 log = logging.getLogger("admin")
 
@@ -106,5 +106,38 @@ async def fn_save_category_defaults(ctx, params: SaveCategoryDefaultsParams) -> 
         data={**body, "action": "saved"},
         summary=f"Default function prices saved (read {params.read} / write {params.write} / "
                 f"destructive {params.destructive} cr). Applies within ~1 min.",
+        refresh_panels=["tools"],
+    )
+
+
+class SaveCodingPricingParams(BaseModel):
+    markup: float = Field(..., ge=0, le=1000, description="Multiplier on the real coding-LLM cost")
+    credits_per_dollar: int = Field(..., ge=1, le=1_000_000, description="Credits per $1 of coding LLM cost")
+    min_charge: int = Field(..., ge=0, le=100_000, description="Minimum credits per billed coding turn")
+    grace_cap: int = Field(..., ge=0, le=20_000, description="Max in-flight overdraft (credits); server-capped at 20000")
+    low_warn_threshold: int = Field(..., ge=0, le=1_000_000, description="Warn the user when balance drops below this")
+
+
+@chat.function("save_coding_pricing", action_type="write",
+               event="coding_pricing_saved", data_model=CodingPricingReceipt,
+               description="Save the coding-agent (webbee-code terminal) pricing: markup on the real "
+                           "LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and "
+                           "low-balance warn threshold, to the billing config.")
+async def fn_save_coding_pricing(ctx, params: SaveCodingPricingParams) -> ActionResult:
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    body = params.model_dump()
+    payload, error = await _admin_put_checked(
+        "/v1/internal/billing/coding-pricing",
+        body,
+        acting=_acting(ctx),
+        forbidden_message="admin role required to change coding pricing",
+    )
+    if error:
+        return ActionResult.error(error)
+    return ActionResult.success(
+        data={**body, "action": "saved"},
+        summary=f"Coding pricing saved (markup x{params.markup} / {params.credits_per_dollar} cr per $ / "
+                f"min {params.min_charge} / grace {params.grace_cap} / warn {params.low_warn_threshold}). Applies within ~1 min.",
         refresh_panels=["tools"],
     )

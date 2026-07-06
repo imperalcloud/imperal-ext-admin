@@ -284,3 +284,23 @@ class CategoryDefaultsReceipt(sdl.Entity):
             data.setdefault("title", "Default Function Prices")
             data.setdefault("kind", "categorydefaults")
         return data
+
+
+class CodingPricingReceipt(sdl.Entity):
+    """Receipt for save_coding_pricing (kind='codingpricing').
+    Mirrors handler return keys: {markup, credits_per_dollar, min_charge, grace_cap, low_warn_threshold, action}."""
+    markup: Optional[float] = None
+    credits_per_dollar: Optional[int] = None
+    min_charge: Optional[int] = None
+    grace_cap: Optional[int] = None
+    low_warn_threshold: Optional[int] = None
+    action: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("id") or "coding_pricing"
+            data.setdefault("title", "Coding Agent Pricing")
+            data.setdefault("kind", "codingpricing")
+        return data

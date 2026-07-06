@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.8.0",
+  "sdk_version": "5.9.3",
   "app_id": "admin",
-  "version": "5.9.1",
+  "version": "5.9.3",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -13644,6 +13644,219 @@
         "x-sdl": "entity"
       },
       "event": "category_defaults_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_coding_pricing",
+      "description": "Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and low-balance warn threshold, to the billing config.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "markup": {
+            "description": "Multiplier on the real coding-LLM cost",
+            "maximum": 1000,
+            "minimum": 0,
+            "title": "Markup",
+            "type": "number"
+          },
+          "credits_per_dollar": {
+            "description": "Credits per $1 of coding LLM cost",
+            "maximum": 1000000,
+            "minimum": 1,
+            "title": "Credits Per Dollar",
+            "type": "integer"
+          },
+          "min_charge": {
+            "description": "Minimum credits per billed coding turn",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Min Charge",
+            "type": "integer"
+          },
+          "grace_cap": {
+            "description": "Max in-flight overdraft (credits); server-capped at 20000",
+            "maximum": 20000,
+            "minimum": 0,
+            "title": "Grace Cap",
+            "type": "integer"
+          },
+          "low_warn_threshold": {
+            "description": "Warn the user when balance drops below this",
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Low Warn Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "markup",
+          "credits_per_dollar",
+          "min_charge",
+          "grace_cap",
+          "low_warn_threshold"
+        ],
+        "title": "SaveCodingPricingParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt for save_coding_pricing (kind='codingpricing').\nMirrors handler return keys: {markup, credits_per_dollar, min_charge, grace_cap, low_warn_threshold, action}.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "markup": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Markup"
+          },
+          "credits_per_dollar": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Credits Per Dollar"
+          },
+          "min_charge": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Min Charge"
+          },
+          "grace_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Grace Cap"
+          },
+          "low_warn_threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Low Warn Threshold"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "CodingPricingReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "coding_pricing_saved",
       "background": false,
       "long_running": false,
       "scopes": [],
