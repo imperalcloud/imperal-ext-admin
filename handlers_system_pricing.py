@@ -42,6 +42,7 @@ class SaveTokenRateParams(BaseModel):
 async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    body = params.model_dump()
     payload, error = await _admin_put_checked(
         "/v1/internal/billing/platform-fees",
         body,
@@ -63,6 +64,7 @@ async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionRe
 async def fn_save_token_rate(ctx, params: SaveTokenRateParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    body = params.model_dump()
     payload, error = await _admin_put_checked(
         "/v1/internal/billing/token-rate",
         body,
@@ -91,6 +93,7 @@ class SaveCategoryDefaultsParams(BaseModel):
 async def fn_save_category_defaults(ctx, params: SaveCategoryDefaultsParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    body = params.model_dump()
     payload, error = await _admin_put_checked(
         "/v1/internal/billing/category-defaults",
         body,
