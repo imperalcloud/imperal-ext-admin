@@ -5,7 +5,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams, _resolve_user_by_email
+from app import (
+    chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams,
+    _resolve_user_by_email, _invalidate_extension_caches, _signal_session_refresh,
+)
 from models_records import (
     UserListResponse,
     UserRecord,
@@ -139,6 +142,12 @@ async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
     drift = _verify_write_reflected(result, data)
     if drift:
         return ActionResult.error(f"Update did not take effect — {drift}")
+    # Role/scope changes alter extension visibility — flush the shared policy
+    # caches and nudge the live session, mirroring deny/allow_extension (the
+    # missing invalidation kept stale visibility after role moves).
+    if params.role or params.scopes is not None:
+        await _invalidate_extension_caches(user_id=params.user_id)
+        await _signal_session_refresh(params.user_id)
     # SDL: return the updated user as a canonical UserRecord entity (the gateway
     # PATCH echoes the full user dict; _sdl_canon fills id/title/kind). NO legacy
     # {"user": ...} wrapper.

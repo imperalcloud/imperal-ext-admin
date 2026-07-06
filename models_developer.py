@@ -40,6 +40,55 @@ class AppReviewReceipt(sdl.Entity):
 
 # --- payout review ---
 
+class DeveloperProfileRecord(sdl.Entity):
+    """Developer profile entity for developer_profile (kind='developer').
+
+    Mirrors the gateway GET /v1/developer/profile response keys verbatim:
+    {imperal_id, email, nickname, tier, apps_count, total_earnings,
+    registered_at}. tier=None means the user is not a registered developer.
+    id = imperal_id; title = nickname or email."""
+    imperal_id: Optional[str] = None
+    email: Optional[str] = None
+    nickname: Optional[str] = None
+    tier: Optional[str] = None
+    apps_count: Optional[Any] = None
+    total_earnings: Optional[Any] = None
+    registered_at: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("imperal_id") or data.get("id") or "developer"
+            data.setdefault(
+                "title",
+                data.get("nickname") or data.get("email")
+                or data.get("imperal_id") or "developer",
+            )
+            data.setdefault("kind", "developer")
+        return data
+
+
+class DeveloperTierReceipt(sdl.Entity):
+    """Receipt entity for set_developer_tier (kind='devtier').
+
+    Mirrors the ACTUAL handler return keys verbatim (verified vs
+    handlers_developer.fn_set_developer_tier): {imperal_id, tier, comped_by}.
+    id = imperal_id (the TARGET user); title = 'developer tier <tier>'."""
+    imperal_id: Optional[str] = None
+    tier: Optional[str] = None
+    comped_by: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("imperal_id") or data.get("id") or "devtier"
+            data.setdefault("title", f"developer tier {data.get('tier') or ''}".strip())
+            data.setdefault("kind", "devtier")
+        return data
+
+
 class PayoutReviewReceipt(sdl.Entity):
     """Receipt entity for review_payout (kind='payout').
 

@@ -16140,6 +16140,344 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "developer_profile",
+      "description": "Show a user's developer profile: tier, nickname, apps count, earnings, registration date. tier=None means not a registered developer.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Target a user by email or imperal_id.",
+        "properties": {
+          "user": {
+            "description": "Target user: email or imperal_id",
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "DeveloperUserParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Developer profile entity for developer_profile (kind='developer').\n\nMirrors the gateway GET /v1/developer/profile response keys verbatim:\n{imperal_id, email, nickname, tier, apps_count, total_earnings,\nregistered_at}. tier=None means the user is not a registered developer.\nid = imperal_id; title = nickname or email.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imperal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imperal Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Nickname"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tier"
+          },
+          "apps_count": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Apps Count"
+          },
+          "total_earnings": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Earnings"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Registered At"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DeveloperProfileRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_developer_tier",
+      "description": "Set or change a user's DEVELOPER tier (explorer|indie|studio|partner) without charging — audited admin comp. Grants developer status if the user has none. This is the developer 'group'; it is independent of the RBAC role/category.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set a user's developer tier (admin comp, no charge).",
+        "properties": {
+          "user": {
+            "description": "Target user: email or imperal_id",
+            "title": "User",
+            "type": "string"
+          },
+          "tier": {
+            "description": "Developer tier: explorer | indie | studio | partner",
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user",
+          "tier"
+        ],
+        "title": "SetDeveloperTierParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt entity for set_developer_tier (kind='devtier').\n\nMirrors the ACTUAL handler return keys verbatim (verified vs\nhandlers_developer.fn_set_developer_tier): {imperal_id, tier, comped_by}.\nid = imperal_id (the TARGET user); title = 'developer tier <tier>'.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imperal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imperal Id"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tier"
+          },
+          "comped_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Comped By"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DeveloperTierReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "user_updated",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "review_payout",
       "description": "Approve or reject a developer payout request",
       "action_type": "write",

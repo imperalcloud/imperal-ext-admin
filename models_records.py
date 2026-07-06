@@ -27,7 +27,8 @@ re-exports EVERYTHING so handlers keep importing ``from models_records import
                              UserBalanceRecord, UserBalancesResponse
   * models_roles.py        — RoleRecord, RoleListResponse, RoleActionReceipt,
                              BulkRoleAssignReceipt, ScopeRecord, ScopeListResponse
-  * models_developer.py    — AppReviewReceipt, PayoutReviewReceipt
+  * models_developer.py    — AppReviewReceipt, PayoutReviewReceipt,
+                             DeveloperProfileRecord, DeveloperTierReceipt
   * models_extensions.py   — ExtensionRecord, ExtensionsListResponse,
                              ExtensionConfigRecord, AccessPolicyRecord,
                              ExtSettingsReceipt
@@ -63,6 +64,8 @@ from models_roles import (  # noqa: F401
 )
 from models_developer import (  # noqa: F401
     AppReviewReceipt,
+    DeveloperProfileRecord,
+    DeveloperTierReceipt,
     PayoutReviewReceipt,
 )
 from models_extensions import (  # noqa: F401
@@ -114,6 +117,7 @@ __all__ = [
     "ScopeRecord", "ScopeListResponse",
     # developer portal
     "AppReviewReceipt", "PayoutReviewReceipt",
+    "DeveloperProfileRecord", "DeveloperTierReceipt",
     # extensions
     "ExtensionRecord", "ExtensionsListResponse", "ExtensionConfigRecord",
     "AccessPolicyRecord", "ExtSettingsReceipt",

@@ -40,6 +40,17 @@ async def _fetch_effective_scopes(user_id: str) -> list[str]:
     )
 
 
+async def _fetch_developer_profile(user_id: str) -> dict:
+    """Developer profile (tier/nickname/apps/earnings) — {} when the user is
+    not a registered developer (gateway 403) or on any error; never breaks
+    the profile editor."""
+    try:
+        result = await _gw_request("GET", f"/v1/developer/profile?user_id={user_id}")
+        return result if isinstance(result, dict) and "error" not in result else {}
+    except Exception:
+        return {}
+
+
 async def _fetch_user_billing(user_id: str) -> tuple[dict, dict]:
     """Subscription (plan/status/renewal) + wallet for a user. Both gateway
     endpoints key on the canonical imperal_id — same truth the user's own
@@ -74,10 +85,10 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     if not isinstance(user, dict) or "error" in user:
         return ui.Alert(message=f"User {user_id} not found", type="error")
 
-    roles, all_scopes, extensions, user_exts, effective, billing = await asyncio.gather(
+    roles, all_scopes, extensions, user_exts, effective, billing, dev_profile = await asyncio.gather(
         _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
         _fetch_user_extensions(user_id), _fetch_effective_scopes(user_id),
-        _fetch_user_billing(user_id),
+        _fetch_user_billing(user_id), _fetch_developer_profile(user_id),
     )
     sub_data, bal_data = billing
 
@@ -167,6 +178,39 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             ],
         ))
 
+    # ── Developer (tier = the developer "group"; independent of RBAC role) ──
+    dev_tier = dev_profile.get("tier") or ""
+    dev_children: list = []
+    if dev_profile:
+        dev_children.append(ui.KeyValue(items=[
+            {"key": "Tier", "value": dev_tier or "—"},
+            {"key": "Nickname", "value": str(dev_profile.get("nickname") or "—")},
+            {"key": "Apps", "value": str(dev_profile.get("apps_count", 0))},
+            {"key": "Total earnings", "value": str(dev_profile.get("total_earnings", 0))},
+            {"key": "Registered", "value": str(dev_profile.get("registered_at") or "—")},
+        ], columns=2))
+    else:
+        dev_children.append(ui.Text(
+            "Not registered as a developer — setting a tier below grants "
+            "developer status (audited admin comp, no charge).",
+            variant="caption",
+        ))
+    dev_children.append(ui.Form(
+        action="set_developer_tier",
+        submit_label="Set Developer Tier",
+        defaults={"user": user_id},
+        children=[
+            ui.Text("Developer tier (admin comp — no charge)", variant="caption"),
+            ui.Select(
+                options=[{"value": t, "label": t.capitalize()}
+                         for t in ("explorer", "indie", "studio", "partner")],
+                value=dev_tier or "explorer",
+                param_name="tier",
+            ),
+        ],
+    ))
+    nodes.append(ui.Section(title="Developer", children=dev_children))
+
     # ── Individual Limits ──────────────────────────────────────────
     nodes.append(ui.Section(
         title="Individual Limits",
@@ -210,6 +254,10 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
         "confirmation_enabled", "confirmation_skip_read",
         "account_type", "billing", "company", "display_name", "full_name",
         "email_verified", "email_verified_at", "stripe_customer_id", "auto_topup",
+        # shown in the Developer section above
+        "developer_tier", "developer_registered_at", "developer_tier_started_at",
+        "developer_tier_expires_at", "developer_tier_grace_until",
+        "developer_tier_pending_downgrade",
     }
     display_attrs = {k: v for k, v in attrs.items() if k not in _surfaced}
     attr_children: list = []
