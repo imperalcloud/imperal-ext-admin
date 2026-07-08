@@ -11,7 +11,10 @@ import httpx
 import redis.asyncio as aioredis
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, AUTH_GW, EmptyParams, _resolve_user_by_email, _gw_request
+from app import (
+    chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, EmptyParams,
+    _resolve_user_by_email, _gw_request, _admin_put,
+)
 from models_records import (
     BillingHealthResponse, BillingOverviewResponse, UserBalanceRecord, UserBalancesResponse,
 )
@@ -320,3 +323,55 @@ async def fn_billing_health(ctx, params: EmptyParams) -> ActionResult:
     except Exception as e:
         log.error("billing_health failed: %s", e)
         return ActionResult.error(f"Failed: {e}", retryable=True)
+
+
+# ─── Plan assignment (active subscription) ──────────────────────────────── #
+
+def _acting(ctx) -> str:
+    try:
+        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
+    except Exception:
+        return ""
+
+
+class _PlanSetReceipt(BaseModel):
+    action: str = "saved"
+
+
+class SetUserPlanParams(BaseModel):
+    """Assign a user's active subscription plan."""
+    user_id: str = Field(description="Canonical imperal_id of the target user (imp_u_*).")
+    plan_ref: str = Field(description="Plan to assign — the plan NAME or its id.")
+
+
+@chat.function("set_user_plan", action_type="write", event="user_plan_set",
+               data_model=_PlanSetReceipt,
+               description="Assign a user's active subscription plan (by plan name or id).")
+async def fn_set_user_plan(ctx, params: SetUserPlanParams) -> ActionResult:
+    # Mirrors handlers_voice.set_plan_feature auth/error handling. The gateway
+    # returns {plan, plan_id, status} (not the request body), so the raw-response
+    # _admin_put + manual status checks are used rather than _admin_put_checked
+    # (whose reflect-verify would false-fail on the differing response shape).
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    body = {"user_id": params.user_id, "plan_ref": params.plan_ref}
+    try:
+        resp = await _admin_put("/v1/internal/billing/user-plan", body, _acting(ctx))
+    except Exception as e:
+        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
+    if resp.status_code == 403:
+        return ActionResult.error("admin role required to change a user's plan")
+    if resp.status_code == 404:
+        return ActionResult.error("plan not found")
+    if resp.status_code != 200:
+        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:200]}")
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = {}
+    plan_name = (payload.get("plan") if isinstance(payload, dict) else None) or params.plan_ref
+    return ActionResult.success(
+        data={**body, "action": "saved"},
+        summary=f"Plan set to {plan_name}. Applies within ~1 min.",
+        refresh_panels=["tools"],
+    )

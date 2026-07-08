@@ -101,6 +101,20 @@ async def _fetch_roles() -> list[dict]:
     return await _cached("roles", _fetch_roles_raw)
 
 
+async def _fetch_plans_raw() -> list[dict]:
+    """Fetch billing plans from Auth GW (same read fn_billing_overview uses)."""
+    try:
+        plans = await _gw_request("GET", "/v1/billing/plans")
+        return plans if isinstance(plans, list) else []
+    except Exception as e:
+        log.warning("Panel: fetch plans failed: %s", e)
+        return []
+
+
+async def _fetch_plans() -> list[dict]:
+    return await _cached("plans", _fetch_plans_raw)
+
+
 async def _fetch_extensions_raw() -> list[dict]:
     """Cross-store view of every app: merge the Registry (`/v1/apps`), the
     Marketplace store (`developer_apps` via `/v1/admin/apps`), and the on-disk

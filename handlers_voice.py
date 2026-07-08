@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN,
-    _verify_write_reflected, _gw_request, _admin_put_checked,
+    _verify_write_reflected, _gw_request, _admin_put, _admin_put_checked,
 )
 
 log = logging.getLogger("admin")
@@ -77,7 +77,7 @@ async def fn_save_voice_enabled(ctx, params: SaveVoiceEnabledParams) -> ActionRe
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = {"enabled": bool(params.enabled)}
     try:
-        resp = await _put_billing("/v1/internal/billing/voice-enabled", body, _acting(ctx))
+        resp = await _admin_put("/v1/internal/billing/voice-enabled", body, _acting(ctx))
     except Exception as e:
         return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
     if resp.status_code == 403:
@@ -151,19 +151,20 @@ async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> Action
 
 class SetPlanFeatureParams(BaseModel):
     plan_id: str = Field(..., description="Plan id")
-    feature: str = Field(..., pattern="^(voice|connectors)$", description="Feature: 'voice' or 'connectors'")
+    feature: str = Field(..., pattern="^(voice|connectors|coding)$",
+                         description="Feature: 'voice', 'connectors', or 'coding' (Webbee Code)")
     enabled: bool = Field(..., description="Enable (true) or disable (false) the feature for this plan")
 
 
 @chat.function("set_plan_feature", action_type="write",
                event="plan_feature_set", data_model=_Receipt,
-               description="Enable or disable a feature (voice or connectors) for an entire subscription plan.")
+               description="Enable or disable a feature (voice, connectors, or coding/Webbee Code) for an entire subscription plan.")
 async def fn_set_plan_feature(ctx, params: SetPlanFeatureParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = {"plan_id": params.plan_id, "feature": params.feature, "enabled": bool(params.enabled)}
     try:
-        resp = await _put_billing("/v1/internal/billing/plan-feature", body, _acting(ctx))
+        resp = await _admin_put("/v1/internal/billing/plan-feature", body, _acting(ctx))
     except Exception as e:
         return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
     if resp.status_code == 403:

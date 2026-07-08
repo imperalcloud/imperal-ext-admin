@@ -59,6 +59,13 @@ class RemoveUserAttributeParams(BaseModel):
     attr_key: str = Field(description="Attribute key to remove")
 
 
+class SetUserCodingAccessParams(BaseModel):
+    """Set a user's Webbee Code (coding agent) access override."""
+    user_id: str = Field(description="imperal_id")
+    access: str  = Field(default="inherit", pattern="^(inherit|allow|deny)$",
+                         description="inherit (use the plan), allow (force-grant), or deny")
+
+
 class ResetConvParams(BaseModel):
     """Reset (clear) a specific user's conversation. A target is REQUIRED — pass
     user_id or email; the tool NEVER silently defaults to the caller (for a
@@ -339,4 +346,35 @@ async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> Ac
         data={"imperal_id": params.user_id, "attributes": attrs},
         summary=f"Attribute '{params.attr_key}' removed from {params.user_id}",
     refresh_panels=["tools"],
+    )
+
+
+# ─── Webbee Code access override (coding_access attribute) ───────────────── #
+
+@chat.function("set_user_coding_access", action_type="write", event="user_updated",
+               data_model=UserRecord,
+               description=("Set a user's Webbee Code (coding agent) access: inherit the plan, "
+                            "force-allow, or deny. The per-user `coding_access` attribute overrides "
+                            "the plan's coding feature (admins are always allowed)."))
+async def fn_set_user_coding_access(ctx, params: SetUserCodingAccessParams) -> ActionResult:
+    # MERGE (never wipe) attributes — mirrors fn_update_user_limits / fn_set_user_attribute:
+    # fetch the user, keep every existing key, set only `coding_access`, then PATCH.
+    # CRITICAL: never PATCH a bare attributes dict that drops existing keys
+    # (2026-07-02 role-change attribute-wipe incident).
+    user = await _gw_request("GET", f"/v1/users/{params.user_id}")
+    if isinstance(user, dict) and "error" in user:
+        return ActionResult.error(user["error"])
+    attrs = (user.get("attributes") or {}) if isinstance(user, dict) else {}
+    # coding_access values: "allow" | "deny" | "" (empty = inherit the plan).
+    attrs["coding_access"] = "" if params.access == "inherit" else params.access
+    result = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
+                               {"attributes": attrs})
+    if isinstance(result, dict) and "error" in result:
+        return ActionResult.error(result["error"])
+    label = {"inherit": "inherited from plan", "allow": "allowed", "deny": "denied"}[params.access]
+    # SDL: canonical UserRecord entity carrying the merged attributes (field-symmetric).
+    return ActionResult.success(
+        data={"imperal_id": params.user_id, "attributes": attrs},
+        summary=f"Webbee Code access {label} for {params.user_id}",
+        refresh_panels=["tools"],
     )

@@ -15,6 +15,7 @@ from imperal_sdk import ui
 from panels_sections import (
     _fetch_users,
     _fetch_roles,
+    _fetch_plans,
     _fetch_extensions,
     _fetch_user_extensions,
     _fetch_scope_names,
@@ -92,7 +93,8 @@ def _build_ext_badges(extensions: list[dict], user_exts: list[dict]) -> list:
 def _build_user_expanded(user: dict, role_options: list[dict],
                          all_scopes: list[str],
                          extensions: list[dict],
-                         user_exts: list[dict]) -> list:
+                         user_exts: list[dict],
+                         plan_options: list[dict]) -> list:
     """Build expanded_content for a single user ListItem."""
     uid = user.get("imperal_id", user.get("id", ""))
     role = user.get("role", "user")
@@ -103,6 +105,15 @@ def _build_user_expanded(user: dict, role_options: list[dict],
     auth_method = user.get("auth_method", "password")
     last_login = user.get("last_login", "Never")
     confirmation = attrs.get("confirmation_enabled", "inherit from role")
+    # Current subscription plan (from the user record if present, else "free").
+    current_plan = (
+        user.get("plan")
+        or (user.get("subscription") or {}).get("plan")
+        or attrs.get("plan")
+        or "free"
+    )
+    # Per-user Webbee Code access override: attribute "" (inherit) | "allow" | "deny".
+    coding_access = attrs.get("coding_access") or "inherit"
 
     rows: list = [
         ui.Section(title="Identity", children=[
@@ -126,6 +137,15 @@ def _build_user_expanded(user: dict, role_options: list[dict],
                     on_change=ui.Call("update_user", user_id=uid),
                 ),
             ], direction="h", gap=3),
+            ui.Text("Billing plan", variant="caption"),
+            ui.Select(
+                # Guard against an empty plan fetch so the current value always
+                # has a matching option to render.
+                options=plan_options or [{"value": current_plan, "label": current_plan}],
+                value=current_plan,
+                param_name="plan_ref",
+                on_change=ui.Call("set_user_plan", user_id=uid),
+            ),
         ]),
         ui.Text(f"User Scopes ({len(scopes)})", variant="caption"),
         ui.TagInput(
@@ -138,6 +158,21 @@ def _build_user_expanded(user: dict, role_options: list[dict],
 
     rows.extend(_build_limit_badges(attrs))
     rows.extend(_build_ext_badges(extensions, user_exts))
+
+    rows += [
+        ui.Divider(),
+        ui.Text("Webbee Code", variant="caption"),
+        ui.Select(
+            options=[
+                {"value": "inherit", "label": "По плану"},
+                {"value": "allow", "label": "Разрешить"},
+                {"value": "deny", "label": "Запретить"},
+            ],
+            value=coding_access,
+            param_name="access",
+            on_change=ui.Call("set_user_coding_access", user_id=uid),
+        ),
+    ]
 
     rows += [
         ui.Divider(),
@@ -174,8 +209,9 @@ def _build_user_expanded(user: dict, role_options: list[dict],
 async def build_users(ctx, role_filter: str = "",
                       status_filter: str = "", **kwargs):
     """User management: expandable cards with inline editing + filters."""
-    users, roles, all_scopes, extensions = await asyncio.gather(
+    users, roles, all_scopes, extensions, plans = await asyncio.gather(
         _fetch_users(), _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
+        _fetch_plans(),
     )
 
     if not users:
@@ -188,6 +224,12 @@ async def build_users(ctx, role_filter: str = "",
         {"value": r.get("name", ""),
          "label": r.get("display_name", r.get("name", ""))}
         for r in roles
+    ]
+    # Plan selector options — value = plan NAME (user-plan accepts name OR id, and
+    # the user record carries the plan name), label = plan name.
+    plan_options = [
+        {"value": p.get("name", ""), "label": p.get("name", "")}
+        for p in plans if p.get("name")
     ]
 
     # Apply filters
@@ -240,7 +282,7 @@ async def build_users(ctx, role_filter: str = "",
             expandable=True,
             expanded_content=_build_user_expanded(
                 u, role_options, all_scopes, extensions,
-                user_ext_map.get(uid, []),
+                user_ext_map.get(uid, []), plan_options,
             ),
         ))
 
