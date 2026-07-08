@@ -164,9 +164,9 @@ def _build_user_expanded(user: dict, role_options: list[dict],
         ui.Text("Webbee Code", variant="caption"),
         ui.Select(
             options=[
-                {"value": "inherit", "label": "По плану"},
-                {"value": "allow", "label": "Разрешить"},
-                {"value": "deny", "label": "Запретить"},
+                {"value": "inherit", "label": "Plan default"},
+                {"value": "allow", "label": "Allow"},
+                {"value": "deny", "label": "Deny"},
             ],
             value=coding_access,
             param_name="access",
