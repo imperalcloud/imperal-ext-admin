@@ -125,7 +125,7 @@ async def build_voice(ctx, **kwargs):
 
     # ── Per-plan access (Plan.features voice/connectors/coding) ──────────
     plan_children = [
-        ui.Text("Enable voice / connectors / Webbee Code per subscription plan. Additive (OR) "
+        ui.Text("Enable voice / connectors / Webbee Code / Connections (SSH & MCP targets) per subscription plan. Additive (OR) "
                 "with the role and per-user toggles — a user gets a feature if their PLAN, role, "
                 "or a personal grant allows it. (A per-user Webbee Code override, set in the Users "
                 "panel, takes precedence over the plan's coding feature.)", variant="caption"),
@@ -138,6 +138,7 @@ async def build_voice(ctx, **kwargs):
             has_v = bool(feats.get("voice"))
             has_c = bool(feats.get("connectors"))
             has_code = bool(feats.get("coding"))
+            has_conn = bool(feats.get("connections"))
             plan_children.append(ui.Button(
                 label=f"{pname} · voice: {'Disable' if has_v else 'Enable'}  ({'ON' if has_v else 'off'})",
                 variant=("danger" if has_v else "primary"),
@@ -153,10 +154,15 @@ async def build_voice(ctx, **kwargs):
                 variant=("danger" if has_code else "primary"),
                 on_click=ui.Call("set_plan_feature", plan_id=pid, feature="coding", enabled=(not has_code)),
             ))
+            plan_children.append(ui.Button(
+                label=f"{pname} · Connections (SSH/MCP): {'Disable' if has_conn else 'Enable'}  ({'ON' if has_conn else 'off'})",
+                variant=("danger" if has_conn else "primary"),
+                on_click=ui.Call("set_plan_feature", plan_id=pid, feature="connections", enabled=(not has_conn)),
+            ))
     else:
         plan_children.append(ui.Text("No plans found.", variant="caption"))
     plan_card = ui.Card(
-        title="Access by plan (voice / connectors / Webbee Code)",
+        title="Access by plan (voice / connectors / Webbee Code / Connections)",
         content=ui.Stack(direction="v", gap=1, children=plan_children),
     )
 
