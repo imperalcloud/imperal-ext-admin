@@ -14451,6 +14451,50 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "set_role_connections",
+      "description": "Grant or revoke Connections access (the connections:use scope — a user's own SSH/MCP targets) for an entire role/group.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "role_id": {
+            "description": "Role id (UUID)",
+            "title": "Role Id",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Grant (true) or revoke (false) connections:use for this role",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "role_id",
+          "enabled"
+        ],
+        "title": "SetRoleConnectionsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "role_connections_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "set_plan_feature",
       "description": "Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan.",
       "action_type": "write",

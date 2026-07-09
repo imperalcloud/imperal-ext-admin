@@ -75,6 +75,35 @@ def _build_role_expanded(
         ],
     ))
 
+    # ── Quick access grants (connectors / connections) ────────────
+    # One-click shortcuts for the two feature scopes — same effect as adding
+    # them to Default Scopes above (both cascade to the role's members).
+    has_connectors = "connectors:use" in scopes
+    has_connections = "connections:use" in scopes
+    nodes.append(ui.Section(
+        title="Quick access grants",
+        collapsible=True,
+        children=[
+            ui.Text("One-click grant/revoke of a feature scope for the WHOLE role "
+                    "(cascades to members). Equivalent to editing Default Scopes above.",
+                    variant="caption"),
+            ui.Stack(direction="h", gap=2, wrap=True, children=[
+                ui.Button(
+                    f"Connectors (Telegram / Discord): {'Disable' if has_connectors else 'Enable'}",
+                    variant=("danger" if has_connectors else "primary"),
+                    on_click=ui.Call("set_role_connectors", role_id=role_id,
+                                     enabled=(not has_connectors)),
+                ),
+                ui.Button(
+                    f"Connections (SSH / MCP): {'Disable' if has_connections else 'Enable'}",
+                    variant=("danger" if has_connections else "primary"),
+                    on_click=ui.Call("set_role_connections", role_id=role_id,
+                                     enabled=(not has_connections)),
+                ),
+            ]),
+        ],
+    ))
+
     # ── Default Extensions ─────────────────────────────────────────
     if default_exts:
         nodes.append(ui.Section(

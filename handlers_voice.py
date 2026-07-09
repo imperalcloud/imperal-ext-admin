@@ -96,6 +96,7 @@ async def fn_save_voice_enabled(ctx, params: SaveVoiceEnabledParams) -> ActionRe
 # ── Per-role voice access (voice:use scope on default_scopes) ─────────────
 
 CONNECTORS_SCOPE = "connectors:use"
+CONNECTIONS_SCOPE = "connections:use"
 
 
 async def _toggle_role_scope(role_id: str, scope: str, enabled: bool, label: str) -> ActionResult:
@@ -145,6 +146,18 @@ class SetRoleConnectorsParams(BaseModel):
                description="Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.")
 async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> ActionResult:
     return await _toggle_role_scope(params.role_id, CONNECTORS_SCOPE, params.enabled, "Connector access")
+
+
+class SetRoleConnectionsParams(BaseModel):
+    role_id: str = Field(..., description="Role id (UUID)")
+    enabled: bool = Field(..., description="Grant (true) or revoke (false) connections:use for this role")
+
+
+@chat.function("set_role_connections", action_type="write",
+               event="role_connections_set", data_model=_Receipt,
+               description="Grant or revoke Connections access (the connections:use scope — a user's own SSH/MCP targets) for an entire role/group.")
+async def fn_set_role_connections(ctx, params: SetRoleConnectionsParams) -> ActionResult:
+    return await _toggle_role_scope(params.role_id, CONNECTIONS_SCOPE, params.enabled, "Connections access")
 
 
 # ── Per-plan feature access (Plan.features voice/connectors) ──────────────
