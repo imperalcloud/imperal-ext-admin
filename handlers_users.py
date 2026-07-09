@@ -66,6 +66,13 @@ class SetUserCodingAccessParams(BaseModel):
                          description="inherit (use the plan), allow (force-grant), or deny")
 
 
+class SetUserConnectionsAccessParams(BaseModel):
+    """Set a user's Connections (SSH/MCP targets) access override."""
+    user_id: str = Field(description="imperal_id")
+    access: str  = Field(default="inherit", pattern="^(inherit|allow|deny)$",
+                         description="inherit (use the plan), allow (force-grant), or deny")
+
+
 class ResetConvParams(BaseModel):
     """Reset (clear) a specific user's conversation. A target is REQUIRED — pass
     user_id or email; the tool NEVER silently defaults to the caller (for a
@@ -376,5 +383,34 @@ async def fn_set_user_coding_access(ctx, params: SetUserCodingAccessParams) -> A
     return ActionResult.success(
         data={"imperal_id": params.user_id, "attributes": attrs},
         summary=f"Webbee Code access {label} for {params.user_id}",
+        refresh_panels=["tools"],
+    )
+
+
+# ─── Connections access override (connections_access attribute) ──────────── #
+
+@chat.function("set_user_connections_access", action_type="write", event="user_updated",
+               data_model=UserRecord,
+               description=("Set a user's Connections (their own SSH/MCP targets) access: inherit the "
+                            "plan, force-allow, or deny. The per-user `connections_access` attribute "
+                            "overrides the plan's connections feature (admins are always allowed)."))
+async def fn_set_user_connections_access(ctx, params: SetUserConnectionsAccessParams) -> ActionResult:
+    # MERGE (never wipe) attributes — same discipline as fn_set_user_coding_access
+    # (2026-07-02 role-change attribute-wipe incident): fetch, keep every key,
+    # set only `connections_access`, then PATCH.
+    user = await _gw_request("GET", f"/v1/users/{params.user_id}")
+    if isinstance(user, dict) and "error" in user:
+        return ActionResult.error(user["error"])
+    attrs = (user.get("attributes") or {}) if isinstance(user, dict) else {}
+    # connections_access values: "allow" | "deny" | "" (empty = inherit the plan).
+    attrs["connections_access"] = "" if params.access == "inherit" else params.access
+    result = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
+                               {"attributes": attrs})
+    if isinstance(result, dict) and "error" in result:
+        return ActionResult.error(result["error"])
+    label = {"inherit": "inherited from plan", "allow": "allowed", "deny": "denied"}[params.access]
+    return ActionResult.success(
+        data={"imperal_id": params.user_id, "attributes": attrs},
+        summary=f"Connections access {label} for {params.user_id}",
         refresh_panels=["tools"],
     )

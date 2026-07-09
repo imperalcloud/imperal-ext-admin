@@ -114,6 +114,8 @@ def _build_user_expanded(user: dict, role_options: list[dict],
     )
     # Per-user Webbee Code access override: attribute "" (inherit) | "allow" | "deny".
     coding_access = attrs.get("coding_access") or "inherit"
+    # Per-user Connections (SSH/MCP) access override: same tri-state.
+    connections_access = attrs.get("connections_access") or "inherit"
 
     rows: list = [
         ui.Section(title="Identity", children=[
@@ -171,6 +173,18 @@ def _build_user_expanded(user: dict, role_options: list[dict],
             value=coding_access,
             param_name="access",
             on_change=ui.Call("set_user_coding_access", user_id=uid),
+        ),
+        ui.Divider(),
+        ui.Text("Connections (SSH / MCP targets)", variant="caption"),
+        ui.Select(
+            options=[
+                {"value": "inherit", "label": "Plan default"},
+                {"value": "allow", "label": "Allow"},
+                {"value": "deny", "label": "Deny"},
+            ],
+            value=connections_access,
+            param_name="access",
+            on_change=ui.Call("set_user_connections_access", user_id=uid),
         ),
     ]
 

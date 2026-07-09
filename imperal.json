@@ -2231,6 +2231,213 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "set_user_connections_access",
+      "description": "Set a user's Connections (their own SSH/MCP targets) access: inherit the plan, force-allow, or deny. The per-user `connections_access` attribute overrides the plan's connections feature (admins are always allowed).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set a user's Connections (SSH/MCP targets) access override.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "access": {
+            "default": "inherit",
+            "description": "inherit (use the plan), allow (force-grant), or deny",
+            "pattern": "^(inherit|allow|deny)$",
+            "title": "Access",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "SetUserConnectionsAccessParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A single user as a canonical SDL entity (kind='user'): id=imperal_id,\ntitle=display name. Gateway fields are kept verbatim for rendering.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imperal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imperal Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          },
+          "full_name": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Full Name"
+          },
+          "email": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "role": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role"
+          },
+          "is_active": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Active"
+          },
+          "last_login": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Login"
+          },
+          "scopes": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scopes"
+          },
+          "attributes": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attributes"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "UserRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "user_updated",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "list_roles",
       "description": "List all roles with default scopes.",
       "action_type": "read",
