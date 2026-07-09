@@ -151,14 +151,14 @@ async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> Action
 
 class SetPlanFeatureParams(BaseModel):
     plan_id: str = Field(..., description="Plan id")
-    feature: str = Field(..., pattern="^(voice|connectors|coding)$",
-                         description="Feature: 'voice', 'connectors', or 'coding' (Webbee Code)")
+    feature: str = Field(..., pattern="^(voice|connectors|coding|connections)$",
+                         description="Feature: 'voice', 'connectors', 'coding' (Webbee Code), or 'connections' (external MCP/SSH targets)")
     enabled: bool = Field(..., description="Enable (true) or disable (false) the feature for this plan")
 
 
 @chat.function("set_plan_feature", action_type="write",
                event="plan_feature_set", data_model=_Receipt,
-               description="Enable or disable a feature (voice, connectors, or coding/Webbee Code) for an entire subscription plan.")
+               description="Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan.")
 async def fn_set_plan_feature(ctx, params: SetPlanFeatureParams) -> ActionResult:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")

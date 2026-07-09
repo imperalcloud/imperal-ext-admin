@@ -14245,7 +14245,7 @@
     },
     {
       "name": "set_plan_feature",
-      "description": "Enable or disable a feature (voice, connectors, or coding/Webbee Code) for an entire subscription plan.",
+      "description": "Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [],
@@ -14258,8 +14258,8 @@
             "type": "string"
           },
           "feature": {
-            "description": "Feature: 'voice', 'connectors', or 'coding' (Webbee Code)",
-            "pattern": "^(voice|connectors|coding)$",
+            "description": "Feature: 'voice', 'connectors', 'coding' (Webbee Code), or 'connections' (external MCP/SSH targets)",
+            "pattern": "^(voice|connectors|coding|connections)$",
             "title": "Feature",
             "type": "string"
           },
