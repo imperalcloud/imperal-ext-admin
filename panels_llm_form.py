@@ -128,6 +128,7 @@ def build_llm_form(
     conversational_model: str = "",
     step_reclassify_model: str = "",
     tool_picker_model: str = "",
+    code_model: str = "",
     action_narrator_model: str = "",
     # Live model catalogue fetched from the provider APIs (panels_llm_models.
     # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
@@ -154,6 +155,7 @@ def build_llm_form(
         "model": model,
         "base_url": base_url,
         "api_key": "",
+        "code_model": code_model if code_model != model else "",
         "routing_model": routing_model if routing_model != model else "",
         "execution_model": execution_model if execution_model != model else "",
         "navigate_model": navigate_model if navigate_model != model else "",
@@ -250,7 +252,7 @@ def build_llm_form(
             ], gap=0),
             ui.Select(
                 options=_all_models,
-                value=defaults[f"{key}_model"],
+                value=defaults.get(f"{key}_model", ""),
                 param_name=f"{key}_model",
                 placeholder="Same as default",
             ),

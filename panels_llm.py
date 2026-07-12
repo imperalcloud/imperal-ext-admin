@@ -141,6 +141,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
 
     provider = cfg.get("provider", "anthropic")
     model = cfg.get("model", "")
+    code = cfg.get("code_model", "")
     routing = cfg.get("routing_model", "")
     execution = cfg.get("execution_model", "")
     navigate = cfg.get("navigate_model", "")
@@ -176,6 +177,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     children.extend([
         build_llm_form(
             provider=provider, model=model, base_url=base_url,
+            code_model=code,
             routing_model=routing, execution_model=execution,
             navigate_model=navigate,
             chain_narrative_model=chain_narrative,
