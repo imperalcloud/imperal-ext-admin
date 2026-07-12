@@ -11,6 +11,7 @@ Service-token auth via app.AUTH_GW + AUTH_SERVICE_TOKEN.
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -38,9 +39,15 @@ class SaveLlmModelRateParams(BaseModel):
         ..., ge=0, le=1000,
         description="Output cost per 1k tokens, USD",
     )
-    platform_fee_default: int = Field(
-        default=1, ge=0, le=100,
-        description="Default platform fee tokens for this tier",
+    # VESTIGIAL: nothing in the billing path reads this column — the real
+    # per-action platform fee is PER TIER in System Pricing (unified_config
+    # billing.platform_fee). Optional + no upper bound: the old le=100 400'd
+    # against rows already holding tier-fee-sized values (60/250/2200), which
+    # is how the "Input should be less than or equal to 100" add-model error
+    # surfaced live (2026-07-12). Omitted from the panel form entirely.
+    platform_fee_default: Optional[int] = Field(
+        default=None, ge=0,
+        description="Deprecated/unused — per-action fees are per-tier in System Pricing.",
     )
     is_available: bool = Field(default=True)
 
@@ -70,9 +77,10 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
         "tier": params.tier,
         "input_cost_per_1k": params.input_cost_per_1k,
         "output_cost_per_1k": params.output_cost_per_1k,
-        "platform_fee_default": params.platform_fee_default,
         "is_available": params.is_available,
     }
+    if params.platform_fee_default is not None:
+        body["platform_fee_default"] = params.platform_fee_default
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.put(

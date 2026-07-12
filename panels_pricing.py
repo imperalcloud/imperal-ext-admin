@@ -52,6 +52,9 @@ async def build_pricing(ctx, **kwargs):
     """
     rates = await _fetch_rates()
 
+    # DataTable cells are PLAIN STRINGS only — a UINode in a cell renders as
+    # "[object Object]" (live 2026-07-12). Row actions follow the Payouts
+    # pattern instead: on_row_click selects the row -> the form below edits it.
     rows = []
     for r in rates:
         model_id = r.get("id", "")
@@ -60,27 +63,14 @@ async def build_pricing(ctx, **kwargs):
             "tier": r.get("tier", ""),
             "input": f"${float(r.get('input_cost_per_1k', 0)):.4f}",
             "output": f"${float(r.get('output_cost_per_1k', 0)):.4f}",
-            "platform_fee": str(r.get("platform_fee_default", 0)),
             "available": "Yes" if r.get("is_available", True)
                          else "No (disabled)",
-            "_actions": ui.Stack(children=[
-                ui.Button(
-                    label="Edit", variant="ghost", size="sm",
-                    on_click=ui.Call(
-                        "__panel__tools",
-                        section="pricing", edit_id=model_id,
-                    ),
-                ),
-                ui.Button(
-                    label="Disable", variant="danger", size="sm",
-                    on_click=ui.Call(
-                        "delete_llm_model_rate", model_id=model_id,
-                    ),
-                ),
-            ], direction="h", gap=1),
         })
 
-    edit_id = kwargs.get("edit_id", "")
+    # Row click (payouts pattern) OR explicit edit_id -> edit mode.
+    _clicked = kwargs.get("row")
+    edit_id = kwargs.get("edit_id", "") or (
+        _clicked.get("id", "") if isinstance(_clicked, dict) else "")
     edit_row = next(
         (r for r in rates if r.get("id") == edit_id), {},
     ) if edit_id else {}
@@ -93,7 +83,6 @@ async def build_pricing(ctx, **kwargs):
             "tier": edit_row.get("tier", "standard"),
             "input_cost_per_1k": float(edit_row.get("input_cost_per_1k", 0)),
             "output_cost_per_1k": float(edit_row.get("output_cost_per_1k", 0)),
-            "platform_fee_default": int(edit_row.get("platform_fee_default", 1)),
             "is_available": bool(edit_row.get("is_available", True)),
         },
         children=[
@@ -123,37 +112,47 @@ async def build_pricing(ctx, **kwargs):
                         param_name="output_cost_per_1k",
                         placeholder="e.g. 15.0",
                     ),
-                    ui.Text(
-                        "Platform fee tokens (default)", variant="caption",
-                    ),
-                    ui.Input(
-                        param_name="platform_fee_default",
-                        placeholder="e.g. 5",
-                    ),
                     ui.Toggle(label="Available", param_name="is_available"),
                 ],
             ),
         ],
     )
 
+    edit_actions = None
+    if edit_id and edit_row:
+        _avail = bool(edit_row.get("is_available", True))
+        edit_actions = ui.Stack(direction="h", gap=2, children=[
+            ui.Button(
+                label=("Disable model" if _avail else "Model is disabled — re-enable via Save"),
+                variant="danger", size="sm",
+                on_click=ui.Call("delete_llm_model_rate", model_id=edit_id),
+            ),
+        ]) if _avail else None
+
     return ui.Stack(children=[
         ui.Header("LLM Pricing", level=3),
         ui.Card(
             title=f"LLM Model Rates ({len(rates)} total)",
-            content=ui.DataTable(
-                columns=[
-                    ui.DataColumn(key="id", label="Model ID", width=240),
-                    ui.DataColumn(key="tier", label="Tier", width=100),
-                    ui.DataColumn(key="input", label="Input $/1k", width=100),
-                    ui.DataColumn(key="output", label="Output $/1k", width=100),
-                    ui.DataColumn(
-                        key="platform_fee", label="Plat. Fee", width=80,
-                    ),
-                    ui.DataColumn(key="available", label="Available", width=120),
-                    ui.DataColumn(key="_actions", label="Actions", width=160),
-                ],
-                rows=rows,
-            ),
+            content=ui.Stack(direction="v", gap=1, children=[
+                ui.DataTable(
+                    columns=[
+                        ui.DataColumn(key="id", label="Model ID", width=280),
+                        ui.DataColumn(key="tier", label="Tier", width=110),
+                        ui.DataColumn(key="input", label="Input $/1k", width=110),
+                        ui.DataColumn(key="output", label="Output $/1k", width=110),
+                        ui.DataColumn(key="available", label="Available", width=130),
+                    ],
+                    rows=rows,
+                    on_row_click=ui.Call("__panel__tools", section="pricing"),
+                ),
+                ui.Text(
+                    "These rates set the model's TIER and Imperal's raw provider "
+                    "cost (USD, for cost attribution). What users PAY per action "
+                    "is the per-tier platform fee — set in System Pricing, not "
+                    "here. Click a row to edit it.",
+                    variant="caption",
+                ),
+            ]),
         ),
         form,
-    ], direction="v", gap=2)
+    ] + ([edit_actions] if edit_actions else []), direction="v", gap=2)

@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.3",
   "app_id": "admin",
-  "version": "5.9.4",
+  "version": "5.9.5",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -13332,12 +13332,18 @@
             "type": "number"
           },
           "platform_fee_default": {
-            "default": 1,
-            "description": "Default platform fee tokens for this tier",
-            "maximum": 100,
-            "minimum": 0,
-            "title": "Platform Fee Default",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deprecated/unused — per-action fees are per-tier in System Pricing.",
+            "title": "Platform Fee Default"
           },
           "is_available": {
             "default": true,
