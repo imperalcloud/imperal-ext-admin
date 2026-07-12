@@ -96,7 +96,8 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # via panels_llm_models.provider_for_model — works for ANY model the live
         # catalogue surfaces, no hardcoded model→provider table).
         from panels_llm_models import provider_for_model
-        for _purpose in ("routing", "execution", "navigate", "chain_narrative", "judge",
+        for _purpose in ("code",
+                         "routing", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 2026-05-19 — new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _model_key = f"{_purpose}_model"

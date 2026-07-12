@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.3",
   "app_id": "admin",
-  "version": "5.9.3",
+  "version": "5.9.4",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -11932,6 +11932,18 @@
             "default": "",
             "description": "Custom base URL for OpenAI-compatible providers",
             "title": "Base Url",
+            "type": "string"
+          },
+          "code_model": {
+            "default": "",
+            "description": "Coding brain (Webbee Code) model override — drives every terminal coding/marathon turn (purpose=code). Blank = inherit the reasoning tier (resolve/routing cascade).",
+            "title": "Code Model",
+            "type": "string"
+          },
+          "code_provider": {
+            "default": "",
+            "description": "Coding brain provider override (auto-inferred from the model id when left blank)",
+            "title": "Code Provider",
             "type": "string"
           },
           "routing_model": {

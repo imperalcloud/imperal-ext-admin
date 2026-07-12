@@ -40,6 +40,11 @@ _PROVIDERS = [
 # Select writes `{key}_model` and the AI-param inputs write `purpose_{key}_*`.
 # Order = the order the purposes fire across a typical turn.
 _PURPOSE_MODELS: list[tuple[str, str, str]] = [
+    ("code", "Coding Brain · Webbee Code",
+     "The model behind EVERY Webbee Code terminal turn and marathon "
+     "(purpose=code). The single biggest intelligence lever — pick the "
+     "strongest coding model you can afford. Blank = inherit the reasoning "
+     "tier."),
     ("routing", "Routing · Intent Classifier",
      "Runs on EVERY user turn — detects intent, picks apps, plans the chain. "
      "The brain's first pass; a fast model here is cheapest (cost × every message)."),
