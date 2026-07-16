@@ -20,6 +20,8 @@ class SaveLlmConfigParams(BaseModel):
     base_url: str = Field(default="", description="Custom base URL for OpenAI-compatible providers")
     code_model: str = Field(default="", description="Coding brain (Webbee Code) model override — drives every terminal coding/marathon turn (purpose=code). Blank = inherit the reasoning tier (resolve/routing cascade).")
     code_provider: str = Field(default="", description="Coding brain provider override (auto-inferred from the model id when left blank)")
+    code_fallback_model: str = Field(default="", description="Webbee Code fallback model — used for ONE retry only when the coding-brain primary errors (purpose=code). Blank = no fallback (primary errors surface as today).")
+    code_fallback_provider: str = Field(default="", description="Webbee Code fallback provider (auto-inferred from the fallback model id when left blank)")
     routing_model: str = Field(default="", description="Routing model override")
     routing_provider: str = Field(default="", description="Routing provider override")
     execution_model: str = Field(default="", description="Execution model override")

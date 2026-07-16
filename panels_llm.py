@@ -142,6 +142,8 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     provider = cfg.get("provider", "anthropic")
     model = cfg.get("model", "")
     code = cfg.get("code_model", "")
+    # G2 (2026-07-16): Webbee Code fallback pair read-through (blank = off).
+    code_fallback = cfg.get("code_fallback_model", "")
     routing = cfg.get("routing_model", "")
     execution = cfg.get("execution_model", "")
     navigate = cfg.get("navigate_model", "")
@@ -178,6 +180,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
         build_llm_form(
             provider=provider, model=model, base_url=base_url,
             code_model=code,
+            code_fallback_model=code_fallback,
             routing_model=routing, execution_model=execution,
             navigate_model=navigate,
             chain_narrative_model=chain_narrative,

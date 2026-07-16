@@ -129,6 +129,9 @@ def build_llm_form(
     step_reclassify_model: str = "",
     tool_picker_model: str = "",
     code_model: str = "",
+    # G2 (2026-07-16): Webbee Code fallback pair — retry target when the
+    # coding-brain primary errors. Blank = no fallback (off).
+    code_fallback_model: str = "",
     action_narrator_model: str = "",
     # Live model catalogue fetched from the provider APIs (panels_llm_models.
     # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
@@ -156,6 +159,9 @@ def build_llm_form(
         "base_url": base_url,
         "api_key": "",
         "code_model": code_model if code_model != model else "",
+        # G2: fallback is an independent pair (not an inherit-from-default
+        # override) — pass through verbatim; blank means "no fallback".
+        "code_fallback_model": code_fallback_model,
         "routing_model": routing_model if routing_model != model else "",
         "execution_model": execution_model if execution_model != model else "",
         "navigate_model": navigate_model if navigate_model != model else "",
@@ -256,8 +262,26 @@ def build_llm_form(
                 param_name=f"{key}_model",
                 placeholder="Same as default",
             ),
-            ui.Divider(),
         ])
+        if key == "code":
+            # G2 (2026-07-16): Webbee Code fallback model — one retry on this
+            # model when the primary errors. Same Select pattern as the
+            # per-purpose rows above; writes the flat code_fallback_model key
+            # (provider auto-inferred on save). Blank = no fallback.
+            model_children.extend([
+                ui.Text(
+                    "Fallback model — used only when the primary errors "
+                    "(one retry). Blank = no fallback.",
+                    variant="caption",
+                ),
+                ui.Select(
+                    options=_all_models,
+                    value=defaults.get("code_fallback_model", ""),
+                    param_name="code_fallback_model",
+                    placeholder="No fallback",
+                ),
+            ])
+        model_children.append(ui.Divider())
 
     # ── Category 4: Per-Purpose AI Parameters ────────────────────
     aiparam_children: list = [

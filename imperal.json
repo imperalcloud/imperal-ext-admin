@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.6",
   "app_id": "admin",
-  "version": "5.9.6",
+  "version": "5.9.7",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -11944,6 +11944,18 @@
             "default": "",
             "description": "Coding brain provider override (auto-inferred from the model id when left blank)",
             "title": "Code Provider",
+            "type": "string"
+          },
+          "code_fallback_model": {
+            "default": "",
+            "description": "Webbee Code fallback model — used for ONE retry only when the coding-brain primary errors (purpose=code). Blank = no fallback (primary errors surface as today).",
+            "title": "Code Fallback Model",
+            "type": "string"
+          },
+          "code_fallback_provider": {
+            "default": "",
+            "description": "Webbee Code fallback provider (auto-inferred from the fallback model id when left blank)",
+            "title": "Code Fallback Provider",
             "type": "string"
           },
           "routing_model": {

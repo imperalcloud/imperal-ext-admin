@@ -97,6 +97,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # catalogue surfaces, no hardcoded model→provider table).
         from panels_llm_models import provider_for_model
         for _purpose in ("code",
+                         # G2 (2026-07-16): Webbee Code fallback pair — same flat
+                         # {key}_model/{key}_provider naming, so infer+clear reuse.
+                         "code_fallback",
                          "routing", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 2026-05-19 — new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
