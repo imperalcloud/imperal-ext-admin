@@ -183,7 +183,7 @@ async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
 async def fn_set_extension_system_flag(ctx, params: SetSystemFlagParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     r = await _gw_request(
-        "POST", f"/v1/admin/apps/{aid}/metadata", {"system": bool(params.system)},
+        "POST", f"/v1/admin/apps/{aid}/metadata", {"is_system": bool(params.system)},
     )
     if isinstance(r, dict) and r.get("error"):
         return ActionResult.error(f"Failed: {r['error']}")
