@@ -65,17 +65,6 @@ class PurgeAppParams(BaseModel):
     force: bool       = Field(default=False, description="Purge even if the app is still active")
 
 
-class SetSystemFlagParams(BaseModel):
-    """Mark/unmark an app as a first-party platform system app."""
-    app_id: str  = Field(description="Exact app_id")
-    system: bool = Field(description=(
-        "True = first-party platform app: excluded from Marketplace search/"
-        "listing, auto-installed for every user, cannot be uninstalled by "
-        "the user (mirrors billing/admin/developer/marketplace). "
-        "False = normal marketplace-listed app."
-    ))
-
-
 # ─── Extension Management ─────────────────────────────────────────────── #
 
 @chat.function("list_extensions", action_type="read", data_model=ExtensionsListResponse, description="List all active extensions.")
@@ -165,43 +154,6 @@ async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
 async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "draft", "sent to draft", "off marketplace for rework (existing users keep it)")
-
-
-@chat.function(
-    "set_extension_system_flag", action_type="destructive",
-    event="extension_system_flag_set", data_model=ExtSettingsReceipt,
-    description=(
-        "Mark or unmark an app as a first-party PLATFORM SYSTEM app "
-        "(mirrors billing/admin/developer/marketplace). system=true removes "
-        "it from Marketplace search/listing and auto-installs it for every "
-        "user; system=false returns it to a normal marketplace-listed app. "
-        "This is the SEPARATE gateway bit (developer_apps.system) — NOT the "
-        "same as the app's own manifest 'system' field, which only declares "
-        "intent and is not auto-synced on deploy."
-    ),
-)
-async def fn_set_extension_system_flag(ctx, params: SetSystemFlagParams) -> ActionResult:
-    aid = await _resolve_app_id(params.app_id, include_all=True)
-    val = bool(params.system)
-    # DIAGNOSTIC: metadata endpoint's field allowlist rejected both "system"
-    # and "is_system" with HTTP 400 "No metadata fields to update" — try every
-    # plausible key in ONE call to find the accepted name without burning a
-    # deploy round-trip per guess.
-    r = await _gw_request(
-        "POST", f"/v1/admin/apps/{aid}/metadata", {
-            "system": val, "is_system": val, "is_system_app": val,
-            "system_app": val, "platform_system": val, "first_party": val,
-            "is_first_party": val,
-        },
-    )
-    if isinstance(r, dict) and r.get("error"):
-        return ActionResult.error(f"Failed: {r['error']}")
-    await _invalidate_extension_caches()
-    verb = "marked as a first-party system app (hidden from Marketplace, auto-installed)" if params.system else "unmarked as system (back to normal marketplace app)"
-    return ActionResult.success(
-        data={"app_id": aid, "system": bool(params.system)},
-        summary=f"{aid} {verb}.", refresh_panels=["tools", "extensions"],
-    )
 
 
 # ─── Access Policy Handlers ───────────────────────────────────────────── #
