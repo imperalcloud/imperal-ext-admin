@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.3",
+  "sdk_version": "5.9.6",
   "app_id": "admin",
   "version": "5.9.6",
   "name": "Admin",
@@ -6581,6 +6581,219 @@
         "x-sdl": "entity"
       },
       "event": "extension_drafted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_extension_system_flag",
+      "description": "Mark or unmark an app as a first-party PLATFORM SYSTEM app (mirrors billing/admin/developer/marketplace). system=true removes it from Marketplace search/listing and auto-installs it for every user; system=false returns it to a normal marketplace-listed app. This is the SEPARATE gateway bit (developer_apps.system) — NOT the same as the app's own manifest 'system' field, which only declares intent and is not auto-synced on deploy.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Mark/unmark an app as a first-party platform system app.",
+        "properties": {
+          "app_id": {
+            "description": "Exact app_id",
+            "title": "App Id",
+            "type": "string"
+          },
+          "system": {
+            "description": "True = first-party platform app: excluded from Marketplace search/listing, auto-installed for every user, cannot be uninstalled by the user (mirrors billing/admin/developer/marketplace). False = normal marketplace-listed app.",
+            "title": "System",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "app_id",
+          "system"
+        ],
+        "title": "SetSystemFlagParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt entity for extension write tools that return a small confirmation\npayload keyed by app_id (update_extension_config, update_skeleton_ttl,\nsuspend/activate_extension, set_access_policy, deny/allow_extension,\nsave_ext_* receipts) — kind='extension'. Keeps every observed receipt key\nverbatim so panels/$REF read the same data. Reuse this rather than inventing\na per-verb receipt.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "App Id"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated"
+          },
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ttl"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Previous"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Verified"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy"
+          },
+          "denied": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Denied"
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Removed"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ExtSettingsReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "extension_system_flag_set",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -19665,13 +19878,19 @@
       "panel_id": "sidebar",
       "slot": "left",
       "title": "Administration",
-      "tree": {}
+      "tree": {},
+      "icon": "Shield",
+      "refresh": "manual",
+      "center_overlay": false
     },
     {
       "panel_id": "tools",
       "slot": "center",
       "title": "Dashboard",
-      "tree": {}
+      "tree": {},
+      "icon": "LayoutDashboard",
+      "refresh": "manual",
+      "center_overlay": true
     }
   ]
 }
