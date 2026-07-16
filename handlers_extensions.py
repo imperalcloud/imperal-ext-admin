@@ -182,8 +182,17 @@ async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
 )
 async def fn_set_extension_system_flag(ctx, params: SetSystemFlagParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
+    val = bool(params.system)
+    # DIAGNOSTIC: metadata endpoint's field allowlist rejected both "system"
+    # and "is_system" with HTTP 400 "No metadata fields to update" — try every
+    # plausible key in ONE call to find the accepted name without burning a
+    # deploy round-trip per guess.
     r = await _gw_request(
-        "POST", f"/v1/admin/apps/{aid}/metadata", {"is_system": bool(params.system)},
+        "POST", f"/v1/admin/apps/{aid}/metadata", {
+            "system": val, "is_system": val, "is_system_app": val,
+            "system_app": val, "platform_system": val, "first_party": val,
+            "is_first_party": val,
+        },
     )
     if isinstance(r, dict) and r.get("error"):
         return ActionResult.error(f"Failed: {r['error']}")
