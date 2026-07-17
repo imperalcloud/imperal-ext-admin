@@ -27,6 +27,7 @@ _FEATURES = [
     ("connectors",  "Connectors (Telegram / Discord)"),
     ("coding",      "Webbee Code"),
     ("connections", "Connections (SSH / MCP)"),
+    ("file_reader", "File Reader"),
 ]
 
 

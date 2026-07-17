@@ -164,8 +164,8 @@ async def fn_set_role_connections(ctx, params: SetRoleConnectionsParams) -> Acti
 
 class SetPlanFeatureParams(BaseModel):
     plan_id: str = Field(..., description="Plan id")
-    feature: str = Field(..., pattern="^(voice|connectors|coding|connections)$",
-                         description="Feature: 'voice', 'connectors', 'coding' (Webbee Code), or 'connections' (external MCP/SSH targets)")
+    feature: str = Field(..., pattern="^(voice|connectors|coding|connections|file_reader)$",
+                         description="Feature: 'voice', 'connectors', 'coding' (Webbee Code), 'connections' (external MCP/SSH targets), or 'file_reader' (document ingestion)")
     enabled: bool = Field(..., description="Enable (true) or disable (false) the feature for this plan")
 
 

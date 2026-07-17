@@ -116,6 +116,8 @@ def _build_user_expanded(user: dict, role_options: list[dict],
     coding_access = attrs.get("coding_access") or "inherit"
     # Per-user Connections (SSH/MCP) access override: same tri-state.
     connections_access = attrs.get("connections_access") or "inherit"
+    # Per-user File Reader access override: same tri-state.
+    file_reader_access = attrs.get("file_reader_access") or "inherit"
 
     rows: list = [
         ui.Section(title="Identity", children=[
@@ -185,6 +187,18 @@ def _build_user_expanded(user: dict, role_options: list[dict],
             value=connections_access,
             param_name="access",
             on_change=ui.Call("set_user_connections_access", user_id=uid),
+        ),
+        ui.Divider(),
+        ui.Text("File Reader (document ingestion)", variant="caption"),
+        ui.Select(
+            options=[
+                {"value": "inherit", "label": "Plan default"},
+                {"value": "allow", "label": "Allow"},
+                {"value": "deny", "label": "Deny"},
+            ],
+            value=file_reader_access,
+            param_name="access",
+            on_change=ui.Call("set_user_file_reader_access", user_id=uid),
         ),
     ]
 

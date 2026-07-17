@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.6",
+  "sdk_version": "5.9.11",
   "app_id": "admin",
-  "version": "5.9.7",
+  "version": "5.9.11",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -2257,6 +2257,213 @@
           "user_id"
         ],
         "title": "SetUserConnectionsAccessParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A single user as a canonical SDL entity (kind='user'): id=imperal_id,\ntitle=display name. Gateway fields are kept verbatim for rendering.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imperal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imperal Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          },
+          "full_name": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Full Name"
+          },
+          "email": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "role": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role"
+          },
+          "is_active": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Active"
+          },
+          "last_login": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Login"
+          },
+          "scopes": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scopes"
+          },
+          "attributes": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attributes"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "UserRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "user_updated",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_user_file_reader_access",
+      "description": "Set a user's File Reader (document ingestion) access: inherit the plan, force-allow, or deny. The per-user `file_reader_access` attribute overrides the plan's file_reader feature (admins are always allowed).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set a user's File Reader (document ingestion) access override.",
+        "properties": {
+          "user_id": {
+            "description": "imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "access": {
+            "default": "inherit",
+            "description": "inherit (use the plan), allow (force-grant), or deny",
+            "pattern": "^(inherit|allow|deny)$",
+            "title": "Access",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "SetUserFileReaderAccessParams",
         "type": "object"
       },
       "return_schema": {
@@ -14539,8 +14746,8 @@
             "type": "string"
           },
           "feature": {
-            "description": "Feature: 'voice', 'connectors', 'coding' (Webbee Code), or 'connections' (external MCP/SSH targets)",
-            "pattern": "^(voice|connectors|coding|connections)$",
+            "description": "Feature: 'voice', 'connectors', 'coding' (Webbee Code), 'connections' (external MCP/SSH targets), or 'file_reader' (document ingestion)",
+            "pattern": "^(voice|connectors|coding|connections|file_reader)$",
             "title": "Feature",
             "type": "string"
           },
