@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.10",
+  "sdk_version": "5.9.11",
   "app_id": "admin",
   "version": "5.9.11",
   "name": "Admin",
