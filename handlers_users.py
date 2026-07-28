@@ -126,7 +126,7 @@ async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
     )
 
 
-@chat.function("create_user", action_type="write", event="user_created",
+@chat.function("create_user", action_type="write", effects=["create:user"], event="user_created",
                data_model=UserRecord,
                description="Create a new user with email, password, and role.")
 async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
@@ -148,7 +148,7 @@ async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
     )
 
 
-@chat.function("update_user", action_type="write", event="user_updated",
+@chat.function("update_user", action_type="write", effects=["update:user"], event="user_updated",
                data_model=UserRecord,
                description="Update user role, scopes, attributes, or status.")
 async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
@@ -179,7 +179,7 @@ async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
     )
 
 
-@chat.function("deactivate_user", action_type="destructive", event="user_deactivated",
+@chat.function("deactivate_user", action_type="destructive", effects=["update:user"], event="user_deactivated",
                data_model=UserRecord,
                description="Deactivate user (can reactivate later).")
 async def fn_deactivate_user(ctx, params: UserIdParams) -> ActionResult:
@@ -196,10 +196,11 @@ async def fn_deactivate_user(ctx, params: UserIdParams) -> ActionResult:
     return ActionResult.success(
         data=data,
         summary=f"User {params.user_id} deactivated",
+        refresh_panels=["tools"],
     )
 
 
-@chat.function("hard_delete_user", action_type="destructive", event="user_deleted",
+@chat.function("hard_delete_user", action_type="destructive", effects=["delete:user"], event="user_deleted",
                data_model=UserRecord,
                description="PERMANENT delete. Cannot be undone.")
 async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
@@ -219,7 +220,7 @@ async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
     )
 
 
-@chat.function("reset_conversation", action_type="destructive", event="user_conversation_reset",
+@chat.function("reset_conversation", action_type="destructive", effects=["delete:user_conversation"], event="user_conversation_reset",
                description=(
                    "Reset (clear) a user's chat history and conversational state — history, "
                    "session memory, skeleton caches — and restart their session. Money, usage, "
@@ -270,7 +271,7 @@ async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
 
 # ─── Limits ───────────────────────────────────────────────────────────── #
 
-@chat.function("update_user_limits", action_type="write", event="user_updated",
+@chat.function("update_user_limits", action_type="write", effects=["update:user_limits"], event="user_updated",
                data_model=UserRecord,
                description="Update individual limit overrides for a user.")
 async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionResult:
@@ -313,7 +314,7 @@ async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionRe
 
 # ─── Attributes (ABAC) ───────────────────────────────────────────────── #
 
-@chat.function("set_user_attribute", action_type="write", event="user_updated",
+@chat.function("set_user_attribute", action_type="write", effects=["update:user_attribute"], event="user_updated",
                data_model=UserRecord,
                description="Set a single attribute key-value on a user.")
 async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionResult:
@@ -338,7 +339,7 @@ async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionRe
     )
 
 
-@chat.function("remove_user_attribute", action_type="write", event="user_updated",
+@chat.function("remove_user_attribute", action_type="write", effects=["delete:user_attribute"], event="user_updated",
                data_model=UserRecord,
                description="Remove an attribute key from a user.")
 async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> ActionResult:
@@ -365,7 +366,7 @@ async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> Ac
 
 # ─── Webbee Code access override (coding_access attribute) ───────────────── #
 
-@chat.function("set_user_coding_access", action_type="write", event="user_updated",
+@chat.function("set_user_coding_access", action_type="write", effects=["update:user_access"], event="user_updated",
                data_model=UserRecord,
                description=("Set a user's Webbee Code (coding agent) access: inherit the plan, "
                             "force-allow, or deny. The per-user `coding_access` attribute overrides "
@@ -396,7 +397,7 @@ async def fn_set_user_coding_access(ctx, params: SetUserCodingAccessParams) -> A
 
 # ─── Connections access override (connections_access attribute) ──────────── #
 
-@chat.function("set_user_connections_access", action_type="write", event="user_updated",
+@chat.function("set_user_connections_access", action_type="write", effects=["update:user_access"], event="user_updated",
                data_model=UserRecord,
                description=("Set a user's Connections (their own SSH/MCP targets) access: inherit the "
                             "plan, force-allow, or deny. The per-user `connections_access` attribute "
@@ -425,7 +426,7 @@ async def fn_set_user_connections_access(ctx, params: SetUserConnectionsAccessPa
 
 # ─── File Reader access override (file_reader_access attribute) ───────────── #
 
-@chat.function("set_user_file_reader_access", action_type="write", event="user_updated",
+@chat.function("set_user_file_reader_access", action_type="write", effects=["update:user_access"], event="user_updated",
                data_model=UserRecord,
                description=("Set a user's File Reader (document ingestion) access: inherit the "
                             "plan, force-allow, or deny. The per-user `file_reader_access` attribute "

@@ -54,7 +54,7 @@ async def _resolve_uid(user: str) -> str | None:
 
 # ── App review ───────────────────────────────────────────────────────────────
 
-@chat.function("review_app", action_type="write", data_model=AppReviewReceipt, description="Approve or reject a developer app submission")
+@chat.function("review_app", action_type="write", event="admin.app_reviewed", effects=["update:app_review"], data_model=AppReviewReceipt, description="Approve or reject a developer app submission")
 async def review_app(ctx, params: AppReviewParams) -> ActionResult:
     action = params.action.lower()
     app_id = params.app_id
@@ -130,7 +130,7 @@ async def fn_developer_profile(ctx, params: DeveloperUserParams) -> ActionResult
     )
 
 
-@chat.function("set_developer_tier", action_type="write", event="user_updated",
+@chat.function("set_developer_tier", action_type="write", effects=["update:developer_tier"], event="user_updated",
                data_model=DeveloperTierReceipt,
                description="Set or change a user's DEVELOPER tier (explorer|indie|studio|partner) without charging — audited admin comp. Grants developer status if the user has none. This is the developer 'group'; it is independent of the RBAC role/category.")
 async def fn_set_developer_tier(ctx, params: SetDeveloperTierParams) -> ActionResult:
@@ -159,7 +159,7 @@ async def fn_set_developer_tier(ctx, params: SetDeveloperTierParams) -> ActionRe
 
 # ── Payout review ────────────────────────────────────────────────────────────
 
-@chat.function("review_payout", action_type="write", data_model=PayoutReviewReceipt, description="Approve or reject a developer payout request")
+@chat.function("review_payout", action_type="write", event="admin.payout_reviewed", effects=["update:payout_review"], data_model=PayoutReviewReceipt, description="Approve or reject a developer payout request")
 async def review_payout(ctx, params: PayoutReviewParams) -> ActionResult:
     action = params.action.lower()
     payout_id = params.payout_id

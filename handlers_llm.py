@@ -24,7 +24,7 @@ from models_llm_config import SaveLlmConfigParams  # extracted; keeps file under
 # {saved, tenant_defaults_updated, config} (or {reset} / {override, model}).
 # LLMConfigReceipt mirrors every observed key verbatim
 # (I-EXT-RECORD-FIELD-NAMING-SYMMETRIC).
-@chat.function("save_llm_config", action_type="write", event="llm_config_saved",
+@chat.function("save_llm_config", action_type="write", effects=["update:llm_config"], event="llm_config_saved",
                data_model=LLMConfigReceipt,
                description="Save LLM provider/model config to Redis Config Store.")
 async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:

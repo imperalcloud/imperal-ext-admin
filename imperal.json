@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.11",
+  "sdk_version": "5.9.13",
   "app_id": "admin",
   "version": "5.9.11",
   "name": "Admin",
@@ -306,7 +306,9 @@
       "description": "Create a new user with email, password, and role.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "create:user"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create a new platform user.",
@@ -518,7 +520,9 @@
       "description": "Update user role, scopes, attributes, or status.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update user properties.",
@@ -767,7 +771,9 @@
       "description": "Deactivate user (can reactivate later).",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific user.",
@@ -967,7 +973,9 @@
       "description": "PERMANENT delete. Cannot be undone.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:user"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific user.",
@@ -1167,7 +1175,9 @@
       "description": "Reset (clear) a user's chat history and conversational state — history, session memory, skeleton caches — and restart their session. Money, usage, billing, and installed apps are PRESERVED. With NO user_id/email this resets the CALLER's own conversation (available to any user). With a user_id or email it resets THAT user (ADMIN only). Use when a user says 'clear my history', 'start over', 'reset my chat', or an admin asks to reset a specific user. Confirmation is required before it runs.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:user_conversation"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Reset (clear) a specific user's conversation. A target is REQUIRED — pass\nuser_id or email; the tool NEVER silently defaults to the caller (for a\ngenuine self-reset the kernel passes the caller's own imperal_id).",
@@ -1371,7 +1381,9 @@
       "description": "Update individual limit overrides for a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_limits"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update individual limit overrides for a user.",
@@ -1610,7 +1622,9 @@
       "description": "Set a single attribute key-value on a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_attribute"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set a single attribute key-value on a user.",
@@ -1822,7 +1836,9 @@
       "description": "Remove an attribute key from a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:user_attribute"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Remove a single attribute key from a user.",
@@ -2028,7 +2044,9 @@
       "description": "Set a user's Webbee Code (coding agent) access: inherit the plan, force-allow, or deny. The per-user `coding_access` attribute overrides the plan's coding feature (admins are always allowed).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_access"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set a user's Webbee Code (coding agent) access override.",
@@ -2235,7 +2253,9 @@
       "description": "Set a user's Connections (their own SSH/MCP targets) access: inherit the plan, force-allow, or deny. The per-user `connections_access` attribute overrides the plan's connections feature (admins are always allowed).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_access"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set a user's Connections (SSH/MCP targets) access override.",
@@ -2442,7 +2462,9 @@
       "description": "Set a user's File Reader (document ingestion) access: inherit the plan, force-allow, or deny. The per-user `file_reader_access` attribute overrides the plan's file_reader feature (admins are always allowed).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_access"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set a user's File Reader (document ingestion) access override.",
@@ -2907,7 +2929,9 @@
       "description": "Create a new role with name and default scopes.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "create:role"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create a new role with name and default scopes.",
@@ -3095,7 +3119,9 @@
       "description": "Delete a role by ID or name.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:role"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Delete a role by ID or name.",
@@ -3265,7 +3291,9 @@
       "description": "Update role scopes, limits, or display name. Can cascade.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:role"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update a role's properties including limits.",
@@ -3742,7 +3770,9 @@
       "description": "Create a scope in resource:action format.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "create:scope"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create a scope in resource:action format.",
@@ -3960,7 +3990,9 @@
       "description": "Delete a scope by name or ID.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:scope"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Delete a scope.",
@@ -4655,7 +4687,9 @@
       "description": "Assign a role to multiple users. Max 100.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_role"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Assign a role to multiple users.",
@@ -5744,7 +5778,9 @@
       "description": "Update extension config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_config"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update extension config.",
@@ -5958,7 +5994,9 @@
       "description": "Update skeleton refresh TTL.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_config"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Update skeleton refresh interval.",
@@ -6177,7 +6215,9 @@
       "description": "Suspend a marketplace app — pull it OFF the marketplace AND disable it for users (full kill). One source of truth: developer_apps + Registry synced.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_lifecycle"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific extension.",
@@ -6384,7 +6424,9 @@
       "description": "Restore an app to ACTIVE — back on the marketplace AND usable. Admin override: takes effect immediately (no review).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_lifecycle"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific extension.",
@@ -6591,7 +6633,9 @@
       "description": "Send an app back to DRAFT — off the marketplace for rework. Existing users keep using it; needs re-submit + approve to relist. Softer than suspend.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_lifecycle"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific extension.",
@@ -7058,7 +7102,9 @@
       "description": "Set extension access policy.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_access_policy"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set extension access policy.",
@@ -7714,7 +7760,9 @@
       "description": "Add role/user to denied list.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_access_policy"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Deny or allow access for a role/user.",
@@ -7933,7 +7981,9 @@
       "description": "Remove role/user from denied list.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_access_policy"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Deny or allow access for a role/user.",
@@ -8152,7 +8202,9 @@
       "description": "Permanently purge ANY app from the ENTIRE system — files on the worker, every DB row, Redis caches, the Registry entry, and the marketplace listing. Admin-only. Pass confirm_name equal to the EXACT app_id. Set force=true to purge an app that is still active. THIS CANNOT BE UNDONE.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:app"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Permanently purge an app from the ENTIRE system. Admin-only, irreversible.",
@@ -8360,7 +8412,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "",
+      "event": "admin.app_purged",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -8371,7 +8423,9 @@
       "description": "Save extension general settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -8589,7 +8643,9 @@
       "description": "Save extension AI model settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -8857,7 +8913,9 @@
       "description": "Save extension persona settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -9095,7 +9153,9 @@
       "description": "Save extension alert settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -9320,7 +9380,9 @@
       "description": "Save extension router settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -9544,7 +9606,9 @@
       "description": "Save extension session settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -9775,7 +9839,9 @@
       "description": "Save extension context settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -9999,7 +10065,9 @@
       "description": "Save extension skeleton section settings.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:extension_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "additionalProperties": true,
@@ -10562,7 +10630,9 @@
       "description": "Create automation from natural language.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "create:automation_rule"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Create automation from natural language.",
@@ -10738,7 +10808,9 @@
       "description": "Delete an automation rule.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:automation_rule"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific rule.",
@@ -10902,7 +10974,9 @@
       "description": "Pause an automation rule.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:automation_rule"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific rule.",
@@ -11066,7 +11140,9 @@
       "description": "Resume a paused rule. Resets trigger_count.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:automation_rule"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Target a specific rule.",
@@ -11230,7 +11306,9 @@
       "description": "Set confirmation policy for a role.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:confirmation_policy"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set confirmation policy for a role.",
@@ -11482,7 +11560,9 @@
       "description": "Set confirmation for a user.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_confirmation"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set user confirmation settings.",
@@ -11850,7 +11930,9 @@
       "description": "Set max concurrent tasks for a role (1-50).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:task_limit"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set task limit for a role.",
@@ -12112,7 +12194,9 @@
       "description": "Save LLM provider/model config to Redis Config Store.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:llm_config"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Save LLM provider/model configuration.",
@@ -13519,7 +13603,9 @@
       "description": "Save (upsert) an LLM model rate row in llm_model_rates.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:llm_model_rate"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Save (upsert) a single LLM model rate row.",
@@ -13694,7 +13780,9 @@
       "description": "Soft-delete (mark unavailable) an LLM model rate row.",
       "action_type": "destructive",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "delete:llm_model_rate"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Soft-delete (set is_available=false) a model rate row.",
@@ -13826,7 +13914,9 @@
       "description": "Save per-tier platform fees (economy/standard/premium) to the billing config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:platform_fees"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -13999,7 +14089,9 @@
       "description": "Save the $-to-credit conversion rate (credits per $1) to the billing config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:token_rate"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14132,7 +14224,9 @@
       "description": "Save the default per-action base prices (read/write/destructive) charged when an extension function has no explicit price, to the billing config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:category_defaults"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14305,7 +14399,9 @@
       "description": "Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and low-balance warn threshold, to the billing config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:coding_pricing"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14518,7 +14614,9 @@
       "description": "Save the per-action voice costs (STT transcription + TTS spoken reply) to the billing config.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:voice_costs"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14566,7 +14664,9 @@
       "description": "Turn the entire voice feature ON or OFF platform-wide (off hides the mic for everyone).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:voice_settings"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14604,7 +14704,9 @@
       "description": "Grant or revoke voice access (the voice:use scope) for an entire role/group.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:role_voice"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14648,7 +14750,9 @@
       "description": "Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:role_connectors"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14692,7 +14796,9 @@
       "description": "Grant or revoke Connections access (the connections:use scope — a user's own SSH/MCP targets) for an entire role/group.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:role_connections"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -14736,7 +14842,9 @@
       "description": "Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:plan_feature"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -15630,7 +15738,9 @@
       "description": "Credit or deduct tokens. Positive=credit, negative=deduct.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_balance"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Credit or deduct tokens from a user wallet.",
@@ -16111,7 +16221,9 @@
       "description": "Assign a user's active subscription plan (by plan name or id).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:user_plan"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Assign a user's active subscription plan.",
@@ -16494,7 +16606,9 @@
       "description": "Update Stripe keys via the billing gateway (validates, auto-manages webhook, applies instantly).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:payment_config"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -16721,7 +16835,9 @@
       "description": "Approve or reject a developer app submission",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:app_review"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -16873,7 +16989,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "",
+      "event": "admin.app_reviewed",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -17072,7 +17188,9 @@
       "description": "Set or change a user's DEVELOPER tier (explorer|indie|studio|partner) without charging — audited admin comp. Grants developer status if the user has none. This is the developer 'group'; it is independent of the RBAC role/category.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:developer_tier"
+      ],
       "id_projection": "",
       "params_schema": {
         "description": "Set a user's developer tier (admin comp, no charge).",
@@ -17222,7 +17340,9 @@
       "description": "Approve or reject a developer payout request",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:payout_review"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -17362,7 +17482,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "",
+      "event": "admin.payout_reviewed",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -19363,7 +19483,9 @@
       "description": "Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged. To ONLY enable/disable a case without touching its template, use email_toggle_case instead.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:email_template"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -19558,7 +19680,9 @@
       "description": "Enable or disable an email case WITHOUT touching its subject/body.",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "update:email_template"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {
@@ -19707,7 +19831,9 @@
       "description": "Send a sample of one email case to an address (uses sample data, logged like any send).",
       "action_type": "write",
       "chain_callable": true,
-      "effects": [],
+      "effects": [
+        "create:email_test_send"
+      ],
       "id_projection": "",
       "params_schema": {
         "properties": {

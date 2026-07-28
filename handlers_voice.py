@@ -41,7 +41,7 @@ class SaveVoiceCostsParams(BaseModel):
     speak: int = Field(..., ge=0, le=1_000_000, description="Credits charged per spoken reply synthesis (TTS)")
 
 
-@chat.function("save_voice_costs", action_type="write",
+@chat.function("save_voice_costs", action_type="write", effects=["update:voice_costs"],
                event="voice_costs_saved", data_model=_Receipt,
                description="Save the per-action voice costs (STT transcription + TTS spoken reply) to the billing config.")
 async def fn_save_voice_costs(ctx, params: SaveVoiceCostsParams) -> ActionResult:
@@ -69,7 +69,7 @@ class SaveVoiceEnabledParams(BaseModel):
     enabled: bool = Field(..., description="Global voice master-switch (off = no voice anywhere; mic hidden)")
 
 
-@chat.function("save_voice_enabled", action_type="write",
+@chat.function("save_voice_enabled", action_type="write", effects=["update:voice_settings"],
                event="voice_enabled_saved", data_model=_Receipt,
                description="Turn the entire voice feature ON or OFF platform-wide (off hides the mic for everyone).")
 async def fn_save_voice_enabled(ctx, params: SaveVoiceEnabledParams) -> ActionResult:
@@ -129,7 +129,7 @@ class SetRoleVoiceParams(BaseModel):
     enabled: bool = Field(..., description="Grant (true) or revoke (false) voice:use for this role")
 
 
-@chat.function("set_role_voice", action_type="write",
+@chat.function("set_role_voice", action_type="write", effects=["update:role_voice"],
                event="role_voice_set", data_model=_Receipt,
                description="Grant or revoke voice access (the voice:use scope) for an entire role/group.")
 async def fn_set_role_voice(ctx, params: SetRoleVoiceParams) -> ActionResult:
@@ -141,7 +141,7 @@ class SetRoleConnectorsParams(BaseModel):
     enabled: bool = Field(..., description="Grant (true) or revoke (false) connectors:use for this role")
 
 
-@chat.function("set_role_connectors", action_type="write",
+@chat.function("set_role_connectors", action_type="write", effects=["update:role_connectors"],
                event="role_connectors_set", data_model=_Receipt,
                description="Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.")
 async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> ActionResult:
@@ -153,7 +153,7 @@ class SetRoleConnectionsParams(BaseModel):
     enabled: bool = Field(..., description="Grant (true) or revoke (false) connections:use for this role")
 
 
-@chat.function("set_role_connections", action_type="write",
+@chat.function("set_role_connections", action_type="write", effects=["update:role_connections"],
                event="role_connections_set", data_model=_Receipt,
                description="Grant or revoke Connections access (the connections:use scope — a user's own SSH/MCP targets) for an entire role/group.")
 async def fn_set_role_connections(ctx, params: SetRoleConnectionsParams) -> ActionResult:
@@ -169,7 +169,7 @@ class SetPlanFeatureParams(BaseModel):
     enabled: bool = Field(..., description="Enable (true) or disable (false) the feature for this plan")
 
 
-@chat.function("set_plan_feature", action_type="write",
+@chat.function("set_plan_feature", action_type="write", effects=["update:plan_feature"],
                event="plan_feature_set", data_model=_Receipt,
                description="Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan.")
 async def fn_set_plan_feature(ctx, params: SetPlanFeatureParams) -> ActionResult:

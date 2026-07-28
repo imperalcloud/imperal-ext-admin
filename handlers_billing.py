@@ -219,7 +219,7 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
         return ActionResult.error(f"Failed: {e}", retryable=True)
 
 
-@chat.function("adjust_balance", action_type="write", event="billing_adjusted",
+@chat.function("adjust_balance", action_type="write", effects=["update:user_balance"], event="billing_adjusted",
                data_model=UserBalanceRecord,
                description="Credit or deduct tokens. Positive=credit, negative=deduct.")
 async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
@@ -344,7 +344,7 @@ class SetUserPlanParams(BaseModel):
     plan_ref: str = Field(description="Plan to assign — the plan NAME or its id.")
 
 
-@chat.function("set_user_plan", action_type="write", event="user_plan_set",
+@chat.function("set_user_plan", action_type="write", effects=["update:user_plan"], event="user_plan_set",
                data_model=_PlanSetReceipt,
                description="Assign a user's active subscription plan (by plan name or id).")
 async def fn_set_user_plan(ctx, params: SetUserPlanParams) -> ActionResult:

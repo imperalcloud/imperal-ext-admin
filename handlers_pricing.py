@@ -60,7 +60,7 @@ class DeleteLlmModelRateParams(BaseModel):
 # SDL: save/delete_llm_model_rate return a receipt whose runtime keys are
 # {model_id, action}. LLMModelRateReceipt mirrors those keys verbatim
 # (I-EXT-RECORD-FIELD-NAMING-SYMMETRIC).
-@chat.function("save_llm_model_rate", action_type="write",
+@chat.function("save_llm_model_rate", action_type="write", effects=["update:llm_model_rate"],
                event="llm_model_rate_saved",
                data_model=LLMModelRateReceipt,
                description="Save (upsert) an LLM model rate row in llm_model_rates.")
@@ -105,10 +105,11 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
     return ActionResult.success(
         data={"model_id": params.model_id, "action": action},
         summary=f"Rate saved for {params.model_id} (tier={params.tier})",
+        refresh_panels=["tools"],
     )
 
 
-@chat.function("delete_llm_model_rate", action_type="destructive",
+@chat.function("delete_llm_model_rate", action_type="destructive", effects=["delete:llm_model_rate"],
                event="llm_model_rate_deleted",
                data_model=LLMModelRateReceipt,
                description="Soft-delete (mark unavailable) an LLM model rate row.")
@@ -135,4 +136,5 @@ async def fn_delete_llm_model_rate(ctx, params: DeleteLlmModelRateParams) -> Act
     return ActionResult.success(
         data={"model_id": params.model_id, "action": "softdeleted"},
         summary=f"Rate disabled for {params.model_id}",
+        refresh_panels=["tools"],
     )

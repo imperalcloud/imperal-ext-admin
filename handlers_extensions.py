@@ -100,7 +100,7 @@ async def fn_get_extension_config(ctx, params: AppIdParams) -> ActionResult:
     return ActionResult.success(data={"app_id": aid, "config": r.json()}, summary=f"Config for {aid}")
 
 
-@chat.function("update_extension_config", action_type="write", event="extension_configured", data_model=ExtSettingsReceipt, description="Update extension config.")
+@chat.function("update_extension_config", action_type="write", effects=["update:extension_config"], event="extension_configured", data_model=ExtSettingsReceipt, description="Update extension config.")
 async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -112,7 +112,7 @@ async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> Acti
     return ActionResult.error(f"Failed: HTTP {r.status_code}")
 
 
-@chat.function("update_skeleton_ttl", action_type="write", event="skeleton_updated", data_model=ExtSettingsReceipt, description="Update skeleton refresh TTL.")
+@chat.function("update_skeleton_ttl", action_type="write", effects=["update:extension_config"], event="skeleton_updated", data_model=ExtSettingsReceipt, description="Update skeleton refresh TTL.")
 async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -138,19 +138,19 @@ async def _set_app_lifecycle(aid: str, status: str, verb: str, note: str) -> Act
     )
 
 
-@chat.function("suspend_extension", action_type="destructive", event="extension_suspended", data_model=ExtSettingsReceipt, description="Suspend a marketplace app — pull it OFF the marketplace AND disable it for users (full kill). One source of truth: developer_apps + Registry synced.")
+@chat.function("suspend_extension", action_type="destructive", effects=["update:extension_lifecycle"], event="extension_suspended", data_model=ExtSettingsReceipt, description="Suspend a marketplace app — pull it OFF the marketplace AND disable it for users (full kill). One source of truth: developer_apps + Registry synced.")
 async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "suspended", "suspended", "off marketplace + disabled for users")
 
 
-@chat.function("activate_extension", action_type="write", event="extension_activated", data_model=ExtSettingsReceipt, description="Restore an app to ACTIVE — back on the marketplace AND usable. Admin override: takes effect immediately (no review).")
+@chat.function("activate_extension", action_type="write", effects=["update:extension_lifecycle"], event="extension_activated", data_model=ExtSettingsReceipt, description="Restore an app to ACTIVE — back on the marketplace AND usable. Admin override: takes effect immediately (no review).")
 async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "active", "restored", "live on the marketplace again")
 
 
-@chat.function("draft_extension", action_type="destructive", event="extension_drafted", data_model=ExtSettingsReceipt, description="Send an app back to DRAFT — off the marketplace for rework. Existing users keep using it; needs re-submit + approve to relist. Softer than suspend.")
+@chat.function("draft_extension", action_type="destructive", effects=["update:extension_lifecycle"], event="extension_drafted", data_model=ExtSettingsReceipt, description="Send an app back to DRAFT — off the marketplace for rework. Existing users keep using it; needs re-submit + approve to relist. Softer than suspend.")
 async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "draft", "sent to draft", "off marketplace for rework (existing users keep it)")
@@ -206,7 +206,7 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
     return ActionResult.success(data={"items": items, "total": len(items)}, summary=f"{len(items)} extensions for {ref}")
 
 
-@chat.function("set_access_policy", action_type="write", event="access_policy_set", data_model=ExtSettingsReceipt, description="Set extension access policy.")
+@chat.function("set_access_policy", action_type="write", effects=["update:extension_access_policy"], event="access_policy_set", data_model=ExtSettingsReceipt, description="Set extension access policy.")
 async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResult:
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
@@ -285,7 +285,7 @@ async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
                                 summary=f"{granted} granted, {denied} denied for {aid}")
 
 
-@chat.function("deny_extension", action_type="destructive", event="extension_denied", data_model=ExtSettingsReceipt, description="Add role/user to denied list.")
+@chat.function("deny_extension", action_type="destructive", effects=["update:extension_access_policy"], event="extension_denied", data_model=ExtSettingsReceipt, description="Add role/user to denied list.")
 async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to deny")
@@ -312,7 +312,7 @@ async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
     return ActionResult.success(data={"app_id": aid, "denied": added}, summary=f"Denied {', '.join(added)} from {aid}", refresh_panels=["tools"])
 
 
-@chat.function("allow_extension", action_type="write", event="extension_allowed", data_model=ExtSettingsReceipt, description="Remove role/user from denied list.")
+@chat.function("allow_extension", action_type="write", effects=["update:extension_access_policy"], event="extension_allowed", data_model=ExtSettingsReceipt, description="Remove role/user from denied list.")
 async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to allow")
@@ -340,7 +340,7 @@ async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
     return ActionResult.success(data={"app_id": aid, "removed": removed}, summary=f"Allowed {', '.join(removed)} for {aid}", refresh_panels=["tools"])
 
 
-@chat.function("purge_app", action_type="destructive",
+@chat.function("purge_app", action_type="destructive", event="admin.app_purged", effects=["delete:app"],
                description=("Permanently purge ANY app from the ENTIRE system — files on the worker, "
                             "every DB row, Redis caches, the Registry entry, and the marketplace listing. "
                             "Admin-only. Pass confirm_name equal to the EXACT app_id. Set force=true to purge "

@@ -68,7 +68,7 @@ async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
                                 summary=f"{len(roles)} roles found")
 
 
-@chat.function("create_role", action_type="write", event="role_created",
+@chat.function("create_role", action_type="write", effects=["create:role"], event="role_created",
                data_model=RoleActionReceipt,
                description="Create a new role with name and default scopes.")
 async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
@@ -83,7 +83,7 @@ async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
                                 summary=f"Role '{params.name}' created", refresh_panels=["tools"])
 
 
-@chat.function("delete_role", action_type="destructive", event="role_deleted",
+@chat.function("delete_role", action_type="destructive", effects=["delete:role"], event="role_deleted",
                data_model=RoleActionReceipt,
                description="Delete a role by ID or name.")
 async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
@@ -108,7 +108,7 @@ async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
     )
 
 
-@chat.function("update_role", action_type="write", event="role_updated",
+@chat.function("update_role", action_type="write", effects=["update:role"], event="role_updated",
                data_model=RoleActionReceipt,
                description="Update role scopes, limits, or display name. Can cascade.")
 async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
@@ -160,7 +160,7 @@ async def fn_list_scopes(ctx, params: ListScopesParams) -> ActionResult:
                                 summary=f"{len(scopes)} scopes found")
 
 
-@chat.function("create_scope", action_type="write", event="scope_created",
+@chat.function("create_scope", action_type="write", effects=["create:scope"], event="scope_created",
                data_model=ScopeRecord,
                description="Create a scope in resource:action format.")
 async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
@@ -175,7 +175,7 @@ async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
                                 summary=f"Scope '{name}' created", refresh_panels=["tools"])
 
 
-@chat.function("delete_scope", action_type="destructive", event="scope_deleted",
+@chat.function("delete_scope", action_type="destructive", effects=["delete:scope"], event="scope_deleted",
                data_model=ScopeRecord,
                description="Delete a scope by name or ID.")
 async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:

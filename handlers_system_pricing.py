@@ -36,7 +36,7 @@ class SaveTokenRateParams(BaseModel):
     token_rate: int = Field(..., ge=1, le=1_000_000, description="Credits per $1 (e.g. 1000)")
 
 
-@chat.function("save_platform_fees", action_type="write",
+@chat.function("save_platform_fees", action_type="write", effects=["update:platform_fees"],
                event="platform_fees_saved", data_model=PlatformFeeReceipt,
                description="Save per-tier platform fees (economy/standard/premium) to the billing config.")
 async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionResult:
@@ -58,7 +58,7 @@ async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionRe
     )
 
 
-@chat.function("save_token_rate", action_type="write",
+@chat.function("save_token_rate", action_type="write", effects=["update:token_rate"],
                event="token_rate_saved", data_model=TokenRateReceipt,
                description="Save the $-to-credit conversion rate (credits per $1) to the billing config.")
 async def fn_save_token_rate(ctx, params: SaveTokenRateParams) -> ActionResult:
@@ -86,7 +86,7 @@ class SaveCategoryDefaultsParams(BaseModel):
     destructive: int = Field(..., ge=0, le=100_000, description="Default base price for DESTRUCTIVE actions (credits)")
 
 
-@chat.function("save_category_defaults", action_type="write",
+@chat.function("save_category_defaults", action_type="write", effects=["update:category_defaults"],
                event="category_defaults_saved", data_model=CategoryDefaultsReceipt,
                description="Save the default per-action base prices (read/write/destructive) charged when "
                            "an extension function has no explicit price, to the billing config.")
@@ -118,7 +118,7 @@ class SaveCodingPricingParams(BaseModel):
     low_warn_threshold: int = Field(..., ge=0, le=1_000_000, description="Warn the user when balance drops below this")
 
 
-@chat.function("save_coding_pricing", action_type="write",
+@chat.function("save_coding_pricing", action_type="write", effects=["update:coding_pricing"],
                event="coding_pricing_saved", data_model=CodingPricingReceipt,
                description="Save the coding-agent (webbee-code terminal) pricing: markup on the real "
                            "LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and "

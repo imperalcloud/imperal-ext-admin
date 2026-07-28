@@ -65,7 +65,7 @@ async def fn_payment_test_connection(ctx, params: EmptyParams) -> ActionResult:
         summary=(f"Connected! Account {acct.get('id')}, balance {bal.get('amount',0)} {bal.get('currency','?')}"
                  if ok else "Stripe did not authenticate with the current key."))
 
-@chat.function("payment_config_save", action_type="write", event="payment_config_saved",
+@chat.function("payment_config_save", action_type="write", effects=["update:payment_config"], event="payment_config_saved",
                data_model=PaymentConfigRecord,
                description="Update Stripe keys via the billing gateway (validates, auto-manages webhook, applies instantly).")
 async def fn_payment_config_save(ctx, params: SaveStripeKeysParams) -> ActionResult:

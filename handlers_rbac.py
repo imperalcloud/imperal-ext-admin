@@ -120,7 +120,7 @@ async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
         summary=f"{r1['name']} vs {r2['name']}: {len(common)} common, {len(only1)}+{len(only2)} unique")
 
 
-@chat.function("bulk_assign_role", action_type="write", event="roles_assigned", data_model=BulkRoleAssignReceipt, description="Assign a role to multiple users. Max 100.")
+@chat.function("bulk_assign_role", action_type="write", effects=["update:user_role"], event="roles_assigned", data_model=BulkRoleAssignReceipt, description="Assign a role to multiple users. Max 100.")
 async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult:
     target_role = await _resolve_role_by_name(params.role)
     if not target_role:

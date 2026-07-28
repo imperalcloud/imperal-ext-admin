@@ -83,7 +83,7 @@ async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
         return ActionResult.success(data={"items": rules, "total": len(rules), "my_rules_count": my},
                                     summary=f"{len(rules)} rules total, {my} yours")
 
-@chat.function("create_rule", action_type="write", event="rule_created", data_model=RuleActionReceipt, description="Create automation from natural language.")
+@chat.function("create_rule", action_type="write", effects=["create:automation_rule"], event="rule_created", data_model=RuleActionReceipt, description="Create automation from natural language.")
 async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.post(f"{AUTH_GW}/v1/automations", json={"prompt": params.prompt, "cooldown_seconds": params.cooldown_seconds, "max_per_hour": params.max_per_hour},
@@ -92,19 +92,19 @@ async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
             return ActionResult.success(data={"rule": r.json()}, summary="Automation rule created", refresh_panels=["tools"])
         return ActionResult.error(f"Failed: {r.text}")
 
-@chat.function("delete_rule", action_type="destructive", event="rule_deleted", data_model=RuleActionReceipt, description="Delete an automation rule.")
+@chat.function("delete_rule", action_type="destructive", effects=["delete:automation_rule"], event="rule_deleted", data_model=RuleActionReceipt, description="Delete an automation rule.")
 async def fn_delete_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         await c.delete(f"{AUTH_GW}/v1/automations/{params.rule_id}", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
     return ActionResult.success(data={"deleted": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} deleted", refresh_panels=["tools"])
 
-@chat.function("pause_rule", action_type="write", event="rule_paused", data_model=RuleActionReceipt, description="Pause an automation rule.")
+@chat.function("pause_rule", action_type="write", effects=["update:automation_rule"], event="rule_paused", data_model=RuleActionReceipt, description="Pause an automation rule.")
 async def fn_pause_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         await c.post(f"{AUTH_GW}/v1/automations/{params.rule_id}/pause", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
     return ActionResult.success(data={"paused": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} paused", refresh_panels=["tools"])
 
-@chat.function("resume_rule", action_type="write", event="rule_resumed", data_model=RuleActionReceipt, description="Resume a paused rule. Resets trigger_count.")
+@chat.function("resume_rule", action_type="write", effects=["update:automation_rule"], event="rule_resumed", data_model=RuleActionReceipt, description="Resume a paused rule. Resets trigger_count.")
 async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
     async with httpx.AsyncClient(timeout=10) as c:
         h = {"X-Service-Token": AUTH_SERVICE_TOKEN, "Content-Type": "application/json"}
@@ -114,7 +114,7 @@ async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
 
 # ─── Confirmation Policy ──────────────────────────────────────────────── #
 
-@chat.function("set_confirmation_policy", action_type="write", event="confirmation_set", data_model=ConfirmationPolicyResponse, description="Set confirmation policy for a role.")
+@chat.function("set_confirmation_policy", action_type="write", effects=["update:confirmation_policy"], event="confirmation_set", data_model=ConfirmationPolicyResponse, description="Set confirmation policy for a role.")
 async def fn_set_confirmation_policy(ctx, params: ConfirmationPolicyParams) -> ActionResult:
     valid = ("enforced", "default_on", "default_off", "disabled")
     if params.policy not in valid:
@@ -135,7 +135,7 @@ async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResul
     return ActionResult.success(data={"role": params.role_name, "policy": role.get("confirmation_policy", "default_on")},
                                 summary=f"'{params.role_name}': {role.get('confirmation_policy', 'default_on')}")
 
-@chat.function("set_user_confirmation", action_type="write", event="confirmation_set", data_model=UserConfirmationResponse, description="Set confirmation for a user.")
+@chat.function("set_user_confirmation", action_type="write", effects=["update:user_confirmation"], event="confirmation_set", data_model=UserConfirmationResponse, description="Set confirmation for a user.")
 async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> ActionResult:
     result = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
                                {"attributes": {"confirmation_enabled": params.enabled, "confirmation_skip_read": params.skip_read}})
@@ -158,7 +158,7 @@ async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
 
 # ─── Task Limits ──────────────────────────────────────────────────────── #
 
-@chat.function("set_task_limit", action_type="write", event="task_limit_set", data_model=TaskLimitResponse, description="Set max concurrent tasks for a role (1-50).")
+@chat.function("set_task_limit", action_type="write", effects=["update:task_limit"], event="task_limit_set", data_model=TaskLimitResponse, description="Set max concurrent tasks for a role (1-50).")
 async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
     if not 1 <= params.max_tasks <= 50:
         return ActionResult.error("max_tasks must be 1-50")

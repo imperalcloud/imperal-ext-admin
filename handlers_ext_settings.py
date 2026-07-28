@@ -106,6 +106,7 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
         return ActionResult.success(
             data={"app_id": aid, "updated": True},
             summary=f"{section} settings saved for {aid}",
+            refresh_panels=["tools"],
         )
     return ActionResult.error(f"Save failed: HTTP {r.status_code}")
 
@@ -113,7 +114,7 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
 # ── Handlers ───────────────────────────────────────────────────────── #
 
 @chat.function(
-    "save_ext_general", action_type="write",
+    "save_ext_general", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension general settings.",
@@ -148,7 +149,7 @@ async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_models", action_type="write",
+    "save_ext_models", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension AI model settings.",
@@ -177,7 +178,7 @@ async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_persona", action_type="write",
+    "save_ext_persona", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension persona settings.",
@@ -194,7 +195,7 @@ async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_alerts", action_type="write",
+    "save_ext_alerts", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension alert settings.",
@@ -208,7 +209,7 @@ async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_router", action_type="write",
+    "save_ext_router", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension router settings.",
@@ -222,7 +223,7 @@ async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_session", action_type="write",
+    "save_ext_session", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension session settings.",
@@ -237,7 +238,7 @@ async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_context", action_type="write",
+    "save_ext_context", action_type="write", effects=["update:extension_settings"],
     event="extension_configured",
     data_model=ExtSettingsReceipt,
     description="Save extension context settings.",
@@ -254,7 +255,7 @@ async def fn_save_ext_context(ctx, params: SaveContextParams) -> ActionResult:
 
 
 @chat.function(
-    "save_ext_skeleton", action_type="write",
+    "save_ext_skeleton", action_type="write", effects=["update:extension_settings"],
     event="skeleton_updated",
     data_model=ExtSettingsReceipt,
     description="Save extension skeleton section settings.",

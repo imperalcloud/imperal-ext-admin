@@ -102,7 +102,7 @@ async def fn_email_get_template(ctx, params: _CaseParam) -> ActionResult:
 
 # ── Write tools ───────────────────────────────────────────────────
 
-@chat.function("email_save_template", action_type="write", event="email_template_saved",
+@chat.function("email_save_template", action_type="write", effects=["update:email_template"], event="email_template_saved",
                data_model=EmailTemplateSaved,
                description="Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged. To ONLY enable/disable a case without touching its template, use email_toggle_case instead.")
 async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResult:
@@ -127,7 +127,7 @@ async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResu
                                 refresh_panels=["tools"])
 
 
-@chat.function("email_toggle_case", action_type="write", event="email_case_toggled",
+@chat.function("email_toggle_case", action_type="write", effects=["update:email_template"], event="email_case_toggled",
                data_model=EmailTemplateSaved,
                description="Enable or disable an email case WITHOUT touching its subject/body.")
 async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
@@ -143,7 +143,7 @@ async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
                                 refresh_panels=["tools"])
 
 
-@chat.function("email_send_test", action_type="write", event="email_test_sent",
+@chat.function("email_send_test", action_type="write", effects=["create:email_test_send"], event="email_test_sent",
                data_model=EmailTestResult,
                description="Send a sample of one email case to an address (uses sample data, logged like any send).")
 async def fn_email_send_test(ctx, params: _TestParams) -> ActionResult:
