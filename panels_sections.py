@@ -12,6 +12,7 @@ import logging
 import os
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 from imperal_sdk import ui
 
 from app import _gw_request, _registry_get, AUTH_GW, REGISTRY_URL
@@ -253,7 +254,7 @@ async def _fetch_action_stats() -> dict:
 
 async def _check_health_raw(name: str, url: str) -> str:
     try:
-        async with httpx.AsyncClient(timeout=3) as c:
+        async with shared_http(timeout=3) as c:
             r = await c.get(url)
             return "Operational" if r.status_code == 200 else "Degraded"
     except Exception:

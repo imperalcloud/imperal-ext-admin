@@ -2,6 +2,7 @@
 from __future__ import annotations
 import logging
 import httpx
+from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN
 from models_records import PaymentConfigRecord, PaymentTestResultRecord
@@ -25,11 +26,12 @@ class SaveStripeKeysParams(BaseModel):
 @chat.function("payment_config_get", action_type="read", data_model=PaymentConfigRecord,
                description="Get the real Stripe configuration from the billing gateway.")
 async def fn_payment_config_get(ctx, params: EmptyParams) -> ActionResult:
+    """Get the real Stripe configuration from the billing gateway."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/stripe-config"
     try:
-        async with httpx.AsyncClient(timeout=8.0) as c:
+        async with shared_http(timeout=8.0) as c:
             r = await c.get(url, headers={"X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx)})
     except Exception as e:
         return ActionResult.error(f"gateway unreachable: {type(e).__name__}")
@@ -46,11 +48,12 @@ async def fn_payment_config_get(ctx, params: EmptyParams) -> ActionResult:
 @chat.function("payment_test_connection", action_type="read", data_model=PaymentTestResultRecord,
                description="Test Stripe API connection via the billing gateway (real active key).")
 async def fn_payment_test_connection(ctx, params: EmptyParams) -> ActionResult:
+    """Test Stripe API connection via the billing gateway (real active key)."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/stripe-config"
     try:
-        async with httpx.AsyncClient(timeout=8.0) as c:
+        async with shared_http(timeout=8.0) as c:
             r = await c.get(url, headers={"X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx)})
     except Exception as e:
         return ActionResult.error(f"gateway unreachable: {type(e).__name__}")
@@ -69,6 +72,7 @@ async def fn_payment_test_connection(ctx, params: EmptyParams) -> ActionResult:
                data_model=PaymentConfigRecord,
                description="Update Stripe keys via the billing gateway (validates, auto-manages webhook, applies instantly).")
 async def fn_payment_config_save(ctx, params: SaveStripeKeysParams) -> ActionResult:
+    """Update Stripe keys via the billing gateway (validates, auto-manages webhook, applies instantly)."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     if not (params.secret_key or params.publishable_key or params.webhook_secret):
@@ -80,7 +84,7 @@ async def fn_payment_config_save(ctx, params: SaveStripeKeysParams) -> ActionRes
         "webhook_secret": params.webhook_secret or None,
     }.items() if v}
     try:
-        async with httpx.AsyncClient(timeout=15.0) as c:
+        async with shared_http(timeout=15.0) as c:
             r = await c.put(url, json=body, headers={
                 "X-Service-Token": AUTH_SERVICE_TOKEN, "X-Acting-User": _acting(ctx),
                 "Content-Type": "application/json"})

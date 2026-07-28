@@ -6,6 +6,7 @@ import logging
 import os
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -58,10 +59,11 @@ class TaskLimitParams(BaseModel):
 
 @chat.function("system_health", action_type="read", data_model=SystemHealthResponse, description="Check platform health.")
 async def fn_system_health(ctx, params: EmptyParams) -> ActionResult:
+    """Check platform health."""
     results = {}
     for name, url in [("auth_gateway", f"{AUTH_GW}/healthz"), ("registry", f"{REGISTRY_URL}/health")]:
         try:
-            async with httpx.AsyncClient(timeout=5) as c:
+            async with shared_http(timeout=5) as c:
                 r = await c.get(url)
                 results[name] = "operational" if r.status_code == 200 else "down"
         except Exception:
@@ -72,7 +74,8 @@ async def fn_system_health(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("list_rules", action_type="read", data_model=AdminRulesListResponse, description="List all automation rules.")
 async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
-    async with httpx.AsyncClient(timeout=10) as c:
+    """List all automation rules."""
+    async with shared_http(timeout=10) as c:
         r = await c.get(f"{AUTH_GW}/v1/automations/internal/all", params={"tenant_id": _tenant_id(ctx)},
                         headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
         if r.status_code != 200:
@@ -85,7 +88,8 @@ async def fn_list_rules(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("create_rule", action_type="write", effects=["create:automation_rule"], event="rule_created", data_model=RuleActionReceipt, description="Create automation from natural language.")
 async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
-    async with httpx.AsyncClient(timeout=15) as c:
+    """Create automation from natural language."""
+    async with shared_http(timeout=15) as c:
         r = await c.post(f"{AUTH_GW}/v1/automations", json={"prompt": params.prompt, "cooldown_seconds": params.cooldown_seconds, "max_per_hour": params.max_per_hour},
                          headers={"X-Service-Token": AUTH_SERVICE_TOKEN, "Content-Type": "application/json"})
         if r.status_code in (200, 201):
@@ -94,19 +98,22 @@ async def fn_create_rule(ctx, params: RulePromptParams) -> ActionResult:
 
 @chat.function("delete_rule", action_type="destructive", effects=["delete:automation_rule"], event="rule_deleted", data_model=RuleActionReceipt, description="Delete an automation rule.")
 async def fn_delete_rule(ctx, params: RuleIdParams) -> ActionResult:
-    async with httpx.AsyncClient(timeout=10) as c:
+    """Delete an automation rule."""
+    async with shared_http(timeout=10) as c:
         await c.delete(f"{AUTH_GW}/v1/automations/{params.rule_id}", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
     return ActionResult.success(data={"deleted": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} deleted", refresh_panels=["tools"])
 
 @chat.function("pause_rule", action_type="write", effects=["update:automation_rule"], event="rule_paused", data_model=RuleActionReceipt, description="Pause an automation rule.")
 async def fn_pause_rule(ctx, params: RuleIdParams) -> ActionResult:
-    async with httpx.AsyncClient(timeout=10) as c:
+    """Pause an automation rule."""
+    async with shared_http(timeout=10) as c:
         await c.post(f"{AUTH_GW}/v1/automations/{params.rule_id}/pause", headers={"X-Service-Token": AUTH_SERVICE_TOKEN})
     return ActionResult.success(data={"paused": True, "rule_id": params.rule_id}, summary=f"Rule {params.rule_id} paused", refresh_panels=["tools"])
 
 @chat.function("resume_rule", action_type="write", effects=["update:automation_rule"], event="rule_resumed", data_model=RuleActionReceipt, description="Resume a paused rule. Resets trigger_count.")
 async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
-    async with httpx.AsyncClient(timeout=10) as c:
+    """Resume a paused rule. Resets trigger_count."""
+    async with shared_http(timeout=10) as c:
         h = {"X-Service-Token": AUTH_SERVICE_TOKEN, "Content-Type": "application/json"}
         await c.patch(f"{AUTH_GW}/v1/automations/internal/{params.rule_id}", json={"status": "active"}, headers=h)
         await c.patch(f"{AUTH_GW}/v1/automations/internal/{params.rule_id}", json={"trigger_count": 0}, headers=h)
@@ -116,6 +123,7 @@ async def fn_resume_rule(ctx, params: RuleIdParams) -> ActionResult:
 
 @chat.function("set_confirmation_policy", action_type="write", effects=["update:confirmation_policy"], event="confirmation_set", data_model=ConfirmationPolicyResponse, description="Set confirmation policy for a role.")
 async def fn_set_confirmation_policy(ctx, params: ConfirmationPolicyParams) -> ActionResult:
+    """Set confirmation policy for a role."""
     valid = ("enforced", "default_on", "default_off", "disabled")
     if params.policy not in valid:
         return ActionResult.error(f"Invalid: must be {', '.join(valid)}")
@@ -129,6 +137,7 @@ async def fn_set_confirmation_policy(ctx, params: ConfirmationPolicyParams) -> A
 
 @chat.function("get_confirmation_policy", action_type="read", data_model=ConfirmationPolicyResponse, description="Get confirmation policy for a role.")
 async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResult:
+    """Get confirmation policy for a role."""
     role = await _resolve_role_by_name(params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")
@@ -137,6 +146,7 @@ async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResul
 
 @chat.function("set_user_confirmation", action_type="write", effects=["update:user_confirmation"], event="confirmation_set", data_model=UserConfirmationResponse, description="Set confirmation for a user.")
 async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> ActionResult:
+    """Set confirmation for a user."""
     result = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
                                {"attributes": {"confirmation_enabled": params.enabled, "confirmation_skip_read": params.skip_read}})
     if isinstance(result, dict) and result.get("error"):
@@ -146,6 +156,7 @@ async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> Actio
 
 @chat.function("get_user_confirmation", action_type="read", data_model=UserConfirmationResponse, description="Get user confirmation settings.")
 async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
+    """Get user confirmation settings."""
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
     if isinstance(user, dict) and user.get("error"):
         return ActionResult.error(user["error"])
@@ -160,6 +171,7 @@ async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
 
 @chat.function("set_task_limit", action_type="write", effects=["update:task_limit"], event="task_limit_set", data_model=TaskLimitResponse, description="Set max concurrent tasks for a role (1-50).")
 async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
+    """Set max concurrent tasks for a role (1-50)."""
     if not 1 <= params.max_tasks <= 50:
         return ActionResult.error("max_tasks must be 1-50")
     role = await _resolve_role_by_name(params.role_name)
@@ -173,6 +185,7 @@ async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
 
 @chat.function("get_task_limit", action_type="read", data_model=TaskLimitResponse, description="Get max concurrent tasks for a role.")
 async def fn_get_task_limit(ctx, params: RoleNameParams) -> ActionResult:
+    """Get max concurrent tasks for a role."""
     role = await _resolve_role_by_name(params.role_name)
     if not role:
         return ActionResult.error(f"Role '{params.role_name}' not found")

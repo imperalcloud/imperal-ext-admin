@@ -120,6 +120,7 @@ async def _save_section(app_id: str, section: str, data: dict) -> ActionResult:
     description="Save extension general settings.",
 )
 async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
+    """Save extension general settings."""
     # Status is NOT written here — marketplace lifecycle (active/suspended/draft)
     # has a single source of truth: the gateway status mutator behind the app's
     # Suspend/Restore/To-draft buttons. (params.status kept for back-compat, ignored.)
@@ -132,9 +133,9 @@ async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
     # the Registry write above stays authoritative for this handler's result.
     if params.display_name and AUTH_GW and AUTH_SERVICE_TOKEN:
         try:
-            import httpx
+            from imperal_sdk._shared_http import shared_http
             aid = await _resolve_app_id(params.app_id)
-            async with httpx.AsyncClient(timeout=10.0) as c:
+            async with shared_http(timeout=10.0) as c:
                 await c.post(
                     f"{AUTH_GW}/v1/admin/apps/{aid}/metadata",
                     headers={
@@ -155,6 +156,7 @@ async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
     description="Save extension AI model settings.",
 )
 async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
+    """Save extension model routing settings."""
     payload: dict = {
         "primary_model": params.primary_model,
         "intake_model": params.intake_model,
@@ -184,6 +186,7 @@ async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
     description="Save extension persona settings.",
 )
 async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
+    """Save extension persona settings."""
     return await _save_section(params.app_id, "persona", {
         "system_prompt_intake": params.system_prompt_intake,
         "system_prompt_intelligence": params.system_prompt_intelligence,
@@ -201,6 +204,7 @@ async def fn_save_ext_persona(ctx, params: SavePersonaParams) -> ActionResult:
     description="Save extension alert settings.",
 )
 async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
+    """Save extension alert settings."""
     return await _save_section(params.app_id, "alerts", {
         "enabled": _bool_from_str(params.enabled),
         "cooldown_seconds": params.cooldown_seconds,
@@ -215,6 +219,7 @@ async def fn_save_ext_alerts(ctx, params: SaveAlertsParams) -> ActionResult:
     description="Save extension router settings.",
 )
 async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
+    """Save extension router settings."""
     return await _save_section(params.app_id, "router", {
         "enabled": _bool_from_str(params.enabled),
         "timeout_ms": params.timeout_ms,
@@ -229,6 +234,7 @@ async def fn_save_ext_router(ctx, params: SaveRouterParams) -> ActionResult:
     description="Save extension session settings.",
 )
 async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
+    """Save extension session settings."""
     return await _save_section(params.app_id, "session", {
         "timeout_hours": params.timeout_hours,
         "max_history": params.max_history,
@@ -244,6 +250,7 @@ async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
     description="Save extension context settings.",
 )
 async def fn_save_ext_context(ctx, params: SaveContextParams) -> ActionResult:
+    """Save extension context-window settings."""
     data: dict = {}
     if params.max_tool_rounds:
         data["max_tool_rounds"] = int(params.max_tool_rounds)
@@ -261,6 +268,7 @@ async def fn_save_ext_context(ctx, params: SaveContextParams) -> ActionResult:
     description="Save extension skeleton section settings.",
 )
 async def fn_save_ext_skeleton(ctx, params: SaveSkeletonParams) -> ActionResult:
+    """Save extension skeleton (panel context-refresh) settings."""
     import json
     extra = params.model_extra or {}
 

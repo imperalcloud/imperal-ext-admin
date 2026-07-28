@@ -60,6 +60,7 @@ async def _resolve_ref(user_id: str, email: str) -> str | None:
 
 @chat.function("effective_scopes", action_type="read", data_model=EffectiveScopesResponse, description="Show all effective scopes for a user with sources.")
 async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
+    """Show all effective scopes for a user with sources."""
     ref = await _resolve_ref(params.user_id, params.email)
     if not ref:
         return ActionResult.error("user_id or email required" if not params.email else f"User '{params.email}' not found")
@@ -83,6 +84,7 @@ async def fn_effective_scopes(ctx, params: UserRefParams) -> ActionResult:
 
 @chat.function("check_permission", action_type="read", data_model=PermissionCheckResponse, description="Check if user has a specific scope. YES/NO.")
 async def fn_check_permission(ctx, params: CheckPermissionParams) -> ActionResult:
+    """Check if user has a specific scope. YES/NO."""
     if not params.scope:
         return ActionResult.error("scope is required")
     ref = await _resolve_ref(params.user_id, params.email)
@@ -105,6 +107,7 @@ async def fn_check_permission(ctx, params: CheckPermissionParams) -> ActionResul
 
 @chat.function("compare_roles", action_type="read", data_model=CompareRolesResponse, description="Compare two roles — common and unique scopes.")
 async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
+    """Compare two roles — common and unique scopes."""
     roles = await _gw_request("GET", "/v1/roles")
     if not isinstance(roles, list):
         return ActionResult.error("Failed to fetch roles")
@@ -122,6 +125,7 @@ async def fn_compare_roles(ctx, params: CompareRolesParams) -> ActionResult:
 
 @chat.function("bulk_assign_role", action_type="write", effects=["update:user_role"], event="roles_assigned", data_model=BulkRoleAssignReceipt, description="Assign a role to multiple users. Max 100.")
 async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult:
+    """Assign a role to multiple users. Max 100."""
     target_role = await _resolve_role_by_name(params.role)
     if not target_role:
         return ActionResult.error(f"Role '{params.role}' not found")
@@ -156,6 +160,7 @@ async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult
 
 @chat.function("audit_log", action_type="read", data_model=AuditLogResponse, description="View audit log. Default last 24h, max 50 entries.")
 async def fn_audit_log(ctx, params: AuditLogParams) -> ActionResult:
+    """View audit log. Default last 24h, max 50 entries."""
     parts = [f"hours={params.hours}"]
     if params.actor:  parts.append(f"actor={params.actor}")
     if params.target: parts.append(f"target={params.target}")

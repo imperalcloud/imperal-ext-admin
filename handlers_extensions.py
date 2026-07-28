@@ -69,6 +69,7 @@ class PurgeAppParams(BaseModel):
 
 @chat.function("list_extensions", action_type="read", data_model=ExtensionsListResponse, description="List all active extensions.")
 async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
+    """List all active extensions."""
     r = await _registry_get("/v1/apps?status=active")
     if r.status_code != 200:
         return ActionResult.error(f"Failed: HTTP {r.status_code}")
@@ -92,6 +93,7 @@ async def fn_list_extensions(ctx, params: EmptyParams) -> ActionResult:
 
 @chat.function("get_extension_config", action_type="read", data_model=ExtensionConfigRecord, description="Get full extension config.")
 async def fn_get_extension_config(ctx, params: AppIdParams) -> ActionResult:
+    """Get full extension config."""
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
     r = await _registry_get(f"/v1/apps/{aid}/settings")
@@ -102,6 +104,7 @@ async def fn_get_extension_config(ctx, params: AppIdParams) -> ActionResult:
 
 @chat.function("update_extension_config", action_type="write", effects=["update:extension_config"], event="extension_configured", data_model=ExtSettingsReceipt, description="Update extension config.")
 async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> ActionResult:
+    """Update extension config."""
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
     if not params.config:
@@ -114,6 +117,7 @@ async def fn_update_extension_config(ctx, params: UpdateExtConfigParams) -> Acti
 
 @chat.function("update_skeleton_ttl", action_type="write", effects=["update:extension_config"], event="skeleton_updated", data_model=ExtSettingsReceipt, description="Update skeleton refresh TTL.")
 async def fn_update_skeleton_ttl(ctx, params: UpdateSkeletonTtlParams) -> ActionResult:
+    """Update skeleton refresh TTL."""
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
     payload = {"skeleton": {"sections": [{"section_name": params.section_name, "ttl": params.ttl}]}} if params.section_name else {"skeleton": {"ttl": params.ttl}}
@@ -140,18 +144,21 @@ async def _set_app_lifecycle(aid: str, status: str, verb: str, note: str) -> Act
 
 @chat.function("suspend_extension", action_type="destructive", effects=["update:extension_lifecycle"], event="extension_suspended", data_model=ExtSettingsReceipt, description="Suspend a marketplace app — pull it OFF the marketplace AND disable it for users (full kill). One source of truth: developer_apps + Registry synced.")
 async def fn_suspend_extension(ctx, params: AppIdParams) -> ActionResult:
+    """Suspend a marketplace app — pull it OFF the marketplace AND disable it for users (full kill). One source of truth: developer_apps + Registry synced."""
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "suspended", "suspended", "off marketplace + disabled for users")
 
 
 @chat.function("activate_extension", action_type="write", effects=["update:extension_lifecycle"], event="extension_activated", data_model=ExtSettingsReceipt, description="Restore an app to ACTIVE — back on the marketplace AND usable. Admin override: takes effect immediately (no review).")
 async def fn_activate_extension(ctx, params: AppIdParams) -> ActionResult:
+    """Restore an app to ACTIVE — back on the marketplace AND usable. Admin override: takes effect immediately (no review)."""
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "active", "restored", "live on the marketplace again")
 
 
 @chat.function("draft_extension", action_type="destructive", effects=["update:extension_lifecycle"], event="extension_drafted", data_model=ExtSettingsReceipt, description="Send an app back to DRAFT — off the marketplace for rework. Existing users keep using it; needs re-submit + approve to relist. Softer than suspend.")
 async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
+    """Send an app back to DRAFT — off the marketplace for rework. Existing users keep using it; needs re-submit + approve to relist. Softer than suspend."""
     aid = await _resolve_app_id(params.app_id, include_all=True)
     return await _set_app_lifecycle(aid, "draft", "sent to draft", "off marketplace for rework (existing users keep it)")
 
@@ -171,6 +178,8 @@ async def fn_draft_extension(ctx, params: AppIdParams) -> ActionResult:
     ),
 )
 async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
+    """List the calling user's installed extensions, or another user's when
+    user_id/email is supplied (admin mode)."""
     # B-3 (2026-05-11): when both user_id and email are empty, default to
     # the calling user — this is the self-service path that the
     # hub_routing.txt "extensions/apps" intent class targets. Closes the
@@ -208,6 +217,7 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
 
 @chat.function("set_access_policy", action_type="write", effects=["update:extension_access_policy"], event="access_policy_set", data_model=ExtSettingsReceipt, description="Set extension access policy.")
 async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResult:
+    """Set extension access policy."""
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
     policy: dict = {}
@@ -230,6 +240,7 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
 
 @chat.function("get_access_policy", action_type="read", data_model=AccessPolicyRecord, description="Show access policy with per-role resolution.")
 async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
+    """Show access policy with per-role resolution."""
     aid = await _resolve_app_id(params.app_id)
     tid = _tenant_id(ctx)
     cfg = await _gw_request("GET", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}")
@@ -256,6 +267,7 @@ async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
 
 @chat.function("list_extension_users", action_type="read", data_model=ExtensionUsersResponse, description="List users who can access an extension.")
 async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
+    """List users who can access an extension."""
     aid = await _resolve_app_id(params.app_id, include_all=True)
     result = await _gw_request("GET", f"/v1/extensions/{aid}/users")
     if isinstance(result, dict) and "error" in result:
@@ -287,6 +299,7 @@ async def fn_list_extension_users(ctx, params: AppIdParams) -> ActionResult:
 
 @chat.function("deny_extension", action_type="destructive", effects=["update:extension_access_policy"], event="extension_denied", data_model=ExtSettingsReceipt, description="Add role/user to denied list.")
 async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
+    """Add role/user to denied list."""
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to deny")
     aid = await _resolve_app_id(params.app_id)
@@ -314,6 +327,7 @@ async def fn_deny_extension(ctx, params: DenyAllowParams) -> ActionResult:
 
 @chat.function("allow_extension", action_type="write", effects=["update:extension_access_policy"], event="extension_allowed", data_model=ExtSettingsReceipt, description="Remove role/user from denied list.")
 async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
+    """Remove role/user from denied list."""
     if not params.role and not params.user:
         return ActionResult.error("Provide role or user to allow")
     aid = await _resolve_app_id(params.app_id)
@@ -347,6 +361,7 @@ async def fn_allow_extension(ctx, params: DenyAllowParams) -> ActionResult:
                             "an app that is still active. THIS CANNOT BE UNDONE."),
                data_model=ExtSettingsReceipt)
 async def fn_purge_app(ctx, params: PurgeAppParams) -> ActionResult:
+    """Permanently purge ANY app from the ENTIRE system — files on the worker, every DB row, Redis caches, the Registry entry, and the marketplace listing. Admin-only. Pass confirm_name equal to the EXACT app_id. Set force=true to purge an app that is still active. THIS CANNOT BE UNDONE."""
     import os as _os, shutil as _shutil, re as _re
     aid = (params.app_id or "").strip()
     if not aid:

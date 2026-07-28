@@ -32,6 +32,7 @@ def _aslist(r) -> list:
 @chat.function("get_user_payments", action_type="read", data_model=PaymentsResponse,
                description="A user's payment history (subscriptions + token top-ups): amount, status, type, date, and receipt link.")
 async def fn_get_user_payments(ctx, params: _UserIdParam) -> ActionResult:
+    """A user's payment history (subscriptions + token top-ups): amount, status, type, date, and receipt link."""
     uid, err = await _normalize_to_imperal_id(params.user_id)
     if err:
         return ActionResult.error(err)
@@ -43,6 +44,7 @@ async def fn_get_user_payments(ctx, params: _UserIdParam) -> ActionResult:
 @chat.function("get_user_payment_methods", action_type="read", data_model=PaymentMethodsResponse,
                description="A user's saved payment methods (cards): brand, last4, expiry, default flag.")
 async def fn_get_user_payment_methods(ctx, params: _UserIdParam) -> ActionResult:
+    """A user's saved payment methods (cards): brand, last4, expiry, default flag."""
     uid, err = await _normalize_to_imperal_id(params.user_id)
     if err:
         return ActionResult.error(err)
@@ -54,6 +56,7 @@ async def fn_get_user_payment_methods(ctx, params: _UserIdParam) -> ActionResult
 @chat.function("get_user_limits", action_type="read", data_model=UserLimitsRecord,
                description="A user's effective subscription plan + usage limits.")
 async def fn_get_user_limits(ctx, params: _UserIdParam) -> ActionResult:
+    """A user's effective subscription plan + usage limits."""
     uid, err = await _normalize_to_imperal_id(params.user_id)
     if err:
         return ActionResult.error(err)
@@ -66,6 +69,7 @@ async def fn_get_user_limits(ctx, params: _UserIdParam) -> ActionResult:
 @chat.function("list_agencies", action_type="read", data_model=AgenciesResponse,
                description="List all agencies (multi-tenant orgs): id, display name, domain.")
 async def fn_list_agencies(ctx, params: EmptyParams) -> ActionResult:
+    """List all agencies (multi-tenant orgs): id, display name, domain."""
     items = _aslist(await _gw_request("GET", "/v1/agencies"))
     return ActionResult.success(data={"items": items, "total": len(items)},
                                 summary=f"{len(items)} agencies")
@@ -74,6 +78,7 @@ async def fn_list_agencies(ctx, params: EmptyParams) -> ActionResult:
 @chat.function("list_pending_apps", action_type="read", data_model=PendingAppsResponse,
                description="Marketplace apps awaiting admin review (status=pending_review) — the approve/reject queue.")
 async def fn_list_pending_apps(ctx, params: EmptyParams) -> ActionResult:
+    """Marketplace apps awaiting admin review (status=pending_review) — the approve/reject queue."""
     items = _aslist(await _gw_request("GET", "/v1/admin/apps/pending"))
     return ActionResult.success(data={"items": items, "total": len(items)},
                                 summary=f"{len(items)} app(s) pending review")
@@ -82,6 +87,7 @@ async def fn_list_pending_apps(ctx, params: EmptyParams) -> ActionResult:
 @chat.function("list_pending_payouts", action_type="read", data_model=PendingPayoutsResponse,
                description="Developer payout requests awaiting admin action (status=pending).")
 async def fn_list_pending_payouts(ctx, params: EmptyParams) -> ActionResult:
+    """Developer payout requests awaiting admin action (status=pending)."""
     items = _aslist(await _gw_request("GET", "/v1/admin/payouts/pending"))
     return ActionResult.success(data={"items": items, "total": len(items)},
                                 summary=f"{len(items)} pending payout(s)")

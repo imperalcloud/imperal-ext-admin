@@ -94,6 +94,7 @@ class ResetConvParams(BaseModel):
                data_model=UserListResponse,
                description="List all users with roles, scopes, status.")
 async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
+    """List all users with roles, scopes, status."""
     raw = await _gw_request("GET", "/v1/users?include_inactive=true")
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
@@ -130,6 +131,7 @@ async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
                data_model=UserRecord,
                description="Create a new user with email, password, and role.")
 async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
+    """Create a new user with email, password, and role."""
     result = await _gw_request("POST", "/v1/users", {
         "email": params.email, "password": params.password, "role": params.role,
     })
@@ -152,6 +154,7 @@ async def fn_create_user(ctx, params: CreateUserParams) -> ActionResult:
                data_model=UserRecord,
                description="Update user role, scopes, attributes, or status.")
 async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
+    """Update user role, scopes, attributes, or status."""
     data: dict = {}
     if params.role:                  data["role"] = params.role
     if params.is_active is not None: data["is_active"] = params.is_active
@@ -183,6 +186,7 @@ async def fn_update_user(ctx, params: UpdateUserParams) -> ActionResult:
                data_model=UserRecord,
                description="Deactivate user (can reactivate later).")
 async def fn_deactivate_user(ctx, params: UserIdParams) -> ActionResult:
+    """Deactivate user (can reactivate later)."""
     result = await _gw_request("DELETE", f"/v1/users/{params.user_id}")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
@@ -204,6 +208,7 @@ async def fn_deactivate_user(ctx, params: UserIdParams) -> ActionResult:
                data_model=UserRecord,
                description="PERMANENT delete. Cannot be undone.")
 async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
+    """PERMANENT delete. Cannot be undone."""
     result = await _gw_request("DELETE", f"/v1/users/{params.user_id}?permanent=true")
     if isinstance(result, dict) and "error" in result:
         return ActionResult.error(result["error"])
@@ -231,6 +236,7 @@ async def fn_hard_delete_user(ctx, params: UserIdParams) -> ActionResult:
                    "Confirmation is required before it runs."),
                data_model=UserRecord)
 async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
+    """Reset (clear) a user's chat history and conversational state — history, session memory, skeleton caches — and restart their session. Money, usage, billing, and installed apps are PRESERVED. With NO user_id/email this resets the CALLER's own conversation (available to any user). With a user_id or email it resets THAT user (ADMIN only). Use when a user says 'clear my history', 'start over', 'reset my chat', or an admin asks to reset a specific user. Confirmation is required before it runs."""
     self_uid = getattr(ctx.user, "imperal_id", "") or ""
     target = (params.user_id or "").strip()
     if not target and params.email:
@@ -275,6 +281,7 @@ async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
                data_model=UserRecord,
                description="Update individual limit overrides for a user.")
 async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionResult:
+    """Update individual limit overrides for a user."""
     # Fetch current user to merge attributes
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
     if isinstance(user, dict) and "error" in user:
@@ -318,6 +325,7 @@ async def fn_update_user_limits(ctx, params: UpdateUserLimitsParams) -> ActionRe
                data_model=UserRecord,
                description="Set a single attribute key-value on a user.")
 async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionResult:
+    """Set a single attribute key-value on a user."""
     if not params.attr_key.strip():
         return ActionResult.error("Attribute key is required")
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
@@ -343,6 +351,7 @@ async def fn_set_user_attribute(ctx, params: SetUserAttributeParams) -> ActionRe
                data_model=UserRecord,
                description="Remove an attribute key from a user.")
 async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> ActionResult:
+    """Remove an attribute key from a user."""
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
     if isinstance(user, dict) and "error" in user:
         return ActionResult.error(user["error"])
@@ -372,6 +381,7 @@ async def fn_remove_user_attribute(ctx, params: RemoveUserAttributeParams) -> Ac
                             "force-allow, or deny. The per-user `coding_access` attribute overrides "
                             "the plan's coding feature (admins are always allowed)."))
 async def fn_set_user_coding_access(ctx, params: SetUserCodingAccessParams) -> ActionResult:
+    """Set a user's Webbee Code (coding agent) access: inherit the plan, force-allow, or deny. The per-user `coding_access` attribute overrides the plan's coding feature (admins are always allowed)."""
     # MERGE (never wipe) attributes — mirrors fn_update_user_limits / fn_set_user_attribute:
     # fetch the user, keep every existing key, set only `coding_access`, then PATCH.
     # CRITICAL: never PATCH a bare attributes dict that drops existing keys
@@ -403,6 +413,7 @@ async def fn_set_user_coding_access(ctx, params: SetUserCodingAccessParams) -> A
                             "plan, force-allow, or deny. The per-user `connections_access` attribute "
                             "overrides the plan's connections feature (admins are always allowed)."))
 async def fn_set_user_connections_access(ctx, params: SetUserConnectionsAccessParams) -> ActionResult:
+    """Set a user's Connections (their own SSH/MCP targets) access: inherit the plan, force-allow, or deny. The per-user `connections_access` attribute overrides the plan's connections feature (admins are always allowed)."""
     # MERGE (never wipe) attributes — same discipline as fn_set_user_coding_access
     # (2026-07-02 role-change attribute-wipe incident): fetch, keep every key,
     # set only `connections_access`, then PATCH.
@@ -432,6 +443,7 @@ async def fn_set_user_connections_access(ctx, params: SetUserConnectionsAccessPa
                             "plan, force-allow, or deny. The per-user `file_reader_access` attribute "
                             "overrides the plan's file_reader feature (admins are always allowed)."))
 async def fn_set_user_file_reader_access(ctx, params: SetUserFileReaderAccessParams) -> ActionResult:
+    """Set a user's File Reader (document ingestion) access: inherit the plan, force-allow, or deny. The per-user `file_reader_access` attribute overrides the plan's file_reader feature (admins are always allowed)."""
     # MERGE (never wipe) attributes — same discipline as fn_set_user_coding_access
     # (2026-07-02 role-change attribute-wipe incident): fetch, keep every key,
     # set only `file_reader_access`, then PATCH.

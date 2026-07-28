@@ -40,6 +40,7 @@ class SaveTokenRateParams(BaseModel):
                event="platform_fees_saved", data_model=PlatformFeeReceipt,
                description="Save per-tier platform fees (economy/standard/premium) to the billing config.")
 async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionResult:
+    """Save per-tier platform fees (economy/standard/premium) to the billing config."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = params.model_dump()
@@ -62,6 +63,7 @@ async def fn_save_platform_fees(ctx, params: SavePlatformFeesParams) -> ActionRe
                event="token_rate_saved", data_model=TokenRateReceipt,
                description="Save the $-to-credit conversion rate (credits per $1) to the billing config.")
 async def fn_save_token_rate(ctx, params: SaveTokenRateParams) -> ActionResult:
+    """Save the $-to-credit conversion rate (credits per $1) to the billing config."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = params.model_dump()
@@ -91,6 +93,7 @@ class SaveCategoryDefaultsParams(BaseModel):
                description="Save the default per-action base prices (read/write/destructive) charged when "
                            "an extension function has no explicit price, to the billing config.")
 async def fn_save_category_defaults(ctx, params: SaveCategoryDefaultsParams) -> ActionResult:
+    """Save the default per-action base prices (read/write/destructive) charged when an extension function has no explicit price, to the billing config."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = params.model_dump()
@@ -124,6 +127,7 @@ class SaveCodingPricingParams(BaseModel):
                            "LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and "
                            "low-balance warn threshold, to the billing config.")
 async def fn_save_coding_pricing(ctx, params: SaveCodingPricingParams) -> ActionResult:
+    """Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and low-balance warn threshold, to the billing config."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = params.model_dump()

@@ -28,6 +28,7 @@ from models_llm_config import SaveLlmConfigParams  # extracted; keeps file under
                data_model=LLMConfigReceipt,
                description="Save LLM provider/model config to Redis Config Store.")
 async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
+    """Save LLM provider/model config to Redis Config Store."""
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(REDIS_URL, decode_responses=True)
@@ -196,7 +197,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         tb_updated: list = []
         if tb_payload:
             try:
-                import httpx as _httpx
+                from imperal_sdk._shared_http import shared_http
                 gw = os.getenv("IMPERAL_GATEWAY_URL", "http://104.224.88.155:8085")
                 svc = os.getenv("AUTH_SERVICE_TOKEN", "")
                 acting = ""
@@ -204,7 +205,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                     acting = str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
                 except Exception:
                     pass
-                async with _httpx.AsyncClient(timeout=8.0) as client:
+                async with shared_http(timeout=8.0) as client:
                     resp = await client.patch(
                         f"{gw}/v1/admin/tenant-defaults?tenant_id=default",
                         json=tb_payload,
@@ -241,6 +242,7 @@ class TestLlmParams(BaseModel):
                data_model=LLMTestResultRecord,
                description="Test connection to LLM provider.")
 async def fn_test_llm_connection(ctx, params: TestLlmParams) -> ActionResult:
+    """Test connection to LLM provider."""
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(REDIS_URL, decode_responses=True)

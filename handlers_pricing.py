@@ -14,6 +14,7 @@ import logging
 from typing import Optional
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN
@@ -65,6 +66,7 @@ class DeleteLlmModelRateParams(BaseModel):
                data_model=LLMModelRateReceipt,
                description="Save (upsert) an LLM model rate row in llm_model_rates.")
 async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionResult:
+    """Save (upsert) an LLM model rate row in llm_model_rates."""
     if params.tier not in VALID_TIERS:
         return ActionResult.error(
             f"tier must be one of {VALID_TIERS}, got {params.tier!r}"
@@ -82,7 +84,7 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
     if params.platform_fee_default is not None:
         body["platform_fee_default"] = params.platform_fee_default
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with shared_http(timeout=5.0) as client:
             resp = await client.put(
                 url,
                 headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
@@ -114,12 +116,13 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
                data_model=LLMModelRateReceipt,
                description="Soft-delete (mark unavailable) an LLM model rate row.")
 async def fn_delete_llm_model_rate(ctx, params: DeleteLlmModelRateParams) -> ActionResult:
+    """Soft-delete (mark unavailable) an LLM model rate row."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
 
     url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/model-rates/{params.model_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with shared_http(timeout=5.0) as client:
             resp = await client.delete(
                 url, headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
             )

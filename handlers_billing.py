@@ -8,6 +8,7 @@ import os
 import uuid
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 import redis.asyncio as aioredis
 from pydantic import BaseModel, Field
 
@@ -104,8 +105,9 @@ class AdjustBalanceParams(BaseModel):
                data_model=BillingOverviewResponse,
                description="Show billing plans, pricing tiers, and platform summary.")
 async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
+    """Show billing plans, pricing tiers, and platform summary."""
     try:
-        async with httpx.AsyncClient(timeout=5) as c:
+        async with shared_http(timeout=5) as c:
             resp = await c.get(f"{AUTH_GW}/v1/billing/plans")
         plans = resp.json() if resp.status_code == 200 else []
 
@@ -139,6 +141,7 @@ async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
                data_model=UserBalancesResponse,
                description="List all user wallet balances with totals.")
 async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
+    """List all user wallet balances with totals."""
     try:
         r = await _redis()
         try:
@@ -170,6 +173,7 @@ async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
                data_model=UserBalanceRecord,
                description="Get a user's full billing state: token balance + active holds AND their subscription plan, status and renewal date (the canonical billing read — same truth the admin panel and the user's own billing extension show).")
 async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
+    """Get a user's full billing state: token balance + active holds AND their subscription plan, status and renewal date (the canonical billing read — same truth the admin panel and the user's own billing extension show)."""
     target_id, err = await _normalize_to_imperal_id(params.user_id)
     if err:
         return ActionResult.error(err)
@@ -223,6 +227,7 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
                data_model=UserBalanceRecord,
                description="Credit or deduct tokens. Positive=credit, negative=deduct.")
 async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
+    """Credit or deduct tokens. Positive=credit, negative=deduct."""
     if params.amount == 0:
         return ActionResult.error("Amount must be non-zero")
     target_id, err = await _normalize_to_imperal_id(params.user_id)
@@ -270,6 +275,7 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
                data_model=BillingHealthResponse,
                description="Check billing system health: stream, consumers, pending lag.")
 async def fn_billing_health(ctx, params: EmptyParams) -> ActionResult:
+    """Check billing system health: stream, consumers, pending lag."""
     try:
         r = await _redis()
         try:
@@ -348,6 +354,7 @@ class SetUserPlanParams(BaseModel):
                data_model=_PlanSetReceipt,
                description="Assign a user's active subscription plan (by plan name or id).")
 async def fn_set_user_plan(ctx, params: SetUserPlanParams) -> ActionResult:
+    """Assign a user's active subscription plan (by plan name or id)."""
     # Mirrors handlers_voice.set_plan_feature auth/error handling. The gateway
     # returns {plan, plan_id, status} (not the request body), so the raw-response
     # _admin_put + manual status checks are used rather than _admin_put_checked

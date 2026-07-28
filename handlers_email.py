@@ -62,6 +62,7 @@ class _TestParams(BaseModel):
 @chat.function("email_list_log", action_type="read", data_model=EmailLogResponse,
                description="The durable email log (EVERY send attempt, never deleted): case, recipient, status, time, error. Filter by case/status/user.")
 async def fn_email_list_log(ctx, params: _LogQuery) -> ActionResult:
+    """The durable email log (EVERY send attempt, never deleted): case, recipient, status, time, error. Filter by case/status/user."""
     q = []
     if params.case:
         q.append(f"case={params.case}")
@@ -86,6 +87,7 @@ async def fn_email_list_log(ctx, params: _LogQuery) -> ActionResult:
 @chat.function("email_list_templates", action_type="read", data_model=EmailTemplatesResponse,
                description="All email cases with template status: effective subject, enabled flag, whether a custom body is set.")
 async def fn_email_list_templates(ctx, params: EmptyParams) -> ActionResult:
+    """All email cases with template status: effective subject, enabled flag, whether a custom body is set."""
     items = _aslist(await _gw_request("GET", "/v1/internal/email/templates"))
     return ActionResult.success(data={"items": items, "total": len(items)},
                                 summary=f"{len(items)} email templates")
@@ -94,6 +96,7 @@ async def fn_email_list_templates(ctx, params: EmptyParams) -> ActionResult:
 @chat.function("email_get_template", action_type="read", data_model=EmailTemplateFull,
                description="Full editable template for one case: the current override (empty = none) + the built-in default preview.")
 async def fn_email_get_template(ctx, params: _CaseParam) -> ActionResult:
+    """Full editable template for one case: the current override (empty = none) + the built-in default preview."""
     r = await _gw_request("GET", f"/v1/internal/email/templates/{params.case}")
     if isinstance(r, dict) and "error" in r:
         return ActionResult.error(r["error"])
@@ -106,6 +109,7 @@ async def fn_email_get_template(ctx, params: _CaseParam) -> ActionResult:
                data_model=EmailTemplateSaved,
                description="Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged. To ONLY enable/disable a case without touching its template, use email_toggle_case instead.")
 async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResult:
+    """Edit an email case: subject/body override + enabled. Empty subject/body = use the built-in default; omitted fields stay unchanged. To ONLY enable/disable a case without touching its template, use email_toggle_case instead."""
     # Only send fields the caller actually provided — None = leave unchanged.
     # This lets the LLM toggle `enabled` without wiping a custom body.
     body = {"updated_by": _user_id(ctx) or "admin"}
@@ -131,6 +135,7 @@ async def fn_email_save_template(ctx, params: _SaveTemplateParams) -> ActionResu
                data_model=EmailTemplateSaved,
                description="Enable or disable an email case WITHOUT touching its subject/body.")
 async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
+    """Enable or disable an email case WITHOUT touching its subject/body."""
     r = await _gw_request("PUT", f"/v1/internal/email/templates/{params.case}",
                           {"enabled": params.enabled, "updated_by": _user_id(ctx) or "admin"},
                           acting=_user_id(ctx))
@@ -147,6 +152,7 @@ async def fn_email_toggle_case(ctx, params: _ToggleParams) -> ActionResult:
                data_model=EmailTestResult,
                description="Send a sample of one email case to an address (uses sample data, logged like any send).")
 async def fn_email_send_test(ctx, params: _TestParams) -> ActionResult:
+    """Send a sample of one email case to an address (uses sample data, logged like any send)."""
     if "@" not in (params.to or ""):
         return ActionResult.error("provide a valid recipient email in `to`")
     r = await _gw_request("POST", "/v1/internal/email/test", {"case": params.case, "to": params.to},

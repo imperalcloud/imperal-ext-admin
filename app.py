@@ -7,6 +7,7 @@ import logging
 import os
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 
 from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension, ActionResult
@@ -117,18 +118,18 @@ def _verify_write_reflected(result, expected: dict) -> str | None:
 
 
 async def _registry_get(path):
-    async with httpx.AsyncClient(timeout=10) as c:
+    async with shared_http(timeout=10) as c:
         return await c.get(f"{REGISTRY_URL}{path}", headers={"x-api-key": REGISTRY_KEY})
 
 
 async def _registry_put(path, data):
-    async with httpx.AsyncClient(timeout=10) as c:
+    async with shared_http(timeout=10) as c:
         return await c.put(f"{REGISTRY_URL}{path}", json=data,
                            headers={"x-api-key": REGISTRY_KEY, "Content-Type": "application/json"})
 
 
 async def _registry_patch(path, data):
-    async with httpx.AsyncClient(timeout=10) as c:
+    async with shared_http(timeout=10) as c:
         return await c.patch(f"{REGISTRY_URL}{path}", json=data,
                              headers={"x-api-key": REGISTRY_KEY, "Content-Type": "application/json"})
 
@@ -137,7 +138,7 @@ async def _admin_put(path: str, body: dict, acting: str = "", timeout: float = 5
     headers = {"X-Service-Token": AUTH_SERVICE_TOKEN}
     if acting:
         headers["X-Acting-User"] = acting
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    async with shared_http(timeout=timeout) as client:
         return await client.put(f"{AUTH_GW.rstrip('/')}{path}", json=body, headers=headers)
 
 
@@ -311,7 +312,7 @@ async def health(ctx) -> dict:
     results = {}
     for name, url in [("auth_gateway", f"{AUTH_GW}/healthz"), ("registry", f"{REGISTRY_URL}/health")]:
         try:
-            async with httpx.AsyncClient(timeout=3) as c:
+            async with shared_http(timeout=3) as c:
                 r = await c.get(url)
                 results[name] = "ok" if r.status_code == 200 else "down"
         except Exception:

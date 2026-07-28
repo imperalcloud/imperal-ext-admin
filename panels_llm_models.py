@@ -19,6 +19,7 @@ import os
 import re
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 
 log = logging.getLogger("admin")
 
@@ -82,7 +83,7 @@ def _filter_anthropic(ids: list[str]) -> list[str]:
 
 
 async def _fetch_anthropic(key: str) -> list[str]:
-    async with httpx.AsyncClient(timeout=12.0) as c:
+    async with shared_http(timeout=12.0) as c:
         r = await c.get(
             "https://api.anthropic.com/v1/models",
             headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
@@ -92,7 +93,7 @@ async def _fetch_anthropic(key: str) -> list[str]:
 
 
 async def _fetch_openai(key: str) -> list[str]:
-    async with httpx.AsyncClient(timeout=12.0) as c:
+    async with shared_http(timeout=12.0) as c:
         r = await c.get(
             "https://api.openai.com/v1/models",
             headers={"Authorization": f"Bearer {key}"},

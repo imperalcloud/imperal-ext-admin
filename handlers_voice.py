@@ -45,6 +45,7 @@ class SaveVoiceCostsParams(BaseModel):
                event="voice_costs_saved", data_model=_Receipt,
                description="Save the per-action voice costs (STT transcription + TTS spoken reply) to the billing config.")
 async def fn_save_voice_costs(ctx, params: SaveVoiceCostsParams) -> ActionResult:
+    """Save the per-action voice costs (STT transcription + TTS spoken reply) to the billing config."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = {"stt": params.stt, "speak": params.speak}
@@ -73,6 +74,7 @@ class SaveVoiceEnabledParams(BaseModel):
                event="voice_enabled_saved", data_model=_Receipt,
                description="Turn the entire voice feature ON or OFF platform-wide (off hides the mic for everyone).")
 async def fn_save_voice_enabled(ctx, params: SaveVoiceEnabledParams) -> ActionResult:
+    """Turn the entire voice feature ON or OFF platform-wide (off hides the mic for everyone)."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = {"enabled": bool(params.enabled)}
@@ -133,6 +135,7 @@ class SetRoleVoiceParams(BaseModel):
                event="role_voice_set", data_model=_Receipt,
                description="Grant or revoke voice access (the voice:use scope) for an entire role/group.")
 async def fn_set_role_voice(ctx, params: SetRoleVoiceParams) -> ActionResult:
+    """Grant or revoke voice access (the voice:use scope) for an entire role/group."""
     return await _toggle_role_scope(params.role_id, VOICE_SCOPE, params.enabled, "Voice")
 
 
@@ -145,6 +148,7 @@ class SetRoleConnectorsParams(BaseModel):
                event="role_connectors_set", data_model=_Receipt,
                description="Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group.")
 async def fn_set_role_connectors(ctx, params: SetRoleConnectorsParams) -> ActionResult:
+    """Grant or revoke messenger-connector access (the connectors:use scope) for an entire role/group."""
     return await _toggle_role_scope(params.role_id, CONNECTORS_SCOPE, params.enabled, "Connector access")
 
 
@@ -157,6 +161,7 @@ class SetRoleConnectionsParams(BaseModel):
                event="role_connections_set", data_model=_Receipt,
                description="Grant or revoke Connections access (the connections:use scope — a user's own SSH/MCP targets) for an entire role/group.")
 async def fn_set_role_connections(ctx, params: SetRoleConnectionsParams) -> ActionResult:
+    """Grant or revoke Connections access (the connections:use scope — a user's own SSH/MCP targets) for an entire role/group."""
     return await _toggle_role_scope(params.role_id, CONNECTIONS_SCOPE, params.enabled, "Connections access")
 
 
@@ -173,6 +178,7 @@ class SetPlanFeatureParams(BaseModel):
                event="plan_feature_set", data_model=_Receipt,
                description="Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan.")
 async def fn_set_plan_feature(ctx, params: SetPlanFeatureParams) -> ActionResult:
+    """Enable or disable a feature (voice, connectors, coding/Webbee Code, or connections/external MCP+SSH) for an entire subscription plan."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = {"plan_id": params.plan_id, "feature": params.feature, "enabled": bool(params.enabled)}

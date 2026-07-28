@@ -61,6 +61,7 @@ class DeleteScopeParams(BaseModel):
 
 @chat.function("list_roles", action_type="read", data_model=RoleListResponse, description="List all roles with default scopes.")
 async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
+    """List all roles with default scopes."""
     roles = await _gw_request("GET", "/v1/roles")
     if not isinstance(roles, list):
         return ActionResult.error("Failed to fetch roles")
@@ -72,6 +73,7 @@ async def fn_list_roles(ctx, params: EmptyParams) -> ActionResult:
                data_model=RoleActionReceipt,
                description="Create a new role with name and default scopes.")
 async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
+    """Create a new role with name and default scopes."""
     result = await _gw_request("POST", "/v1/roles", {
         "name": params.name,
         "display_name": params.display_name or params.name,
@@ -87,6 +89,7 @@ async def fn_create_role(ctx, params: CreateRoleParams) -> ActionResult:
                data_model=RoleActionReceipt,
                description="Delete a role by ID or name.")
 async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
+    """Delete a role by ID or name."""
     role_id = params.role_id
     if params.role_name and not role_id:
         roles = await _gw_request("GET", "/v1/roles")
@@ -112,6 +115,7 @@ async def fn_delete_role(ctx, params: DeleteRoleParams) -> ActionResult:
                data_model=RoleActionReceipt,
                description="Update role scopes, limits, or display name. Can cascade.")
 async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
+    """Update role scopes, limits, or display name. Can cascade."""
     role_id = params.role_id
     if params.role_name and not role_id:
         role = await _resolve_role_by_name(params.role_name)
@@ -149,6 +153,7 @@ async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
 
 @chat.function("list_scopes", action_type="read", data_model=ScopeListResponse, description="List all defined scopes.")
 async def fn_list_scopes(ctx, params: ListScopesParams) -> ActionResult:
+    """List all defined scopes."""
     parts = []
     if params.resource: parts.append(f"resource={params.resource}")
     if params.source:   parts.append(f"source={params.source}")
@@ -164,6 +169,7 @@ async def fn_list_scopes(ctx, params: ListScopesParams) -> ActionResult:
                data_model=ScopeRecord,
                description="Create a scope in resource:action format.")
 async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
+    """Create a scope in resource:action format."""
     name = f"{params.resource}:{params.action}"
     data: dict = {"name": name, "resource": params.resource, "action": params.action}
     if params.display_name: data["display_name"] = params.display_name
@@ -179,6 +185,7 @@ async def fn_create_scope(ctx, params: CreateScopeParams) -> ActionResult:
                data_model=ScopeRecord,
                description="Delete a scope by name or ID.")
 async def fn_delete_scope(ctx, params: DeleteScopeParams) -> ActionResult:
+    """Delete a scope by name or ID."""
     scope_id: Any = params.scope_id
     scope_name = params.scope_name
     if params.scope_id:

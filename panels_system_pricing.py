@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 from imperal_sdk import ui
 
 from app import AUTH_GW, AUTH_SERVICE_TOKEN
@@ -26,7 +27,7 @@ async def _get(path: str) -> dict:
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return {}
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with shared_http(timeout=5.0) as client:
             resp = await client.get(
                 f"{AUTH_GW.rstrip('/')}{path}",
                 headers={"X-Service-Token": AUTH_SERVICE_TOKEN},

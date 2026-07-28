@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
 
 from app import (
@@ -56,6 +57,7 @@ async def _resolve_uid(user: str) -> str | None:
 
 @chat.function("review_app", action_type="write", event="admin.app_reviewed", effects=["update:app_review"], data_model=AppReviewReceipt, description="Approve or reject a developer app submission")
 async def review_app(ctx, params: AppReviewParams) -> ActionResult:
+    """Approve or reject a developer app submission"""
     action = params.action.lower()
     app_id = params.app_id
 
@@ -86,7 +88,7 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
                 if entry.get("app_id") == app_id:
                     display_name = entry.get("name", app_id)
                     break
-        async with httpx.AsyncClient(timeout=10) as c:
+        async with shared_http(timeout=10) as c:
             resp = await c.post(
                 f"{REGISTRY_URL}/v1/apps",
                 json={"app_id": app_id, "display_name": display_name},
@@ -110,6 +112,7 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
 @chat.function("developer_profile", action_type="read", data_model=DeveloperProfileRecord,
                description="Show a user's developer profile: tier, nickname, apps count, earnings, registration date. tier=None means not a registered developer.")
 async def fn_developer_profile(ctx, params: DeveloperUserParams) -> ActionResult:
+    """Show a user's developer profile: tier, nickname, apps count, earnings, registration date. tier=None means not a registered developer."""
     uid = await _resolve_uid(params.user)
     if not uid:
         return ActionResult.error(f"User '{params.user}' not found")
@@ -134,6 +137,7 @@ async def fn_developer_profile(ctx, params: DeveloperUserParams) -> ActionResult
                data_model=DeveloperTierReceipt,
                description="Set or change a user's DEVELOPER tier (explorer|indie|studio|partner) without charging — audited admin comp. Grants developer status if the user has none. This is the developer 'group'; it is independent of the RBAC role/category.")
 async def fn_set_developer_tier(ctx, params: SetDeveloperTierParams) -> ActionResult:
+    """Set or change a user's DEVELOPER tier (explorer|indie|studio|partner) without charging — audited admin comp. Grants developer status if the user has none. This is the developer 'group'; it is independent of the RBAC role/category."""
     tier = params.tier.strip().lower()
     if tier not in DEVELOPER_TIERS:
         return ActionResult.error(
@@ -161,6 +165,7 @@ async def fn_set_developer_tier(ctx, params: SetDeveloperTierParams) -> ActionRe
 
 @chat.function("review_payout", action_type="write", event="admin.payout_reviewed", effects=["update:payout_review"], data_model=PayoutReviewReceipt, description="Approve or reject a developer payout request")
 async def review_payout(ctx, params: PayoutReviewParams) -> ActionResult:
+    """Approve or reject a developer payout request"""
     action = params.action.lower()
     payout_id = params.payout_id
 

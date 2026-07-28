@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import httpx
+from imperal_sdk._shared_http import shared_http
 
 from app import ext, AUTH_GW, REGISTRY_URL, _gw_request, _registry_get
 
@@ -45,7 +46,7 @@ async def build_admin_stats(ctx) -> dict:
         stats["extensions_active"] = 0
     for name, url in [("auth_gateway", f"{AUTH_GW}/healthz"), ("registry", f"{REGISTRY_URL}/health")]:
         try:
-            async with httpx.AsyncClient(timeout=5) as c:
+            async with shared_http(timeout=5) as c:
                 r = await c.get(url)
                 stats[f"health_{name}"] = "operational" if r.status_code == 200 else "down"
         except Exception:
