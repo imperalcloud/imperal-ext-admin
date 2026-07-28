@@ -15456,7 +15456,7 @@
         "description": "Look up a specific user's token balance.",
         "properties": {
           "user_id": {
-            "description": "Canonical imperal_id of the user — format `imp_u_XXXXXXXX`. NOT an email. If you only have an email, call get_user_by_email or list_users first to resolve the imperal_id, then pass that value here. Passing an email creates an orphan wallet key that no other service reads.",
+            "description": "The target user — imperal_id (imp_u_*), email, display name, or a partial/fragment of any of those. Resolved flexibly server-side; ambiguous matches return a clear error instead of guessing.",
             "title": "User Id",
             "type": "string"
           }
@@ -15746,7 +15746,7 @@
         "description": "Credit or deduct tokens from a user wallet.",
         "properties": {
           "user_id": {
-            "description": "Canonical imperal_id of the target user — format `imp_u_XXXXXXXX`. NOT an email. If you only have an email, call get_user_by_email or list_users first to resolve the imperal_id, then pass that value here. Passing an email creates an orphan wallet key that no other service reads.",
+            "description": "The target user — imperal_id (imp_u_*), email, display name, or a partial/fragment of any of those. Resolved flexibly server-side; ambiguous matches return a clear error instead of guessing.",
             "title": "User Id",
             "type": "string"
           },

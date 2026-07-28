@@ -204,6 +204,66 @@ async def _resolve_user_by_email(email):
     return None
 
 
+async def _resolve_user_flexible(value: str) -> tuple[str | None, str | None]:
+    """Resolve ANY user identifier the caller might reasonably type to a
+    canonical `imp_u_*` imperal_id — never a hard reject on the first miss.
+
+    Tries, in order:
+    1. Already an `imp_u_*` id -> returned as-is (trusted shape).
+    2. Contains `@` -> exact email match via `_resolve_user_by_email`.
+    3. Anything else (partial id, display name, email fragment) -> pulls the
+       full user list and matches by: exact/substring imperal_id, exact/
+       substring display_name or email (case-insensitive). Ambiguous or
+       zero matches return a clear, actionable error listing the candidates
+       (or lack thereof) instead of silently guessing.
+
+    Returns ``(imperal_id, None)`` on a single confident match, or
+    ``(None, error_message)`` otherwise.
+    """
+    if not value:
+        return None, "user identifier is empty"
+    v = value.strip()
+    if v.startswith("imp_u_"):
+        return v, None
+    if "@" in v:
+        resolved = await _resolve_user_by_email(v)
+        if resolved:
+            return resolved, None
+        return None, f"no user found for email {v!r}."
+
+    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    users = raw.get("items", raw) if isinstance(raw, dict) else raw
+    if not isinstance(users, list):
+        return None, f"could not resolve {v!r}: user list unavailable"
+
+    v_lower = v.lower()
+    matches = []
+    for u in users:
+        if not isinstance(u, dict):
+            continue
+        uid = u.get("imperal_id") or u.get("id") or ""
+        name = u.get("display_name") or u.get("full_name") or ""
+        email = u.get("email") or ""
+        if (v_lower == uid.lower() or v_lower == name.lower() or v_lower == email.lower()):
+            return uid, None  # exact match on any field — take it immediately
+        if v_lower in uid.lower() or v_lower in name.lower() or v_lower in email.lower():
+            matches.append((uid, name, email))
+
+    if len(matches) == 1:
+        return matches[0][0], None
+    if len(matches) > 1:
+        listed = "; ".join(f"{uid} ({name or email})" for uid, name, email in matches[:8])
+        return None, (
+            f"{len(matches)} users match {v!r} — ambiguous. Candidates: {listed}. "
+            f"Use the exact imp_u_* id from this list."
+        )
+    return None, (
+        f"no user found matching {v!r} (checked imperal_id, name and email, "
+        f"including partial matches). Double-check the value, or run "
+        f"list_users to browse the full user list."
+    )
+
+
 async def _resolve_role_by_name(role_name):
     roles = await _gw_request("GET", "/v1/roles")
     if isinstance(roles, list):

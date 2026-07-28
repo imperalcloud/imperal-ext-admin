@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, EmptyParams,
-    _resolve_user_by_email, _gw_request, _admin_put,
+    _resolve_user_by_email, _resolve_user_flexible, _gw_request, _admin_put,
 )
 from models_records import (
     BillingHealthResponse, BillingOverviewResponse, UserBalanceRecord, UserBalancesResponse,
@@ -40,37 +40,15 @@ async def _normalize_to_imperal_id(value: str) -> tuple[str | None, str | None]:
 
     Rationale: every wallet operation MUST key by ``imp_u_*`` — passing an email
     builds an orphan Redis key ``imperal:wallet:<email>`` that no other service
-    reads, silently corrupting the wallet namespace. LLM wrappers regularly
-    confuse the two when the user types an email in chat, so the handler
-    normalizes before touching Redis.
+    reads, silently corrupting the wallet namespace.
 
-    * Starts with ``imp_u_`` -> returned as-is (trusted shape).
-    * Contains ``@`` -> looked up via auth-gw ``/v1/users?search=`` and resolved
-      to the matching account's imperal_id; case-insensitive email match.
-    * Anything else -> rejected.
+    Thin wrapper over `app._resolve_user_flexible`, which additionally accepts
+    partial ids, display names, or email fragments — falling back to a full
+    user-list search instead of a hard reject when the value isn't already a
+    trusted `imp_u_*` id or an exact email match (2026-07-28: admins routinely
+    pass a partial/short identifier, not just email or the full canonical id).
     """
-    if not value:
-        return None, "user_id is empty"
-    v = value.strip()
-    if v.startswith("imp_u_"):
-        return v, None
-    if "@" in v:
-        try:
-            resolved = await _resolve_user_by_email(v)
-        except Exception as e:
-            return None, f"email lookup failed for {v!r}: {e}"
-        if not resolved:
-            return None, (
-                f"no user found for email {v!r}. Either the address is wrong "
-                f"or the user hasn't been created yet. Run list_users or "
-                f"get_user_by_email to confirm the imperal_id, then retry "
-                f"adjust_balance with that imp_u_* value."
-            )
-        return resolved, None
-    return None, (
-        f"user_id {v!r} is neither an imperal_id (imp_u_*) nor an email. "
-        f"Provide the imp_u_* value from list_users or get_user_by_email."
-    )
+    return await _resolve_user_flexible(value)
 
 
 async def _scan_keys(r: aioredis.Redis, pattern: str) -> list[str]:
@@ -89,12 +67,12 @@ async def _scan_keys(r: aioredis.Redis, pattern: str) -> list[str]:
 
 class UserBalanceParams(BaseModel):
     """Look up a specific user's token balance."""
-    user_id: str = Field(description="Canonical imperal_id of the user — format `imp_u_XXXXXXXX`. NOT an email. If you only have an email, call get_user_by_email or list_users first to resolve the imperal_id, then pass that value here. Passing an email creates an orphan wallet key that no other service reads.")
+    user_id: str = Field(description="The target user — imperal_id (imp_u_*), email, display name, or a partial/fragment of any of those. Resolved flexibly server-side; ambiguous matches return a clear error instead of guessing.")
 
 
 class AdjustBalanceParams(BaseModel):
     """Credit or deduct tokens from a user wallet."""
-    user_id: str = Field(description="Canonical imperal_id of the target user — format `imp_u_XXXXXXXX`. NOT an email. If you only have an email, call get_user_by_email or list_users first to resolve the imperal_id, then pass that value here. Passing an email creates an orphan wallet key that no other service reads.")
+    user_id: str = Field(description="The target user — imperal_id (imp_u_*), email, display name, or a partial/fragment of any of those. Resolved flexibly server-side; ambiguous matches return a clear error instead of guessing.")
     amount: int = Field(description="Token amount (positive=credit, negative=deduct)")
     reason: str = Field(default="admin_adjustment", description="Reason for adjustment")
 
