@@ -154,6 +154,15 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     step_reclassify = cfg.get("step_reclassify_model", "")
     tool_picker = cfg.get("tool_picker_model", "")
     action_narrator = cfg.get("action_narrator_model", "")
+    # Webbee Code model tiers (2026-07-30): Webbee Smart/SuperSmart/UltraSmart,
+    # each a full admin-owned (primary, fallback) pair. Read-through from the
+    # SAME flat Config Store keys save_llm_config writes -- no separate store.
+    smart_model = cfg.get("smart_model", "")
+    smart_fallback = cfg.get("smart_fallback_model", "")
+    supersmart_model = cfg.get("supersmart_model", "")
+    supersmart_fallback = cfg.get("supersmart_fallback_model", "")
+    ultrasmart_model = cfg.get("ultrasmart_model", "")
+    ultrasmart_fallback = cfg.get("ultrasmart_fallback_model", "")
     failover_on = cfg.get("failover_enabled", False)
     fo_provider = cfg.get("failover_provider", "")
     fo_model = cfg.get("failover_model", "")
@@ -197,6 +206,13 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             step_reclassify_model=step_reclassify,
             tool_picker_model=tool_picker,
             action_narrator_model=action_narrator,
+            # Webbee Code model tiers (2026-07-30)
+            smart_model=smart_model,
+            smart_fallback_model=smart_fallback,
+            supersmart_model=supersmart_model,
+            supersmart_fallback_model=supersmart_fallback,
+            ultrasmart_model=ultrasmart_model,
+            ultrasmart_fallback_model=ultrasmart_fallback,
             # Live model catalogue from the provider APIs (no hardcoded list).
             model_catalog=model_catalog,
         ),

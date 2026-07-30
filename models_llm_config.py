@@ -22,6 +22,24 @@ class SaveLlmConfigParams(BaseModel):
     code_provider: str = Field(default="", description="Coding brain provider override (auto-inferred from the model id when left blank)")
     code_fallback_model: str = Field(default="", description="Webbee Code fallback model — used for ONE retry only when the coding-brain primary errors (purpose=code). Blank = no fallback (primary errors surface as today).")
     code_fallback_provider: str = Field(default="", description="Webbee Code fallback provider (auto-inferred from the fallback model id when left blank)")
+    # ── Webbee Code model tiers (2026-07-30) — the three named quality tiers
+    # the terminal's /model command lets a user pick between. Each tier is a
+    # full admin-owned (primary, fallback) pair, same shape/precedent as
+    # code_model/code_fallback_model above — NOT a hardcoded model id
+    # anywhere in the kernel. Blank primary = tier falls through to the
+    # existing code_model/reasoning-tier cascade (never a broken tier).
+    smart_model: str = Field(default="", description="Webbee Smart tier — primary model. Default suggestion: a Sonnet-class model.")
+    smart_provider: str = Field(default="", description="Webbee Smart tier — primary provider (auto-inferred from the model id when left blank)")
+    smart_fallback_model: str = Field(default="", description="Webbee Smart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
+    smart_fallback_provider: str = Field(default="", description="Webbee Smart tier — fallback provider (auto-inferred from the fallback model id when left blank)")
+    supersmart_model: str = Field(default="", description="Webbee SuperSmart tier — primary model. Default suggestion: an Opus-class model.")
+    supersmart_provider: str = Field(default="", description="Webbee SuperSmart tier — primary provider (auto-inferred from the model id when left blank)")
+    supersmart_fallback_model: str = Field(default="", description="Webbee SuperSmart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
+    supersmart_fallback_provider: str = Field(default="", description="Webbee SuperSmart tier — fallback provider (auto-inferred from the fallback model id when left blank)")
+    ultrasmart_model: str = Field(default="", description="Webbee UltraSmart tier — primary model (top-of-line reasoning model).")
+    ultrasmart_provider: str = Field(default="", description="Webbee UltraSmart tier — primary provider (auto-inferred from the model id when left blank)")
+    ultrasmart_fallback_model: str = Field(default="", description="Webbee UltraSmart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
+    ultrasmart_fallback_provider: str = Field(default="", description="Webbee UltraSmart tier — fallback provider (auto-inferred from the fallback model id when left blank)")
     routing_model: str = Field(default="", description="Routing model override")
     routing_provider: str = Field(default="", description="Routing provider override")
     execution_model: str = Field(default="", description="Execution model override")

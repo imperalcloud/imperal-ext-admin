@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from imperal_sdk import ui
 from panels_llm_form_tbc import build_tbc_section
+from panels_llm_form_tiers import build_tiers_section
 from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 
 _PROVIDERS = [
@@ -133,6 +134,15 @@ def build_llm_form(
     # coding-brain primary errors. Blank = no fallback (off).
     code_fallback_model: str = "",
     action_narrator_model: str = "",
+    # Webbee Code model tiers (2026-07-30): Webbee Smart/SuperSmart/UltraSmart,
+    # each a full admin-owned (primary, fallback) pair. Blank primary = tier
+    # falls through to code_model above (never a broken/unset tier).
+    smart_model: str = "",
+    smart_fallback_model: str = "",
+    supersmart_model: str = "",
+    supersmart_fallback_model: str = "",
+    ultrasmart_model: str = "",
+    ultrasmart_fallback_model: str = "",
     # Live model catalogue fetched from the provider APIs (panels_llm_models.
     # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
     model_catalog: dict | None = None,
@@ -162,6 +172,16 @@ def build_llm_form(
         # G2: fallback is an independent pair (not an inherit-from-default
         # override) — pass through verbatim; blank means "no fallback".
         "code_fallback_model": code_fallback_model,
+        # Webbee Code model tiers (2026-07-30): each tier's primary follows
+        # the SAME "blank if same as global default" convention as code_model
+        # above; each fallback is an independent pair (verbatim, like
+        # code_fallback_model) -- blank simply means "no fallback set yet".
+        "smart_model": smart_model if smart_model != model else "",
+        "smart_fallback_model": smart_fallback_model,
+        "supersmart_model": supersmart_model if supersmart_model != model else "",
+        "supersmart_fallback_model": supersmart_fallback_model,
+        "ultrasmart_model": ultrasmart_model if ultrasmart_model != model else "",
+        "ultrasmart_fallback_model": ultrasmart_fallback_model,
         "routing_model": routing_model if routing_model != model else "",
         "execution_model": execution_model if execution_model != model else "",
         "navigate_model": navigate_model if navigate_model != model else "",
@@ -433,6 +453,9 @@ def build_llm_form(
             # ── 3 · Per-Purpose Models ────────────────────────────
             ui.Section(title="\U0001f9e0 Per-Purpose Models", collapsible=True,
                        children=model_children),
+
+            # ── 3b · Webbee Code Model Tiers (2026-07-30) ─────────
+            build_tiers_section(defaults, _all_models),
 
             # ── 4 · Per-Purpose AI Parameters ─────────────────────
             ui.Section(title="\U0001f39b Per-Purpose AI Parameters",

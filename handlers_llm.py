@@ -98,11 +98,19 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # catalogue surfaces, no hardcoded model→provider table).
         from panels_llm_models import provider_for_model
         for _purpose in ("code",
-                         # G2 (2026-07-16): Webbee Code fallback pair — same flat
+                         # G2 (2026-07-24): Webbee Code fallback pair -- same flat
                          # {key}_model/{key}_provider naming, so infer+clear reuse.
                          "code_fallback",
+                         # Webbee Code model tiers (2026-07-30): Webbee Smart/SuperSmart/
+                         # UltraSmart each get the SAME flat {key}_model/{key}_provider
+                         # (+ _fallback pair) shape as code/code_fallback above -- this
+                         # loop's infer+clear logic covers all three tiers with zero
+                         # new code. Persisted config, never a hardcoded model id.
+                         "smart", "smart_fallback",
+                         "supersmart", "supersmart_fallback",
+                         "ultrasmart", "ultrasmart_fallback",
                          "routing", "execution", "navigate", "chain_narrative", "judge",
-                         # Federalization 2026-05-19 — new per-purpose models
+                         # Federalization 3.1 -- new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _model_key = f"{_purpose}_model"
             _provider_key = f"{_purpose}_provider"
