@@ -104,7 +104,17 @@ def _build_user_expanded(user: dict, role_options: list[dict],
     tenant = user.get("tenant_id", "default")
     auth_method = user.get("auth_method", "password")
     last_login = user.get("last_login", "Never")
-    confirmation = attrs.get("confirmation_enabled", "inherit from role")
+    # Display-only MIRROR. The value that actually governs the 2-step gate lives
+    # in unified_config.user_settings (served to the kernel by the Auth GW);
+    # set_user_confirmation writes there and mirrors here for this caption.
+    # Rendering the effective value would cost one gateway call PER USER row
+    # (the /v1/users list carries no confirmation field), so an absent mirror is
+    # labelled as the role default rather than asserted to be off.
+    _conf_mirror = attrs.get("confirmation_enabled")
+    confirmation = (
+        "role default" if _conf_mirror is None
+        else f"{'on' if _conf_mirror else 'off'} (mirror)"
+    )
     # Current subscription plan (from the user record if present, else "free").
     current_plan = (
         user.get("plan")
@@ -204,7 +214,7 @@ def _build_user_expanded(user: dict, role_options: list[dict],
 
     rows += [
         ui.Divider(),
-        ui.Text(f"Confirmation: {confirmation}", variant="caption"),
+        ui.Text(f"Confirmation (2-step): {confirmation}", variant="caption"),
         ui.Stack([
             ui.Button(
                 "Edit Profile",

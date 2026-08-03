@@ -146,26 +146,91 @@ async def fn_get_confirmation_policy(ctx, params: RoleNameParams) -> ActionResul
 
 @chat.function("set_user_confirmation", action_type="write", effects=["update:user_confirmation"], event="confirmation_set", data_model=UserConfirmationResponse, description="Set confirmation for a user.")
 async def fn_set_user_confirmation(ctx, params: UserConfirmationParams) -> ActionResult:
-    """Set confirmation for a user."""
-    result = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
-                               {"attributes": {"confirmation_enabled": params.enabled, "confirmation_skip_read": params.skip_read}})
+    """Set confirmation for a user.
+
+    STORE OF TRUTH: ``unified_config`` (scope=user) ``user_settings``, written
+    via ``PATCH /v1/internal/users/{id}/settings``. That is the SAME row the
+    Auth GW serves to the kernel on every turn
+    (kernel_resolve._resolve_settings -> kctx.confirmation_enabled), so a
+    toggle here takes effect on the user's very next message.
+
+    Historically this handler wrote ``users.attributes.confirmation_enabled``
+    instead. MEASURED on live prod: NOTHING reads that key for the gate — 0/38
+    active users had it set, while 13/13 resolvable users tracked
+    unified_config exactly. The 2-step toggle was therefore a silent no-op:
+    admins could "enable" confirmations and the destructive gate stayed off,
+    and get_user_confirmation always reported "inherit" no matter the real
+    value. Federal: the confirmation gate is mandatory safety machinery, so
+    its admin control MUST write the store the gate actually reads.
+
+    ``attributes`` is still mirrored (best-effort, non-fatal) because the
+    Users panel renders ``attrs.confirmation_enabled`` in the expanded row --
+    keeping it in sync stops the panel showing a stale "inherit from role".
+    """
+    # 1) authoritative write -- the store the kernel reads
+    settings_patch = {
+        "confirmation_enabled": params.enabled,
+        "confirmation_skip_read": params.skip_read,
+    }
+    result = await _gw_request(
+        "PATCH", f"/v1/internal/users/{params.user_id}/settings", settings_patch)
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
+
+    # 2) verify it actually landed -- never report success on an unconfirmed write
+    check = await _gw_request(
+        "GET", f"/v1/internal/users/{params.user_id}/settings?tenant_id={_tenant_id(ctx)}")
+    effective = None
+    if isinstance(check, dict) and not check.get("error"):
+        effective = (check.get("settings", check) or {}).get("confirmation_enabled")
+    if effective is not None and bool(effective) != bool(params.enabled):
+        return ActionResult.error(
+            f"confirmation setting did not persist (asked {params.enabled}, "
+            f"gateway still reports {effective})")
+
+    # 3) best-effort mirror for the Users panel display (never fatal)
+    mirror = await _gw_request("PATCH", f"/v1/users/{params.user_id}",
+                               {"attributes": {"confirmation_enabled": params.enabled,
+                                               "confirmation_skip_read": params.skip_read}})
+    if isinstance(mirror, dict) and mirror.get("error"):
+        log.warning("set_user_confirmation: attributes mirror failed for %s: %s",
+                    params.user_id, mirror.get("error"))
+
     return ActionResult.success(data={"user_id": params.user_id, "enabled": params.enabled},
                                 summary=f"User {params.user_id} confirmation {'enabled' if params.enabled else 'disabled'}", refresh_panels=["tools"])
 
 @chat.function("get_user_confirmation", action_type="read", data_model=UserConfirmationResponse, description="Get user confirmation settings.")
 async def fn_get_user_confirmation(ctx, params: UserIdParams) -> ActionResult:
-    """Get user confirmation settings."""
+    """Get user confirmation settings.
+
+    Reads the EFFECTIVE value from the same store the kernel resolves
+    (``unified_config.user_settings`` via the Auth GW internal settings
+    endpoint) instead of ``users.attributes``, which no longer governs the
+    gate. ``enabled`` is therefore what the user will actually experience on
+    their next turn; ``role_policy`` is reported alongside as context, not as
+    the answer.
+    """
     user = await _gw_request("GET", f"/v1/users/{params.user_id}")
     if isinstance(user, dict) and user.get("error"):
         return ActionResult.error(user["error"])
     attrs = user.get("attributes", {}) if isinstance(user, dict) else {}
+
+    settings = await _gw_request(
+        "GET", f"/v1/internal/users/{params.user_id}/settings?tenant_id={_tenant_id(ctx)}")
+    enabled = None
+    if isinstance(settings, dict) and not settings.get("error"):
+        s = settings.get("settings", settings) or {}
+        enabled = s.get("confirmation_enabled")
+    else:
+        # settings endpoint unreachable -- fall back to the legacy attribute
+        # rather than silently claiming the gate is off.
+        enabled = attrs.get("confirmation_enabled")
+
     return ActionResult.success(
         data={"user_id": params.user_id, "email": user.get("email", ""), "role": user.get("role", ""),
-              "enabled": attrs.get("confirmation_enabled"), "skip_read": attrs.get("confirmation_skip_read", False),
+              "enabled": enabled, "skip_read": attrs.get("confirmation_skip_read", False),
               "role_policy": user.get("role_confirmation_policy", "default_on")},
-        summary=f"{user.get('email', params.user_id)}: enabled={attrs.get('confirmation_enabled', 'inherit')}")
+        summary=f"{user.get('email', params.user_id)}: enabled={enabled if enabled is not None else 'unknown'}")
 
 # ─── Task Limits ──────────────────────────────────────────────────────── #
 
