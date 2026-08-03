@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from imperal_sdk import ui
 from panels_llm_form_tbc import build_tbc_section
+from panels_llm_form_coding_thread import build_coding_thread_section
 from panels_llm_form_tiers import build_tiers_section
 from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 
@@ -146,6 +147,10 @@ def build_llm_form(
     # Live model catalogue fetched from the provider APIs (panels_llm_models.
     # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
     model_catalog: dict | None = None,
+    # I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE (2026-07-31): the 6 coding-thread
+    # compaction knobs live in imperal:config:llm (cfg), NOT tenant_defaults —
+    # panels_llm.py reads them straight off cfg and passes them here.
+    coding_thread_config: dict | None = None,
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -233,6 +238,14 @@ def build_llm_form(
         "default_routing_context": int(_td.get("routing_context", 12)),
         "default_kav_max_retries": int(_td.get("kav_max_retries", 2)),
         "default_confirmation_enabled": bool(_td.get("confirmation_enabled", False)),
+        # I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE (2026-07-31): read from cfg
+        # (imperal:config:llm), not tenant_defaults -- see coding_thread_config= above.
+        "coding_thread_window_budget_chars": int((coding_thread_config or {}).get("coding_thread_window_budget_chars", 250000)),
+        "coding_thread_keep_recent": int((coding_thread_config or {}).get("coding_thread_keep_recent", 20)),
+        "coding_thread_input_cap": int((coding_thread_config or {}).get("coding_thread_input_cap", 120000)),
+        "coding_thread_max_rounds": int((coding_thread_config or {}).get("coding_thread_max_rounds", 6)),
+        "coding_thread_time_budget_s": int((coding_thread_config or {}).get("coding_thread_time_budget_s", 100)),
+        "coding_thread_fold_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_max_tokens", 4096)),
         # Phase 16 (2026-05-17): orphans wired from System tab
         "narrator_structured_data_chars": int(_td.get("narrator_structured_data_chars", 8000)),
         "default_max_result_tokens": int(_td.get("default_max_result_tokens", 3000)),
@@ -467,6 +480,9 @@ def build_llm_form(
 
             # ── 6 · Token Budget Controls (TBC) ───────────────────
             build_tbc_section(defaults),
+
+            # ── 6b · Webbee Code Thread Compaction ────────────────
+            build_coding_thread_section(defaults),
 
             # ── 7 · Feature Flags ─────────────────────────────────
             ui.Section(title="\U0001f6a9 Feature Flags (Kernel)", collapsible=True,

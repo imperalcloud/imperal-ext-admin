@@ -215,6 +215,11 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             ultrasmart_fallback_model=ultrasmart_fallback,
             # Live model catalogue from the provider APIs (no hardcoded list).
             model_catalog=model_catalog,
+            # I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE (2026-07-31): these 6
+            # knobs live in cfg (imperal:config:llm) directly -- NOT
+            # tenant_defaults -- same store the kernel's get_admin_llm_config_field
+            # cascade reads.
+            coding_thread_config=cfg,
         ),
         ui.Divider(),
         ui.Section(

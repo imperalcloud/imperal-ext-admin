@@ -481,6 +481,76 @@ class SaveLlmConfigParams(BaseModel):
         ),
     )
 
+    # ── Webbee Code coding-thread compaction (I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE,
+    # 2026-07-31) -- the coherent-mind thread NEVER truncates; compaction (folding the
+    # oldest span into the working-model digest) is the ONLY scaling mechanism. These
+    # 6 knobs were previously hardcoded constants / activity-payload defaults; now
+    # tenant-wide adjustable here, with an explicit per-call payload value still
+    # winning (caller-explicit invariant, mirrors every other max_tokens knob).
+    coding_thread_window_budget_chars: Optional[int] = Field(
+        default=None, ge=20_000, le=2_000_000,
+        description=(
+            "UNIT: characters. Serialized-message size that triggers compaction "
+            "(fold the oldest span into the digest). Default 250000. Lower = "
+            "compacts earlier/more often (smaller per-step thread, cheaper turns, "
+            "more digest cycles); higher = keeps more verbatim history before the "
+            "first fold. Reads at core/coding_thread.py:THREAD_WINDOW_BUDGET_CHARS "
+            "via activities/coding_thread.py:compact_coding_thread."
+        ),
+    )
+    coding_thread_keep_recent: Optional[int] = Field(
+        default=None, ge=4, le=200,
+        description=(
+            "UNIT: messages. How many of the MOST RECENT messages always survive "
+            "verbatim (never folded) on every compaction round. Default 20. Higher "
+            "= more recent context stays exact, more chars per step; lower = "
+            "tighter recent window, compacts more aggressively. Reads at "
+            "core/coding_thread.py:THREAD_KEEP_RECENT."
+        ),
+    )
+    coding_thread_input_cap: Optional[int] = Field(
+        default=None, ge=5_000, le=500_000,
+        description=(
+            "UNIT: characters. Max serialized size of the OLDEST span folded into "
+            "ONE digest LLM call (progressive folding -- a huge backlog folds over "
+            "several rounds, never one giant unbounded call). Default 120000. "
+            "Higher = fewer rounds needed but a heavier/slower single fold call. "
+            "Reads at core/coding_thread.py:COMPACT_INPUT_CHAR_CAP."
+        ),
+    )
+    coding_thread_max_rounds: Optional[int] = Field(
+        default=None, ge=1, le=30,
+        description=(
+            "UNIT: rounds. Max fold rounds ONE compact_coding_thread activity call "
+            "may run (catch-up folding: keeps compacting until under budget or this "
+            "cap). Default 6. Higher = a badly-behind thread converges fully in "
+            "one call; lower = spreads catch-up over more activity invocations. "
+            "Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS."
+        ),
+    )
+    coding_thread_time_budget_s: Optional[int] = Field(
+        default=None, ge=10, le=140,
+        description=(
+            "UNIT: seconds. Wall-clock budget for the WHOLE compact_coding_thread "
+            "call across all its rounds -- must stay safely under the coding "
+            "workflow's activity start_to_close timeout. Default 100. Reads at "
+            "activities/coding_thread.py:_COMPACT_TIME_BUDGET_S."
+        ),
+    )
+    coding_thread_fold_max_tokens: Optional[int] = Field(
+        default=None, ge=1024, le=16_000,
+        description=(
+            "UNIT: tokens. Response cap for the digest-fold LLM call. "
+            "I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy "
+            "spans (~1-2 tokens/char) truncating the digest JSON mid-string at the "
+            "old fixed 4096, so the fold silently skipped and the thread never "
+            "shrank. On any truncation/parse failure the call now automatically "
+            "retries ONCE at 2x this value before falling back to a mechanical "
+            "(no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Default "
+            "4096. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS."
+        ),
+    )
+
     # ── Per-purpose AI params (LCU-4, 2026-04-30) — empty string = inherit
     purpose_routing_temperature: str = Field(default="", description="Per-purpose temperature for routing (blank = inherit)")
     purpose_routing_top_p: str = Field(default="", description="Per-purpose top_p for routing")
