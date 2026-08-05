@@ -35,5 +35,6 @@ import handlers_payment        # noqa: F401
 import handlers_developer      # noqa: F401
 import handlers_admin_reads    # noqa: F401  # Webbee read-gaps: payments/cards/limits/agencies/pending-apps/pending-payouts
 import handlers_email          # noqa: F401  # Email tab: durable log + per-case template control + test send
+import handlers_repo_index     # noqa: F401  # Repo index map: read the coding agent's code map from ANY surface
 import skeleton                # noqa: F401
 import panels                  # noqa: F401
