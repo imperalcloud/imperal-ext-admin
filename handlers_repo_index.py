@@ -30,8 +30,15 @@ import os
 import time
 
 import redis.asyncio as aioredis
-from imperal_sdk import ActionResult, chat
 from pydantic import BaseModel, Field
+
+# `chat` is the ChatExtension INSTANCE built in app.py -- it must come from
+# there, exactly like every other handler module in this extension. Importing
+# `chat` from imperal_sdk instead yields the SDK's chat MODULE, which has no
+# `.function` attribute, so main.py dies at import with
+# `AttributeError: module 'imperal_sdk.chat' has no attribute 'function'`
+# and the whole extension fails to load (deploy check "main.py loads").
+from app import ActionResult, chat
 
 log = logging.getLogger(__name__)
 
