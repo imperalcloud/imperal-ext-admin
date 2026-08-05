@@ -39,6 +39,11 @@ from pydantic import BaseModel, Field
 # `AttributeError: module 'imperal_sdk.chat' has no attribute 'function'`
 # and the whole extension fails to load (deploy check "main.py loads").
 from app import ActionResult, chat
+from models_repo_index import (
+    IndexedReposResponse,
+    RepoIndexMapRecord,
+    RepoKnowledgeResponse,
+)
 
 log = logging.getLogger(__name__)
 
@@ -131,11 +136,13 @@ def _summarise(d: dict) -> str:
 @chat.function(
     "list_indexed_repos",
     action_type="read",
+    data_model=IndexedReposResponse,
     description=("List the repositories Webbee has a code index for, newest first — "
                  "file counts, languages, symbol counts and how fresh each index is. "
                  "Works on every surface (panel, Telegram, terminal)."),
 )
 async def fn_list_indexed_repos(ctx, params: _EmptyParams) -> ActionResult:
+    """List the repositories Webbee has a code index for, newest first."""
     uid = _caller(ctx)
     if not uid:
         return ActionResult.error("Could not identify the calling user.")
@@ -167,12 +174,14 @@ async def fn_list_indexed_repos(ctx, params: _EmptyParams) -> ActionResult:
 @chat.function(
     "get_repo_index_map",
     action_type="read",
+    data_model=RepoIndexMapRecord,
     description=("Show what Webbee knows about ONE repository's code: file and language "
                  "breakdown, how many functions/classes are indexed, key symbols with "
                  "file:line, semantic-search status, and the exact commit the index was "
                  "built at. Readable from any surface."),
 )
 async def fn_get_repo_index_map(ctx, params: _RepoParam) -> ActionResult:
+    """Show the full code map Webbee holds for ONE repository."""
     uid = _caller(ctx)
     if not uid:
         return ActionResult.error("Could not identify the calling user.")
@@ -258,12 +267,14 @@ async def _load_memories(uid: str) -> list[dict]:
 @chat.function(
     "get_repo_knowledge",
     action_type="read",
+    data_model=RepoKnowledgeResponse,
     description=("Show the durable notes Webbee has learned about your repositories — the "
                  "cloud-side WEBBEE.md. These are facts distilled while coding (conventions, "
                  "gotchas, where things live), kept per repo and independent of any single "
                  "machine or checkout, so context is never lost. Readable from any surface."),
 )
 async def fn_get_repo_knowledge(ctx, params: _RepoParam) -> ActionResult:
+    """Show the durable notes Webbee learned about a repository."""
     uid = _caller(ctx)
     if not uid:
         return ActionResult.error("Could not identify the calling user.")

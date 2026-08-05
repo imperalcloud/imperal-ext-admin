@@ -12249,6 +12249,78 @@
             "title": "Code Fallback Provider",
             "type": "string"
           },
+          "smart_model": {
+            "default": "",
+            "description": "Webbee Smart tier — primary model. Default suggestion: a Sonnet-class model.",
+            "title": "Smart Model",
+            "type": "string"
+          },
+          "smart_provider": {
+            "default": "",
+            "description": "Webbee Smart tier — primary provider (auto-inferred from the model id when left blank)",
+            "title": "Smart Provider",
+            "type": "string"
+          },
+          "smart_fallback_model": {
+            "default": "",
+            "description": "Webbee Smart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.",
+            "title": "Smart Fallback Model",
+            "type": "string"
+          },
+          "smart_fallback_provider": {
+            "default": "",
+            "description": "Webbee Smart tier — fallback provider (auto-inferred from the fallback model id when left blank)",
+            "title": "Smart Fallback Provider",
+            "type": "string"
+          },
+          "supersmart_model": {
+            "default": "",
+            "description": "Webbee SuperSmart tier — primary model. Default suggestion: an Opus-class model.",
+            "title": "Supersmart Model",
+            "type": "string"
+          },
+          "supersmart_provider": {
+            "default": "",
+            "description": "Webbee SuperSmart tier — primary provider (auto-inferred from the model id when left blank)",
+            "title": "Supersmart Provider",
+            "type": "string"
+          },
+          "supersmart_fallback_model": {
+            "default": "",
+            "description": "Webbee SuperSmart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.",
+            "title": "Supersmart Fallback Model",
+            "type": "string"
+          },
+          "supersmart_fallback_provider": {
+            "default": "",
+            "description": "Webbee SuperSmart tier — fallback provider (auto-inferred from the fallback model id when left blank)",
+            "title": "Supersmart Fallback Provider",
+            "type": "string"
+          },
+          "ultrasmart_model": {
+            "default": "",
+            "description": "Webbee UltraSmart tier — primary model (top-of-line reasoning model).",
+            "title": "Ultrasmart Model",
+            "type": "string"
+          },
+          "ultrasmart_provider": {
+            "default": "",
+            "description": "Webbee UltraSmart tier — primary provider (auto-inferred from the model id when left blank)",
+            "title": "Ultrasmart Provider",
+            "type": "string"
+          },
+          "ultrasmart_fallback_model": {
+            "default": "",
+            "description": "Webbee UltraSmart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.",
+            "title": "Ultrasmart Fallback Model",
+            "type": "string"
+          },
+          "ultrasmart_fallback_provider": {
+            "default": "",
+            "description": "Webbee UltraSmart tier — fallback provider (auto-inferred from the fallback model id when left blank)",
+            "title": "Ultrasmart Fallback Provider",
+            "type": "string"
+          },
           "routing_model": {
             "default": "",
             "description": "Routing model override",
@@ -13050,6 +13122,96 @@
             "default": null,
             "description": "UNIT: days. SessionMemory Redis TTL (was hardcoded 1 day / 86400s). Default 1 day. Higher = users keep more conversation history but more Redis storage. Reads via IMPERAL_HISTORY_TTL_SECONDS env at core/session_memory.py:_history_ttl_seconds (env set on worker boot).",
             "title": "History Ttl Days"
+          },
+          "coding_thread_window_budget_chars": {
+            "anyOf": [
+              {
+                "maximum": 2000000,
+                "minimum": 20000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Serialized-message size that triggers compaction (fold the oldest span into the digest). Default 250000. Lower = compacts earlier/more often (smaller per-step thread, cheaper turns, more digest cycles); higher = keeps more verbatim history before the first fold. Reads at core/coding_thread.py:THREAD_WINDOW_BUDGET_CHARS via activities/coding_thread.py:compact_coding_thread.",
+            "title": "Coding Thread Window Budget Chars"
+          },
+          "coding_thread_keep_recent": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 4,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: messages. How many of the MOST RECENT messages always survive verbatim (never folded) on every compaction round. Default 20. Higher = more recent context stays exact, more chars per step; lower = tighter recent window, compacts more aggressively. Reads at core/coding_thread.py:THREAD_KEEP_RECENT.",
+            "title": "Coding Thread Keep Recent"
+          },
+          "coding_thread_input_cap": {
+            "anyOf": [
+              {
+                "maximum": 500000,
+                "minimum": 5000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Max serialized size of the OLDEST span folded into ONE digest LLM call (progressive folding -- a huge backlog folds over several rounds, never one giant unbounded call). Default 120000. Higher = fewer rounds needed but a heavier/slower single fold call. Reads at core/coding_thread.py:COMPACT_INPUT_CHAR_CAP.",
+            "title": "Coding Thread Input Cap"
+          },
+          "coding_thread_max_rounds": {
+            "anyOf": [
+              {
+                "maximum": 30,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: rounds. Max fold rounds ONE compact_coding_thread activity call may run (catch-up folding: keeps compacting until under budget or this cap). Default 6. Higher = a badly-behind thread converges fully in one call; lower = spreads catch-up over more activity invocations. Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS.",
+            "title": "Coding Thread Max Rounds"
+          },
+          "coding_thread_time_budget_s": {
+            "anyOf": [
+              {
+                "maximum": 140,
+                "minimum": 10,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: seconds. Wall-clock budget for the WHOLE compact_coding_thread call across all its rounds -- must stay safely under the coding workflow's activity start_to_close timeout. Default 100. Reads at activities/coding_thread.py:_COMPACT_TIME_BUDGET_S.",
+            "title": "Coding Thread Time Budget S"
+          },
+          "coding_thread_fold_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 16000,
+                "minimum": 1024,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. Response cap for the digest-fold LLM call. I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy spans (~1-2 tokens/char) truncating the digest JSON mid-string at the old fixed 4096, so the fold silently skipped and the thread never shrank. On any truncation/parse failure the call now automatically retries ONCE at 2x this value before falling back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Default 4096. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS.",
+            "title": "Coding Thread Fold Max Tokens"
           },
           "purpose_routing_temperature": {
             "default": "",
@@ -19984,6 +20146,725 @@
         "x-sdl": "entity"
       },
       "event": "email_test_sent",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "list_indexed_repos",
+      "description": "List the repositories Webbee has a code index for, newest first — file counts, languages, symbol counts and how fresh each index is. Works on every surface (panel, Telegram, terminal).",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No input: the caller is always the authenticated user.",
+        "properties": {},
+        "title": "_EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "IndexedRepoRecord": {
+            "description": "One indexed repository, as summarised for the list view.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "repo_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Repo Key"
+              },
+              "repo_root": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Repo Root"
+              },
+              "file_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "File Count"
+              },
+              "languages": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Languages"
+              },
+              "symbol_kinds": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Symbol Kinds"
+              },
+              "vectors_ready": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Vectors Ready"
+              },
+              "embedded_chunks": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Embedded Chunks"
+              },
+              "git_ref": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Git Ref"
+              },
+              "branch": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Branch"
+              },
+              "indexed": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Indexed"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "IndexedRepoRecord",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/IndexedRepoRecord"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "IndexedReposResponse",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_repo_index_map",
+      "description": "Show what Webbee knows about ONE repository's code: file and language breakdown, how many functions/classes are indexed, key symbols with file:line, semantic-search status, and the exact commit the index was built at. Readable from any surface.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "repo": {
+            "default": "",
+            "description": "Which repo to describe — its repo_key, or any fragment of its path/name. Empty = the most recently indexed one.",
+            "title": "Repo",
+            "type": "string"
+          }
+        },
+        "title": "_RepoParam",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "The full structural map of ONE repo, exactly as the kernel stored it.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "repo_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Repo Key"
+          },
+          "repo_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Repo Root"
+          },
+          "file_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Count"
+          },
+          "languages": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Languages"
+          },
+          "symbol_kinds": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Symbol Kinds"
+          },
+          "top_symbols": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Top Symbols"
+          },
+          "test_hint_files": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Test Hint Files"
+          },
+          "vectors_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Vectors Ready"
+          },
+          "embedded_chunks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Embedded Chunks"
+          },
+          "git_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Git Ref"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Branch"
+          },
+          "updated_at": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "RepoIndexMapRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_repo_knowledge",
+      "description": "Show the durable notes Webbee has learned about your repositories — the cloud-side WEBBEE.md. These are facts distilled while coding (conventions, gotchas, where things live), kept per repo and independent of any single machine or checkout, so context is never lost. Readable from any surface.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "repo": {
+            "default": "",
+            "description": "Which repo to describe — its repo_key, or any fragment of its path/name. Empty = the most recently indexed one.",
+            "title": "Repo",
+            "type": "string"
+          }
+        },
+        "title": "_RepoParam",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "RepoKnowledgeRecord": {
+            "description": "One durable note the coding agent distilled about a repo.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source"
+              },
+              "repo_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Repo Key"
+              },
+              "updated_at": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Updated At"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "RepoKnowledgeRecord",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RepoKnowledgeRecord"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "RepoKnowledgeResponse",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
       "background": false,
       "long_running": false,
       "scopes": [],
