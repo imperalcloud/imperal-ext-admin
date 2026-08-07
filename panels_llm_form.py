@@ -42,6 +42,12 @@ _PROVIDERS = [
 # Select writes `{key}_model` and the AI-param inputs write `purpose_{key}_*`.
 # Order = the order the purposes fire across a typical turn.
 _PURPOSE_MODELS: list[tuple[str, str, str]] = [
+    ("resolve", "Universal Brain · Reasoning Tier",
+     "The brain's own reasoning model (purpose=resolve) — the agentic loop "
+     "behind chat AND every unattended automation run. It was configurable "
+     "all along (flat resolve_model key) but had no field here, so the model "
+     "actually doing the thinking was invisible in this form. Blank = "
+     "inherit the default model above."),
     ("code", "Coding Brain · Webbee Code",
      "The model behind EVERY Webbee Code terminal turn and marathon "
      "(purpose=code). The single biggest intelligence lever — pick the "
@@ -138,8 +144,11 @@ def build_llm_form(
     # Webbee Code model tiers (2026-07-30): Webbee Smart/SuperSmart/UltraSmart,
     # each a full admin-owned (primary, fallback) pair. Blank primary = tier
     # falls through to code_model above (never a broken/unset tier).
-    smart_model: str = "",
-    smart_fallback_model: str = "",
+    webbeesmart_model: str = "",
+    webbeesmart_fallback_model: str = "",
+    # Universal Brain reasoning tier (purpose="resolve") -- settable all along
+    # through the flat resolve_model key, but with no field here until now.
+    resolve_model: str = "",
     supersmart_model: str = "",
     supersmart_fallback_model: str = "",
     ultrasmart_model: str = "",
@@ -181,8 +190,11 @@ def build_llm_form(
         # the SAME "blank if same as global default" convention as code_model
         # above; each fallback is an independent pair (verbatim, like
         # code_fallback_model) -- blank simply means "no fallback set yet".
-        "smart_model": smart_model if smart_model != model else "",
-        "smart_fallback_model": smart_fallback_model,
+        "webbeesmart_model": webbeesmart_model if webbeesmart_model != model else "",
+        "webbeesmart_fallback_model": webbeesmart_fallback_model,
+        # Universal Brain reasoning tier -- same "blank if same as the global
+        # default" convention as the per-purpose rows above.
+        "resolve_model": resolve_model if resolve_model != model else "",
         "supersmart_model": supersmart_model if supersmart_model != model else "",
         "supersmart_fallback_model": supersmart_fallback_model,
         "ultrasmart_model": ultrasmart_model if ultrasmart_model != model else "",

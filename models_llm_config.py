@@ -28,10 +28,18 @@ class SaveLlmConfigParams(BaseModel):
     # code_model/code_fallback_model above — NOT a hardcoded model id
     # anywhere in the kernel. Blank primary = tier falls through to the
     # existing code_model/reasoning-tier cascade (never a broken tier).
-    smart_model: str = Field(default="", description="Webbee Smart tier — primary model. Default suggestion: a Sonnet-class model.")
-    smart_provider: str = Field(default="", description="Webbee Smart tier — primary provider (auto-inferred from the model id when left blank)")
-    smart_fallback_model: str = Field(default="", description="Webbee Smart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
-    smart_fallback_provider: str = Field(default="", description="Webbee Smart tier — fallback provider (auto-inferred from the fallback model id when left blank)")
+    # ── Universal Brain reasoning tier (purpose="resolve") ──────────────
+    # Read by the kernel's generic flat-key cascade (f"{purpose}_model" /
+    # f"{purpose}_provider"), exactly like routing/execution below -- so this
+    # needed no kernel change, only a field. It was settable but unlisted,
+    # which is how an admin could see a model in automation telemetry that
+    # appeared nowhere in this form.
+    resolve_model: str = Field(default="", description="Universal Brain reasoning model (purpose=resolve) — the agentic loop behind chat and every automation run. Blank = inherit the global default model.")
+    resolve_provider: str = Field(default="", description="Universal Brain reasoning provider (auto-inferred from the model id when left blank)")
+    webbeesmart_model: str = Field(default="", description="Webbee Smart tier — primary model. Default suggestion: a Sonnet-class model.")
+    webbeesmart_provider: str = Field(default="", description="Webbee Smart tier — primary provider (auto-inferred from the model id when left blank)")
+    webbeesmart_fallback_model: str = Field(default="", description="Webbee Smart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
+    webbeesmart_fallback_provider: str = Field(default="", description="Webbee Smart tier — fallback provider (auto-inferred from the fallback model id when left blank)")
     supersmart_model: str = Field(default="", description="Webbee SuperSmart tier — primary model. Default suggestion: an Opus-class model.")
     supersmart_provider: str = Field(default="", description="Webbee SuperSmart tier — primary provider (auto-inferred from the model id when left blank)")
     supersmart_fallback_model: str = Field(default="", description="Webbee SuperSmart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
@@ -213,6 +221,30 @@ class SaveLlmConfigParams(BaseModel):
     # Resolver cascade reads via `_extract_per_purpose_admin` flat-key
     # `f"{purpose}_max_tokens"` in llm/provider.py:733. NULL = inherit
     # quality_ceiling_tokens. Previously hardcoded in code; now admin-tunable.
+    # Universal Brain reasoning tier. The kernel floors this at
+    # IMPERAL_RESOLVE_MAX_TOKENS_FLOOR (default 4096) via
+    # _floor_resolve_max_tokens -- reasoning models count reasoning against
+    # the completion cap, so a too-small value here cannot starve the brain.
+    # Coding brain (purpose=code). The form has always rendered a budget row
+    # for it (the loop iterates _PURPOSE_MODELS), but the field was never
+    # declared, so that input silently discarded whatever the admin typed.
+    # The kernel reads it generically via _extract_per_purpose_admin, so
+    # declaring it is all that was missing.
+    code_max_tokens: Optional[int] = Field(
+        default=None,
+        description=(
+            "UNIT: tokens. max_tokens for the coding brain (purpose=code) — "
+            "every Webbee Code terminal and marathon turn. NULL = inherit."
+        ),
+    )
+    resolve_max_tokens: Optional[int] = Field(
+        default=None,
+        description=(
+            "UNIT: tokens. max_tokens for the Universal Brain reasoning LLM "
+            "(purpose=resolve) — the agentic loop behind chat and automations. "
+            "Floored at 4096 by the kernel. NULL = inherit the global default."
+        ),
+    )
     routing_max_tokens: Optional[int] = Field(
         default=None, ge=512, le=32000,
         description=(
@@ -552,6 +584,14 @@ class SaveLlmConfigParams(BaseModel):
     )
 
     # ── Per-purpose AI params (LCU-4, 2026-04-30) — empty string = inherit
+    purpose_code_temperature: str = Field(default="", description="Per-purpose temperature for code (coding brain; blank = inherit)")
+    purpose_code_top_p: str = Field(default="", description="Per-purpose top_p for code")
+    purpose_code_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for code")
+    purpose_code_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for code")
+    purpose_resolve_temperature: str = Field(default="", description="Per-purpose temperature for resolve (Universal Brain reasoning tier; blank = inherit)")
+    purpose_resolve_top_p: str = Field(default="", description="Per-purpose top_p for resolve")
+    purpose_resolve_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for resolve")
+    purpose_resolve_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for resolve")
     purpose_routing_temperature: str = Field(default="", description="Per-purpose temperature for routing (blank = inherit)")
     purpose_routing_top_p: str = Field(default="", description="Per-purpose top_p for routing")
     purpose_routing_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for routing")

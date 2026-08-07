@@ -72,6 +72,12 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             "responses_judge_max_tokens", "rule_engine_max_tokens",
             "default_max_response_tokens", "default_max_tool_rounds", "default_routing_context", "default_kav_max_retries", "default_confirmation_enabled",
             # LCU-4 per-purpose AI params — handled separately below (nested under "purpose")
+            # Coding brain (purpose=code) — the form always rendered these rows;
+            # they simply had no field to land in until now.
+            "purpose_code_temperature", "purpose_code_top_p", "purpose_code_presence_penalty", "purpose_code_frequency_penalty",
+            # Universal Brain reasoning tier (purpose=resolve) — handled below
+            # like every other per-purpose AI param slot.
+            "purpose_resolve_temperature", "purpose_resolve_top_p", "purpose_resolve_presence_penalty", "purpose_resolve_frequency_penalty",
             "purpose_routing_temperature", "purpose_routing_top_p", "purpose_routing_presence_penalty", "purpose_routing_frequency_penalty",
             "purpose_execution_temperature", "purpose_execution_top_p", "purpose_execution_presence_penalty", "purpose_execution_frequency_penalty",
             "purpose_navigate_temperature", "purpose_navigate_top_p", "purpose_navigate_presence_penalty", "purpose_navigate_frequency_penalty",
@@ -106,9 +112,16 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                          # (+ _fallback pair) shape as code/code_fallback above -- this
                          # loop's infer+clear logic covers all three tiers with zero
                          # new code. Persisted config, never a hardcoded model id.
-                         "smart", "smart_fallback",
+                         # "webbeesmart" (NOT "smart") -- must match MODEL_TIERS in
+                         # the kernel's llm/model_tiers.py verbatim, since that tuple
+                         # is what the read side keys off. Shipped as "smart", a key
+                         # nothing reads, so the Webbee Smart row was inert.
+                         "webbeesmart", "webbeesmart_fallback",
                          "supersmart", "supersmart_fallback",
                          "ultrasmart", "ultrasmart_fallback",
+                         # Universal Brain reasoning tier -- same generic flat-key
+                         # cascade as the purposes below (f"{purpose}_model").
+                         "resolve",
                          "routing", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 3.1 -- new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
@@ -135,7 +148,8 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # nested dict and merge into the existing `purpose` map so existing
         # entries (e.g. ones written by earlier saves) survive.
         _purpose_map: dict = current.get("purpose") if isinstance(current.get("purpose"), dict) else {}
-        for _p in ("routing", "execution", "navigate", "chain_narrative", "judge",
+        for _p in ("resolve", "code",
+                   "routing", "execution", "navigate", "chain_narrative", "judge",
                    # Federalization 2026-05-19 — new per-purpose AI params
                    "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _slot = dict(_purpose_map.get(_p) or {})

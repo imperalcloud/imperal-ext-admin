@@ -157,8 +157,15 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     # Webbee Code model tiers (2026-07-30): Webbee Smart/SuperSmart/UltraSmart,
     # each a full admin-owned (primary, fallback) pair. Read-through from the
     # SAME flat Config Store keys save_llm_config writes -- no separate store.
-    smart_model = cfg.get("smart_model", "")
-    smart_fallback = cfg.get("smart_fallback_model", "")
+    # "webbeesmart" matches MODEL_TIERS in the kernel's llm/model_tiers.py --
+    # the read side keys off that tuple, so the flat Config Store prefix must
+    # agree exactly (this panel previously read/wrote "smart_*", a key nothing
+    # on the kernel side ever looked at).
+    webbeesmart_model = cfg.get("webbeesmart_model", "")
+    webbeesmart_fallback = cfg.get("webbeesmart_fallback_model", "")
+    # Universal Brain reasoning tier (purpose="resolve") -- configurable via
+    # this flat key all along, but with no field in the form until now.
+    resolve_model = cfg.get("resolve_model", "")
     supersmart_model = cfg.get("supersmart_model", "")
     supersmart_fallback = cfg.get("supersmart_fallback_model", "")
     ultrasmart_model = cfg.get("ultrasmart_model", "")
@@ -207,8 +214,9 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             tool_picker_model=tool_picker,
             action_narrator_model=action_narrator,
             # Webbee Code model tiers (2026-07-30)
-            smart_model=smart_model,
-            smart_fallback_model=smart_fallback,
+            webbeesmart_model=webbeesmart_model,
+            webbeesmart_fallback_model=webbeesmart_fallback,
+            resolve_model=resolve_model,
             supersmart_model=supersmart_model,
             supersmart_fallback_model=supersmart_fallback,
             ultrasmart_model=ultrasmart_model,

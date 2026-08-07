@@ -24,7 +24,13 @@ from imperal_sdk import ui
 # `tier key` is the flat Config Store prefix — MUST match config_resolver.py's
 # MODEL_TIERS tuple verbatim (federal source of truth for the read side).
 _TIERS: tuple[tuple[str, str, str], ...] = (
-    ("smart", "🐝 Webbee Smart",
+    # NOTE: the key is "webbeesmart", NOT "smart" -- it must match
+    # MODEL_TIERS in the kernel's llm/model_tiers.py verbatim, because that
+    # tuple is what the READ side keys off. This form shipped writing
+    # "smart_model", a key nothing reads, so the Webbee Smart row was inert:
+    # the admin picked a model and the tier kept resolving through the
+    # code_model cascade. The other two tiers were always correct.
+    ("webbeesmart", "🐝 Webbee Smart",
      "The default, fast everyday tier."),
     ("supersmart", "🐝 Webbee SuperSmart",
      "A stronger reasoning tier for harder tasks."),
