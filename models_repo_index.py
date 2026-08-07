@@ -29,6 +29,9 @@ class IndexedRepoRecord(sdl.Entity):
     file_count: Optional[int] = None
     languages: Optional[dict] = None
     symbol_kinds: Optional[dict] = None
+    endpoint_count: Optional[int] = None
+    schema_count: Optional[int] = None
+    contract_evidence_complete: Optional[bool] = None
     vectors_ready: Optional[bool] = None
     embedded_chunks: Optional[int] = None
     git_ref: Optional[str] = None
@@ -58,11 +61,19 @@ class RepoIndexMapRecord(sdl.Entity):
 
     repo_key: Optional[str] = None
     repo_root: Optional[str] = None
+    evidence_version: Optional[int] = None
+    content_digest: Optional[str] = None
     file_count: Optional[int] = None
     languages: Optional[dict] = None
     symbol_kinds: Optional[dict] = None
     top_symbols: Optional[list] = None
     test_hint_files: Optional[list] = None
+    endpoint_count: Optional[int] = None
+    schema_count: Optional[int] = None
+    contract_evidence_limit: Optional[int] = None
+    contract_evidence_complete: Optional[bool] = None
+    endpoints: Optional[list] = None
+    schemas: Optional[list] = None
     vectors_ready: Optional[bool] = None
     embedded_chunks: Optional[int] = None
     git_ref: Optional[str] = None
@@ -79,6 +90,31 @@ class RepoIndexMapRecord(sdl.Entity):
             ref = (d.get("git_ref") or "")[:12]
             d.setdefault("title", f"{name} @ {ref}" if ref else str(name))
             d.setdefault("kind", "repo_index_map")
+        return d
+
+
+class CrossRepoContractGraphRecord(sdl.Entity):
+    """Bounded endpoint/schema evidence graph across the caller's repos."""
+
+    repo_count: Optional[int] = None
+    endpoint_count: Optional[int] = None
+    schema_count: Optional[int] = None
+    link_count: Optional[int] = None
+    evidence_origin: Optional[str] = None
+    contracts_complete: Optional[bool] = None
+    repositories: Optional[list] = None
+    endpoints: Optional[list] = None
+    schemas: Optional[list] = None
+    links: Optional[list] = None
+    freshness: Optional[list] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _c(cls, d):
+        if isinstance(d, dict):
+            d["id"] = "cross-repo-contract-graph"
+            d.setdefault("title", f"Cross-repo contracts — {d.get('repo_count', 0)} repos")
+            d.setdefault("kind", "cross_repo_contract_graph")
         return d
 
 
