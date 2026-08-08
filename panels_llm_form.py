@@ -23,6 +23,7 @@ from imperal_sdk import ui
 from panels_llm_form_tbc import build_tbc_section
 from panels_llm_form_coding_thread import build_coding_thread_section
 from panels_llm_form_tiers import build_tiers_section
+from panels_llm_form_automation import build_automation_section
 from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 
 _PROVIDERS = [
@@ -403,6 +404,16 @@ def build_llm_form(
         submit_label="Save LLM Config",
         defaults=defaults,
         children=[
+            # ── 0 · Automations map (read-only) ───────────────────
+            # Placed FIRST deliberately: it is the "you are here" for the
+            # whole tab. An admin who came to tune automations reads this,
+            # learns which knob matters and where it lives, and only then
+            # scrolls into the generic sections below. It renders no inputs,
+            # so it cannot collide with the write controls it points at.
+            # Values come from `defaults`, which already holds every knob this
+            # map displays — so no extra config plumbing is needed here.
+            build_automation_section(defaults),
+
             # ── 1 · Provider & Connection ─────────────────────────
             ui.Section(title="\U0001f50c Provider & Connection", children=[
                 ui.Text(
