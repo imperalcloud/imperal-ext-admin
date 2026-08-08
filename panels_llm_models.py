@@ -25,6 +25,11 @@ log = logging.getLogger("admin")
 
 _CACHE_KEY = "imperal:config:llm:model_catalog"
 _CACHE_TTL = 3600  # seconds (1h) — providers add models rarely
+# A catalogue missing a configured provider must NOT be cached for the full
+# hour: one transient network blip would erase that provider from the LLM
+# Config dropdowns until the TTL expired. Degraded results get a short TTL so
+# the next render retries the provider instead of serving a truncated form.
+_CACHE_TTL_DEGRADED = 120  # seconds (2m)
 
 # Provider inference by model-id prefix (rule-based, not an enumerated list).
 _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
@@ -134,12 +139,20 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
         try:
             catalog["anthropic"] = await _fetch_anthropic(ak)
         except Exception as e:
-            log.warning("model_catalog: anthropic fetch failed: %s", e)
+            # Include the exception TYPE: httpx timeouts stringify to "", which
+            # produced log lines with no cause at all ("fetch failed: ").
+            log.warning(
+                "model_catalog: anthropic fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
     if ok:
         try:
             catalog["openai"] = await _fetch_openai(ok)
         except Exception as e:
-            log.warning("model_catalog: openai fetch failed: %s", e)
+            log.warning(
+                "model_catalog: openai fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
 
     catalog = {p: m for p, m in catalog.items() if m}
     if not catalog:
@@ -151,10 +164,28 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
         log.warning("model_catalog: all live fetches empty — using fallback")
         return {p: list(v) for p, v in FALLBACK_CATALOG.items()}
 
-    # 3. Cache the live result
+    # 2b. Partial failure: a provider IS configured (key present) but its fetch
+    # failed or returned nothing. Without this, a single blip drops that whole
+    # provider from the LLM Config dropdowns — the admin sees e.g. only
+    # Anthropic and cannot pick a GPT model at all. Backfill from the static
+    # fallback so every configured provider stays selectable, and mark the
+    # result degraded so it is cached briefly instead of for an hour.
+    expected = {p for p, key in (("anthropic", ak), ("openai", ok)) if key}
+    missing = sorted(expected - set(catalog))
+    for prov in missing:
+        fb = FALLBACK_CATALOG.get(prov)
+        if fb:
+            catalog[prov] = list(fb)
+            log.warning(
+                "model_catalog: %s unavailable — serving fallback list (%d models)",
+                prov, len(fb),
+            )
+
+    # 3. Cache the live result (short TTL when degraded, so we retry soon)
     if r is not None:
         try:
-            await r.set(_CACHE_KEY, json.dumps(catalog), ex=_CACHE_TTL)
+            ttl = _CACHE_TTL_DEGRADED if missing else _CACHE_TTL
+            await r.set(_CACHE_KEY, json.dumps(catalog), ex=ttl)
             await r.aclose()
         except Exception as e:
             log.warning("model_catalog: cache write failed: %s", e)
