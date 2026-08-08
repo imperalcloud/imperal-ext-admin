@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.13",
   "app_id": "admin",
-  "version": "5.9.11",
+  "version": "5.10.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -12249,28 +12249,40 @@
             "title": "Code Fallback Provider",
             "type": "string"
           },
-          "smart_model": {
+          "resolve_model": {
+            "default": "",
+            "description": "Universal Brain reasoning model (purpose=resolve) — the agentic loop behind chat and every automation run. Blank = inherit the global default model.",
+            "title": "Resolve Model",
+            "type": "string"
+          },
+          "resolve_provider": {
+            "default": "",
+            "description": "Universal Brain reasoning provider (auto-inferred from the model id when left blank)",
+            "title": "Resolve Provider",
+            "type": "string"
+          },
+          "webbeesmart_model": {
             "default": "",
             "description": "Webbee Smart tier — primary model. Default suggestion: a Sonnet-class model.",
-            "title": "Smart Model",
+            "title": "Webbeesmart Model",
             "type": "string"
           },
-          "smart_provider": {
+          "webbeesmart_provider": {
             "default": "",
             "description": "Webbee Smart tier — primary provider (auto-inferred from the model id when left blank)",
-            "title": "Smart Provider",
+            "title": "Webbeesmart Provider",
             "type": "string"
           },
-          "smart_fallback_model": {
+          "webbeesmart_fallback_model": {
             "default": "",
             "description": "Webbee Smart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.",
-            "title": "Smart Fallback Model",
+            "title": "Webbeesmart Fallback Model",
             "type": "string"
           },
-          "smart_fallback_provider": {
+          "webbeesmart_fallback_provider": {
             "default": "",
             "description": "Webbee Smart tier — fallback provider (auto-inferred from the fallback model id when left blank)",
-            "title": "Smart Fallback Provider",
+            "title": "Webbeesmart Fallback Provider",
             "type": "string"
           },
           "supersmart_model": {
@@ -12704,6 +12716,32 @@
             "default": null,
             "description": "UNIT: tokens. max_tokens for rule-engine eval LLM (one-shot trigger/condition matchers). Default 50. Reads at services/rule_engine.py:182.",
             "title": "Rule Engine Max Tokens"
+          },
+          "code_max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. max_tokens for the coding brain (purpose=code) — every Webbee Code terminal and marathon turn. NULL = inherit.",
+            "title": "Code Max Tokens"
+          },
+          "resolve_max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. max_tokens for the Universal Brain reasoning LLM (purpose=resolve) — the agentic loop behind chat and automations. Floored at 4096 by the kernel. NULL = inherit the global default.",
+            "title": "Resolve Max Tokens"
           },
           "routing_max_tokens": {
             "anyOf": [
@@ -13212,6 +13250,54 @@
             "default": null,
             "description": "UNIT: tokens. Response cap for the digest-fold LLM call. I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy spans (~1-2 tokens/char) truncating the digest JSON mid-string at the old fixed 4096, so the fold silently skipped and the thread never shrank. On any truncation/parse failure the call now automatically retries ONCE at 2x this value before falling back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Default 4096. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS.",
             "title": "Coding Thread Fold Max Tokens"
+          },
+          "purpose_code_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for code (coding brain; blank = inherit)",
+            "title": "Purpose Code Temperature",
+            "type": "string"
+          },
+          "purpose_code_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for code",
+            "title": "Purpose Code Top P",
+            "type": "string"
+          },
+          "purpose_code_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for code",
+            "title": "Purpose Code Presence Penalty",
+            "type": "string"
+          },
+          "purpose_code_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for code",
+            "title": "Purpose Code Frequency Penalty",
+            "type": "string"
+          },
+          "purpose_resolve_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for resolve (Universal Brain reasoning tier; blank = inherit)",
+            "title": "Purpose Resolve Temperature",
+            "type": "string"
+          },
+          "purpose_resolve_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for resolve",
+            "title": "Purpose Resolve Top P",
+            "type": "string"
+          },
+          "purpose_resolve_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for resolve",
+            "title": "Purpose Resolve Presence Penalty",
+            "type": "string"
+          },
+          "purpose_resolve_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for resolve",
+            "title": "Purpose Resolve Frequency Penalty",
+            "type": "string"
           },
           "purpose_routing_temperature": {
             "default": "",
@@ -18882,6 +18968,1178 @@
           "items"
         ],
         "title": "PendingPayoutsResponse",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "find_users",
+      "description": "FIND a person in the user base by ANY detail: imperal_id (full or partial), email, display/full name, nickname, company or business name, tax id, phone, city, country, role or account type. Also filters by active/deactivated and never-logged-in. Use this whenever asked who a user is or to locate an account.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Search the user base by ANY identifying detail.\n\nA single ``query`` is matched against every identity field at once —\nimperal_id, email, display name, full name, nickname, company /\nbusiness name, tax id, phone, city and country. That is the normal\nway to use it (\"find me Robert\", \"who is imp_u_2o4S…\", \"the user from\nAcme Ltd\"). The structured filters below narrow the result further\nand can be combined.",
+        "properties": {
+          "query": {
+            "default": "",
+            "description": "Free-text search across imperal_id, email, display name, full name, nickname, company name, tax id, phone, city and country. Case-insensitive substring match. Omit to list everyone.",
+            "title": "Query",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "description": "Match the email field specifically (substring, case-insensitive).",
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "Match display name / full name / nickname specifically.",
+            "title": "Name",
+            "type": "string"
+          },
+          "company": {
+            "default": "",
+            "description": "Match the business/company name or tax id specifically.",
+            "title": "Company",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "description": "Match account state in words: 'active', 'inactive' (= deactivated/disabled), or 'never_logged_in'.",
+            "title": "Status",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "Only users with this exact role, e.g. 'admin', 'user', 'developer'.",
+            "title": "Role",
+            "type": "string"
+          },
+          "country": {
+            "default": "",
+            "description": "Only users whose billing country matches (substring).",
+            "title": "Country",
+            "type": "string"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True = only active accounts, False = only deactivated. Omit for both.",
+            "title": "Is Active"
+          },
+          "account_type": {
+            "default": "",
+            "description": "Only this account type, e.g. 'personal' or 'business'.",
+            "title": "Account Type",
+            "type": "string"
+          },
+          "never_logged_in": {
+            "default": false,
+            "description": "Only accounts that have NEVER logged in.",
+            "title": "Never Logged In",
+            "type": "boolean"
+          },
+          "sort": {
+            "default": "",
+            "description": "Sort order: 'name' (default), 'newest', 'oldest', 'last_login', 'role'.",
+            "title": "Sort",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Max rows to return (1-500). Use a high value when counting.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "FindUsersParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "UserSearchRecord": {
+            "description": "One matched user, enriched with the identity fields a human actually\nsearches by (company, phone, country) lifted out of ``attributes``.\n\nThe raw gateway fields are kept verbatim alongside, so nothing is lost.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "imperal_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Imperal Id"
+              },
+              "email": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Email"
+              },
+              "display_name": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Display Name"
+              },
+              "full_name": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Full Name"
+              },
+              "nickname": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Nickname"
+              },
+              "role": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Role"
+              },
+              "is_active": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Active"
+              },
+              "account_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Account Type"
+              },
+              "company_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Company Name"
+              },
+              "tax_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tax Id"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Phone"
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Country"
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "City"
+              },
+              "created_at": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Created At"
+              },
+              "last_login": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Login"
+              },
+              "never_logged_in": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Never Logged In"
+              },
+              "email_verified": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Email Verified"
+              },
+              "auth_method": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Auth Method"
+              },
+              "matched_on": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Matched On"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "UserSearchRecord",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "find_users return shape — matched users plus what was searched.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/UserSearchRecord"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "total_scanned": {
+            "default": 0,
+            "title": "Total Scanned",
+            "type": "integer"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "filter": {
+            "additionalProperties": true,
+            "title": "Filter",
+            "type": "object"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "UserSearchResponse",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_user_details",
+      "description": "The COMPLETE 360° profile of one user, found by imperal_id, email, name or company: identity and contact, business/tax details, billing address, role and scopes, account status, subscription, wallet balance, effective limits and recent activity — in one answer.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "user",
+      "params_schema": {
+        "description": "Identify one user for the full 360° profile.",
+        "properties": {
+          "user": {
+            "description": "The user — imperal_id, email, display name, company name, or any unambiguous fragment of those. Resolved flexibly; an ambiguous match returns the candidates instead of guessing.",
+            "title": "User",
+            "type": "string"
+          },
+          "include_billing": {
+            "default": true,
+            "description": "Also fetch wallet balance, plan and subscription state.",
+            "title": "Include Billing",
+            "type": "boolean"
+          },
+          "include_activity": {
+            "default": true,
+            "description": "Also fetch recent audit-log activity for this user.",
+            "title": "Include Activity",
+            "type": "boolean"
+          },
+          "activity_hours": {
+            "default": 168,
+            "description": "How far back to read activity, in hours (default 168 = 7 days).",
+            "title": "Activity Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "UserDetailsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "The complete 360° picture of one user: identity, business details,\nbilling address, role/scopes, subscription, wallet and recent activity.\n\nEvery section is optional — a missing sub-system degrades to an empty\ndict rather than failing the whole read.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "imperal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Imperal Id"
+          },
+          "email": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "display_name": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          },
+          "full_name": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Full Name"
+          },
+          "nickname": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Nickname"
+          },
+          "role": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role"
+          },
+          "is_active": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Active"
+          },
+          "auth_method": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Auth Method"
+          },
+          "email_verified": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email Verified"
+          },
+          "created_at": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created At"
+          },
+          "last_login": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Login"
+          },
+          "scopes": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scopes"
+          },
+          "account_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Account Type"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Company Name"
+          },
+          "tax_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tax Id"
+          },
+          "tax_id_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tax Id Type"
+          },
+          "company": {
+            "additionalProperties": true,
+            "title": "Company",
+            "type": "object"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Phone"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "City"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Country"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Postal Code"
+          },
+          "address_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Address Line"
+          },
+          "billing_address": {
+            "additionalProperties": true,
+            "title": "Billing Address",
+            "type": "object"
+          },
+          "subscription": {
+            "additionalProperties": true,
+            "title": "Subscription",
+            "type": "object"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plan"
+          },
+          "subscription_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subscription Status"
+          },
+          "balance": {
+            "default": 0,
+            "title": "Balance",
+            "type": "integer"
+          },
+          "wallet": {
+            "additionalProperties": true,
+            "title": "Wallet",
+            "type": "object"
+          },
+          "limits": {
+            "additionalProperties": true,
+            "title": "Limits",
+            "type": "object"
+          },
+          "activity": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Activity",
+            "type": "array"
+          },
+          "recent_actions_count": {
+            "default": 0,
+            "title": "Recent Actions Count",
+            "type": "integer"
+          },
+          "activity_summary": {
+            "additionalProperties": true,
+            "title": "Activity Summary",
+            "type": "object"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "unavailable": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unavailable",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "UserProfileRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_user_activity",
+      "description": "One user's audit trail — every recorded action with timestamp, scope, status and IP. Find the user by id, email, name or company. Use to answer 'what has this user been doing' or to investigate an incident.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "user",
+      "params_schema": {
+        "description": "Read one user's audit trail.",
+        "properties": {
+          "user": {
+            "description": "The user — imperal_id, email, name, or a fragment of any.",
+            "title": "User",
+            "type": "string"
+          },
+          "hours": {
+            "default": 168,
+            "description": "Look-back window in hours (default 168 = 7 days).",
+            "title": "Hours",
+            "type": "integer"
+          },
+          "action": {
+            "default": "",
+            "description": "Only entries whose action matches this (substring), e.g. 'login', 'delete'.",
+            "title": "Action",
+            "type": "string"
+          },
+          "scope": {
+            "default": "",
+            "description": "Only entries in this scope, e.g. 'billing', 'automations', 'users'.",
+            "title": "Scope",
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "description": "Max entries to return (1-200), newest first.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "UserActivityParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "UserActivityEntry": {
+            "description": "One audit-log entry attributed to a user.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "entry_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Entry Id"
+              },
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Timestamp"
+              },
+              "action": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Action"
+              },
+              "scope": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Scope"
+              },
+              "actor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Actor"
+              },
+              "target": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Target"
+              },
+              "detail": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Detail"
+              },
+              "ip": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Ip"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "UserActivityEntry",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "get_user_activity return shape.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/UserActivityEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "user_id": {
+            "default": "",
+            "title": "User Id",
+            "type": "string"
+          },
+          "hours": {
+            "default": 0,
+            "title": "Hours",
+            "type": "integer"
+          },
+          "actions_seen": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actions Seen",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "UserActivityResponse",
         "type": "object",
         "x-sdl": "entity-list"
       },
