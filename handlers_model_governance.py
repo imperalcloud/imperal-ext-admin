@@ -59,9 +59,16 @@ async def _live_llm_config() -> dict:
     """The flat LLM Config Store document the kernel's cascade reads."""
     try:
         r = await _gw_request("GET", "/v1/internal/config/llm")
-        if getattr(r, "status_code", 0) == 200:
-            data = r.json()
-            return data if isinstance(data, dict) else {}
+        # _gw_request returns the DECODED body (a dict), never a response
+        # object: on HTTP >=400 it returns {"error": "HTTP ..."}. The old
+        # check asked for r.status_code, which a dict NEVER has, so this read
+        # always fell through to {} and every routing report refused to answer
+        # ("Could not read the live LLM config") even while the gateway was
+        # happily returning 200. Fixed 2026-08-08.
+        if isinstance(r, dict) and "error" not in r:
+            return r
+        if isinstance(r, dict):
+            log.warning("llm config read failed: %s", r.get("error"))
     except Exception as exc:  # pragma: no cover - network shape varies
         log.warning("llm config read failed: %s: %s", type(exc).__name__, exc)
     return {}
@@ -73,9 +80,12 @@ async def _live_model_rates() -> list[dict]:
         r = await _gw_request(
             "GET", "/v1/internal/billing/model-rates?include_unavailable=true"
         )
-        if getattr(r, "status_code", 0) == 200:
-            data = r.json()
-            return data if isinstance(data, list) else []
+        # Same decoded-body contract as _live_llm_config above: this endpoint
+        # returns a LIST on success, and an error surfaces as {"error": ...}.
+        if isinstance(r, list):
+            return r
+        if isinstance(r, dict):
+            log.warning("model rates read failed: %s", r.get("error"))
     except Exception as exc:  # pragma: no cover
         log.warning("model rates read failed: %s: %s", type(exc).__name__, exc)
     return []
@@ -89,11 +99,14 @@ async def _live_tier_fees() -> tuple[dict[str, int], bool]:
     """
     try:
         r = await _gw_request("GET", "/v1/internal/billing/platform-fees")
-        if getattr(r, "status_code", 0) == 200:
-            data = r.json()
-            if isinstance(data, dict) and data:
-                return {k: int(v) for k, v in data.items()
-                        if isinstance(v, (int, float))}, True
+        # Same decoded-body contract as the two reads above.
+        if isinstance(r, dict) and "error" not in r and r:
+            fees = {k: int(v) for k, v in r.items()
+                    if isinstance(v, (int, float))}
+            if fees:
+                return fees, True
+        elif isinstance(r, dict) and "error" in r:
+            log.warning("platform fees read failed: %s", r.get("error"))
     except Exception as exc:  # pragma: no cover
         log.warning("platform fees read failed: %s: %s", type(exc).__name__, exc)
     return dict(DEFAULT_TIER_FEES), False
