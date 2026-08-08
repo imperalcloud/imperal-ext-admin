@@ -121,7 +121,10 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                          "ultrasmart", "ultrasmart_fallback",
                          # Universal Brain reasoning tier -- same generic flat-key
                          # cascade as the purposes below (f"{purpose}_model").
-                         "resolve",
+                         # "resolve_fallback" (2026-08-08) is the brain's admin-set
+                         # failover pair -- the retry target for chat AND every
+                         # unattended automation run; same infer+clear logic.
+                         "resolve", "resolve_fallback",
                          "routing", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 3.1 -- new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):

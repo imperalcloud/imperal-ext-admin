@@ -150,6 +150,10 @@ def build_llm_form(
     # Universal Brain reasoning tier (purpose="resolve") -- settable all along
     # through the flat resolve_model key, but with no field here until now.
     resolve_model: str = "",
+    # Brain failover pair (2026-08-08): the retry target for chat AND every
+    # unattended automation run. Independent pair like code_fallback_model --
+    # blank means "no admin override" (kernel keeps its reasoning-grade default).
+    resolve_fallback_model: str = "",
     supersmart_model: str = "",
     supersmart_fallback_model: str = "",
     ultrasmart_model: str = "",
@@ -193,9 +197,15 @@ def build_llm_form(
         # code_fallback_model) -- blank simply means "no fallback set yet".
         "webbeesmart_model": webbeesmart_model if webbeesmart_model != model else "",
         "webbeesmart_fallback_model": webbeesmart_fallback_model,
-        # Universal Brain reasoning tier -- same "blank if same as the global
-        # default" convention as the per-purpose rows above.
-        "resolve_model": resolve_model if resolve_model != model else "",
+        # Universal Brain reasoning tier.
+        # 2026-08-08: written VERBATIM, NOT blanked when it equals the global
+        # model. For purpose="resolve" a blank key does NOT mean "use the
+        # global default" -- the kernel cascade (step 3c) makes the brain
+        # inherit whatever the ROUTING model happens to be, so blanking it
+        # silently re-priced every automation run whenever routing changed.
+        # An explicit pick must stay explicit.
+        "resolve_model": resolve_model,
+        "resolve_fallback_model": resolve_fallback_model,
         "supersmart_model": supersmart_model if supersmart_model != model else "",
         "supersmart_fallback_model": supersmart_fallback_model,
         "ultrasmart_model": ultrasmart_model if ultrasmart_model != model else "",
@@ -309,6 +319,24 @@ def build_llm_form(
                 placeholder="Same as default",
             ),
         ])
+        if key == "resolve":
+            # Brain failover (2026-08-08): the retry target for chat AND every
+            # unattended automation run. Writes the flat resolve_fallback_model
+            # key (provider auto-inferred on save); blank = kernel default.
+            model_children.extend([
+                ui.Text(
+                    "Failover model — used only when the brain's primary "
+                    "errors (one retry). Applies to every automation run. "
+                    "Blank = platform reasoning default.",
+                    variant="caption",
+                ),
+                ui.Select(
+                    options=_all_models,
+                    value=defaults.get("resolve_fallback_model", ""),
+                    param_name="resolve_fallback_model",
+                    placeholder="Platform default",
+                ),
+            ])
         if key == "code":
             # G2 (2026-07-16): Webbee Code fallback model — one retry on this
             # model when the primary errors. Same Select pattern as the

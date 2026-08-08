@@ -146,8 +146,19 @@ _PIPELINE: list[tuple[str, str, str, list[tuple[str, str, str, str, str]]]] = [
                 _SEC_MODELS,
                 "inherit",
                 "THE most consequential setting for automation quality. This is "
-                "the model that thinks during every unattended run. Blank means "
-                "it inherits the default model at the top of this tab.",
+                "the model that thinks during every unattended run. Blank does "
+                "NOT mean the default model at the top of this tab — the kernel "
+                "makes the brain follow the ROUTING model instead, so a routing "
+                "change silently re-prices every automation. Pick one to pin it.",
+                "shared with chat",
+            ),
+            (
+                "resolve_fallback_model",
+                _SEC_MODELS,
+                "platform reasoning default",
+                "The retry target when the brain's primary model errors — one "
+                "retry, then the run fails. Applies to every unattended run. "
+                "Blank uses the platform's reasoning-grade default.",
                 "shared with chat",
             ),
             (

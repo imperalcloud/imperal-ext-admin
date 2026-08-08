@@ -166,6 +166,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     # Universal Brain reasoning tier (purpose="resolve") -- configurable via
     # this flat key all along, but with no field in the form until now.
     resolve_model = cfg.get("resolve_model", "")
+    resolve_fallback = cfg.get("resolve_fallback_model", "")
     supersmart_model = cfg.get("supersmart_model", "")
     supersmart_fallback = cfg.get("supersmart_fallback_model", "")
     ultrasmart_model = cfg.get("ultrasmart_model", "")
@@ -217,6 +218,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             webbeesmart_model=webbeesmart_model,
             webbeesmart_fallback_model=webbeesmart_fallback,
             resolve_model=resolve_model,
+            resolve_fallback_model=resolve_fallback,
             supersmart_model=supersmart_model,
             supersmart_fallback_model=supersmart_fallback,
             ultrasmart_model=ultrasmart_model,

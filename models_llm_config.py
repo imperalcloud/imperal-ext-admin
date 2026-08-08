@@ -34,8 +34,10 @@ class SaveLlmConfigParams(BaseModel):
     # needed no kernel change, only a field. It was settable but unlisted,
     # which is how an admin could see a model in automation telemetry that
     # appeared nowhere in this form.
-    resolve_model: str = Field(default="", description="Universal Brain reasoning model (purpose=resolve) — the agentic loop behind chat and every automation run. Blank = inherit the global default model.")
+    resolve_model: str = Field(default="", description="Universal Brain reasoning model (purpose=resolve) — the agentic loop behind chat and every automation run. Blank does NOT mean the global default: the kernel makes the brain inherit whatever the ROUTING model is, so leaving this blank lets a routing change silently re-price every automation run. Pick a model explicitly to pin the cost.")
     resolve_provider: str = Field(default="", description="Universal Brain reasoning provider (auto-inferred from the model id when left blank)")
+    resolve_fallback_model: str = Field(default="", description="Universal Brain failover model \u2014 used for ONE retry only when the brain's primary errors (purpose=resolve). Applies to chat AND every unattended automation run. Blank = platform reasoning-grade default.")
+    resolve_fallback_provider: str = Field(default="", description="Universal Brain failover provider (auto-inferred from the fallback model id when left blank)")
     webbeesmart_model: str = Field(default="", description="Webbee Smart tier — primary model. Default suggestion: a Sonnet-class model.")
     webbeesmart_provider: str = Field(default="", description="Webbee Smart tier — primary provider (auto-inferred from the model id when left blank)")
     webbeesmart_fallback_model: str = Field(default="", description="Webbee Smart tier — fallback model, used for ONE retry only when the primary errors. Blank = no fallback.")
