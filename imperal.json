@@ -22524,6 +22524,806 @@
       "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "llm_routing_report",
+      "description": "Report WHICH model actually runs for every purpose slot (reasoning, routing, execution, judge, ...), its billing tier, the per-action platform fee, and the estimated credit cost of a run. Explains why identical automations can cost wildly different amounts of credits, and flags premium models on hot paths, unpriced models and silent substitutions (failover / per-extension override).",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Ask what will really run, optionally costed for a concrete run.",
+        "properties": {
+          "actions": {
+            "default": 5,
+            "description": "How many actions to cost the estimate for. Default 5 — the size of a typical automation run.",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Actions",
+            "type": "integer"
+          },
+          "category": {
+            "default": "read",
+            "description": "Action category for the base price: read | write | destructive.",
+            "title": "Category",
+            "type": "string"
+          },
+          "include_code_tiers": {
+            "default": true,
+            "description": "Also report the three Webbee Code tiers (terminal /model).",
+            "title": "Include Code Tiers",
+            "type": "boolean"
+          }
+        },
+        "title": "RoutingReportParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "LlmRoutingSlotRecord": {
+            "description": "One resolved purpose slot: which model runs, its tier, what it costs.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "purpose": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Purpose"
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Label"
+              },
+              "effective_model": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Effective Model"
+              },
+              "provider": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Provider"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source"
+              },
+              "tier": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tier"
+              },
+              "platform_fee": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Platform Fee"
+              },
+              "is_priced": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Priced"
+              },
+              "is_available": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Is Available"
+              },
+              "estimated_run_credits": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Estimated Run Credits"
+              },
+              "warnings": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "LlmRoutingSlotRecord",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "Slots + the fee table used, so the credit maths can be checked.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/LlmRoutingSlotRecord"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "substitutions": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Substitutions",
+            "type": "array"
+          },
+          "tier_fees": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Tier Fees",
+            "type": "object"
+          },
+          "fees_are_live": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fees Are Live"
+          },
+          "category_prices": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Category Prices",
+            "type": "object"
+          },
+          "actions_costed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Actions Costed"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "LlmRoutingReportResponse",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "audit_extension_models",
+      "description": "Audit every extension's AI Models settings and report which ones pin their own model instead of inheriting the system default — the Primary / Intake / Analysis / Router slots, plus sampling overrides. Use before resetting apps to the system defaults.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Audit which extensions pin their own models instead of inheriting.",
+        "properties": {
+          "app_id": {
+            "default": "",
+            "description": "Audit ONE extension. Blank = audit every active extension.",
+            "title": "App Id",
+            "type": "string"
+          },
+          "only_deviating": {
+            "default": false,
+            "description": "Report only apps that do NOT use the system defaults.",
+            "title": "Only Deviating",
+            "type": "boolean"
+          }
+        },
+        "title": "AuditExtModelsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ExtensionModelPolicyRecord": {
+            "description": "One extension's AI Models settings vs the system defaults.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "app_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "App Id"
+              },
+              "display_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Display Name"
+              },
+              "uses_system_defaults": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Uses System Defaults"
+              },
+              "pinned_models": {
+                "default": [],
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "title": "Pinned Models",
+                "type": "array"
+              },
+              "pinned_params": {
+                "additionalProperties": true,
+                "default": {},
+                "title": "Pinned Params",
+                "type": "object"
+              },
+              "forced_params": {
+                "additionalProperties": true,
+                "default": {},
+                "title": "Forced Params",
+                "type": "object"
+              },
+              "forced_params_are_form_defaults": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Forced Params Are Form Defaults"
+              },
+              "thinking_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Thinking Mode"
+              },
+              "findings": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Findings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "ExtensionModelPolicyRecord",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "Audit result. `unreadable_app_ids` is reported, never silently skipped.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ExtensionModelPolicyRecord"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "deviating_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Deviating Count"
+          },
+          "unreadable_app_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Unreadable App Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ExtensionModelAuditResponse",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "reset_extension_models",
+      "description": "Reset extensions' AI Models settings back to the system defaults, so every model slot inherits the platform cascade instead of pinning its own model. Previews by default (dry_run) — pass dry_run=false AND confirm=true to apply.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:extension_settings"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Return extensions to the system model defaults.",
+        "properties": {
+          "app_id": {
+            "default": "",
+            "description": "Reset ONE extension. Blank = every active extension.",
+            "title": "App Id",
+            "type": "string"
+          },
+          "reset_sampling_params": {
+            "default": false,
+            "description": "Also restore temperature/max_tokens to the documented defaults (0.7 / 2048). They cannot be blanked — the save path always writes them — so this restores the default VALUE, not inherit.",
+            "title": "Reset Sampling Params",
+            "type": "boolean"
+          },
+          "dry_run": {
+            "default": true,
+            "description": "Preview only: report the exact before -> after per key and change nothing. Defaults to TRUE — a fleet-wide model change never fires by accident. Set false WITH confirm=true to apply.",
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "confirm": {
+            "default": false,
+            "description": "Required to actually write. Without it the call stays a preview.",
+            "title": "Confirm",
+            "type": "boolean"
+          }
+        },
+        "title": "ResetExtModelsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt for a reset run. `applied=False` means it was a preview.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "applied": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Applied"
+          },
+          "changed": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Changed",
+            "type": "array"
+          },
+          "unchanged": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Unchanged",
+            "type": "array"
+          },
+          "failed": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "inherit_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Inherit Value"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ExtensionModelResetReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "extension_configured",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
     }
   ],
   "signals": [],
