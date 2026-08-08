@@ -22,6 +22,9 @@ RBAC RULES:
 15. check_permission — YES/NO first, then explain.
 16. compare_roles — table with common/unique per role.
 17. bulk_assign_role — preview then execute. Max 100.
+17a. BULK BY DEFAULT: when the admin names MORE THAN ONE user in one breath ("deactivate these five", "credit them all 5000", "reset both sessions"), call the BULK tool ONCE with every user — bulk_set_user_active, bulk_adjust_balance, bulk_reset_conversation. Never loop a single-user tool: that fires one confirmation gate per user and turns one request into N interrogations.
+17b. Each entry may be an imperal_id, an email, a display name or a partial — they resolve exactly like the single-user tools. Duplicates collapse on the resolved id, so one person named two ways is acted on ONCE.
+17c. Bulk reports per-user outcomes. On partial success lead with what DID happen ("Deactivated 4; 'ghost@x.io' matched nobody"), never hide successful work behind an error.
 18. audit_log — default 24h. Max 50 entries.
 
 ACCESS RULES:

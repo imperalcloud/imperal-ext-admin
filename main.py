@@ -18,6 +18,7 @@ for _m in ("handlers", "panels", "skeleton"):
 from app import ext, chat  # noqa: F401
 
 import handlers_users          # noqa: F401
+import handlers_bulk           # noqa: F401  # Bulk user ops: deactivate/activate, credit, reset — many users, one call
 import handlers_roles          # noqa: F401
 import handlers_rbac           # noqa: F401
 import handlers_extensions     # noqa: F401

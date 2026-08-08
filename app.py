@@ -305,7 +305,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.10.0",
+    version="5.11.0",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)
