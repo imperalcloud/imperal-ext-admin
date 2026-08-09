@@ -25,8 +25,8 @@ import logging
 from pydantic import BaseModel, Field
 
 from app import (
-    chat, ActionResult, _gw_request, _registry_get, _registry_put,
-    _resolve_app_id,
+    chat, ActionResult, _admin_put, _gw_request, _registry_get, _registry_put,
+    _resolve_app_id, AUTH_GW, AUTH_SERVICE_TOKEN,
 )
 from models_ext_model_policy import (
     INHERIT,
@@ -237,6 +237,33 @@ class AuditExtModelsParams(BaseModel):
     )
 
 
+async def _own_models(app_id: str) -> dict | None:
+    """Return ONLY what `app_id` has explicitly stored under `models`.
+
+    ``GET /v1/apps/{id}/settings`` is the RESOLVED view: Registry merges its own
+    DEFAULT_CONFIG and the Gateway merges PLATFORM_DEFAULTS into it, so an app
+    that pinned nothing comes back looking fully configured. Auditing or
+    resetting off that view reports phantom pins and "resets" apps that never
+    stored anything -- while missing the real residue.
+
+    The app-scope row in the unified config store is the only honest answer:
+    an absent key means inherit. Returns None when it cannot be read, so the
+    caller can say so instead of guessing.
+    """
+    try:
+        data = await _gw_request(
+            "GET",
+            f"/v1/internal/config/app/{app_id}?tenant_id=default&app_id={app_id}",
+        )
+    except Exception as exc:  # pragma: no cover
+        log.warning("unresolved config read failed for %s: %s", app_id, exc)
+        return None
+    if not isinstance(data, dict):
+        return None
+    section = (data.get("config") or {}).get("models")
+    return section if isinstance(section, dict) else {}
+
+
 @chat.function(
     "audit_extension_models", action_type="read",
     data_model=ExtensionModelAuditResponse,
@@ -274,20 +301,16 @@ async def fn_audit_extension_models(ctx, params: AuditExtModelsParams) -> Action
         aid = t["app_id"]
         if not aid:
             continue
-        try:
-            r = await _registry_get(f"/v1/apps/{aid}/settings")
-            settings = r.json() if getattr(r, "status_code", 0) == 200 else None
-        except Exception as exc:  # pragma: no cover
-            log.warning("settings read failed for %s: %s", aid, exc)
-            settings = None
-
-        if not isinstance(settings, dict):
+        own = await _own_models(aid)
+        if own is None:
             # Say so rather than reporting a clean bill of health for an app
             # whose settings could not be read.
             unreadable.append(aid)
             continue
 
-        policy = read_policy(aid, settings, display_name=t["display_name"])
+        # read_policy takes a settings-shaped document; give it the app's OWN
+        # section so "inherited" never registers as a pin.
+        policy = read_policy(aid, {"models": own}, display_name=t["display_name"])
         if params.only_deviating and policy.uses_system_defaults:
             continue
         row = policy.model_dump()
@@ -347,6 +370,36 @@ class ResetExtModelsParams(BaseModel):
     )
 
 
+async def _prune_models(app_id: str, models: dict) -> tuple[bool, str]:
+    """Rewrite the app-scope `models` subtree wholesale instead of merging.
+
+    Both Registry and the Gateway deep-merge a settings section, so a key that
+    a reset OMITS keeps its old value and goes on shadowing the platform
+    cascade. ``replace_paths`` is the Gateway's own opt-in prune
+    (I-PANEL-SLOT-PRUNE) and is the only way an omitted key genuinely means
+    "inherit".
+
+    Returns (ok, error). A missing service token is reported rather than
+    silently skipped: pruning is what makes the reset real, so skipping it
+    would turn a half-finished reset into a success message.
+    """
+    if not (AUTH_GW and AUTH_SERVICE_TOKEN):
+        return False, "gateway service token unavailable"
+    try:
+        await _admin_put(
+            f"/v1/internal/config/app/{app_id}?tenant_id=default&app_id={app_id}",
+            {
+                "config": {"models": models},
+                "replace_paths": ["models"],
+                "updated_by": "admin-reset-extension-models",
+            },
+        )
+    except Exception as exc:  # pragma: no cover
+        log.warning("prune failed for %s: %s", app_id, exc)
+        return False, f"{type(exc).__name__}: {exc}"
+    return True, ""
+
+
 @chat.function(
     "reset_extension_models", action_type="write",
     effects=["update:extension_settings"], event="extension_configured",
@@ -380,18 +433,12 @@ async def fn_reset_extension_models(ctx, params: ResetExtModelsParams) -> Action
     for aid in targets:
         if not aid:
             continue
-        try:
-            r = await _registry_get(f"/v1/apps/{aid}/settings")
-            settings = r.json() if getattr(r, "status_code", 0) == 200 else None
-        except Exception as exc:  # pragma: no cover
-            log.warning("settings read failed for %s: %s", aid, exc)
-            settings = None
-
-        if not isinstance(settings, dict):
+        own = await _own_models(aid)
+        if own is None:
             failed.append({"app_id": aid, "error": "settings unreadable"})
             continue
 
-        before = (settings.get("models") or {})
+        before = own
         after = build_reset_payload(
             before, reset_params=params.reset_sampling_params
         )
@@ -408,7 +455,22 @@ async def fn_reset_extension_models(ctx, params: ResetExtModelsParams) -> Action
         try:
             w = await _registry_put(f"/v1/apps/{aid}/settings", {"models": after})
             if getattr(w, "status_code", 0) == 200:
-                would_change.append(entry)
+                # Registry AND the Gateway both deep-merge a settings section,
+                # so the keys this reset DROPPED would survive in the store and
+                # keep shadowing the cascade — the reset would report success
+                # while changing nothing that matters. Prune the app-scope row
+                # explicitly (I-PANEL-SLOT-PRUNE) so an absent key is a real
+                # inherit.
+                pruned, prune_error = await _prune_models(aid, after)
+                if pruned:
+                    would_change.append(entry)
+                else:
+                    # Do NOT claim a clean reset we could not complete: the
+                    # slots were rewritten but the dropped keys are still live.
+                    failed.append({
+                        "app_id": aid,
+                        "error": f"slots reset, but store not pruned: {prune_error}",
+                    })
             else:
                 failed.append({
                     "app_id": aid,

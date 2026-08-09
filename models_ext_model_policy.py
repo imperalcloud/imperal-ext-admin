@@ -12,15 +12,20 @@ per-action platform fee follows the TIER of the model that actually runs --
 a pinned premium model quietly bills at premium rates forever, no matter what
 the system default says.
 
-Two asymmetries in the existing save path make the drift easy to miss and are
-the reason this module exists:
+The save path used to be asymmetric, which is how the drift went unnoticed:
 
   * `top_p` / `presence_penalty` / `frequency_penalty` are dropped from the
     payload when blank, so they genuinely inherit.
-  * `temperature` / `max_tokens` are Pydantic fields with defaults 0.7 / 2048
-    and are written on EVERY save. There is no blank, therefore no way to
-    express "inherit" -- every app that ever opened the form now carries a
-    hard-pinned sampling config it never chose.
+  * `temperature` / `max_tokens` / `thinking_mode` were Pydantic fields with
+    defaults 0.7 / 2048 / "auto" and were written on EVERY save. There was no
+    blank, therefore no way to express "inherit" -- every app that ever opened
+    the form carried a hard-pinned sampling config it never chose.
+
+That second half is FIXED (2026-08-09): all three are now blank-able strings
+handled exactly like the sampling params, so "inherit" is expressible for the
+whole section. `FORCED_PARAMS` is kept as the name of the *legacy* residue --
+values written by the old form that are still sitting in stored configs -- so
+the audit can still spot and clean them.
 
 This module is pure: no HTTP, no ctx. It decides what counts as pinned and
 what a reset should look like, so the behaviour is unit-testable and the
@@ -43,8 +48,9 @@ MODEL_SLOTS: tuple[tuple[str, str], ...] = (
 # Sampling knobs that CAN already express inherit (blank -> key dropped).
 INHERITABLE_PARAMS: tuple[str, ...] = ("top_p", "presence_penalty", "frequency_penalty")
 
-# Sampling knobs the current form always writes, so they cannot inherit.
-# Listed explicitly because they are the silent half of the problem.
+# Sampling knobs the OLD form always wrote, so they could not inherit. The form
+# no longer writes them when blank (2026-08-09), but stored configs still carry
+# the residue, so they keep their own name for reporting and cleanup.
 FORCED_PARAMS: tuple[str, ...] = ("temperature", "max_tokens")
 
 # The values the form ships as its own defaults. A stored value equal to these
@@ -142,10 +148,11 @@ def read_policy(app_id: str, settings: dict, display_name: str = "") -> Extensio
         )
     if forced_params and at_form_defaults:
         findings.append(
-            "temperature/max_tokens are stored at the form's own defaults "
+            "temperature/max_tokens are stored at the old form's defaults "
             f"({', '.join(f'{k}={v}' for k, v in sorted(forced_params.items()))}). "
-            "The form always writes them, so this is probably not a deliberate "
-            "choice — but it still overrides the platform cascade."
+            "The old form wrote them on every save, so this is probably not a "
+            "deliberate choice — but it still overrides the platform cascade. "
+            "Blank them in the AI Models tab (or reset) to inherit."
         )
     elif forced_params:
         findings.append(
@@ -174,25 +181,33 @@ def build_reset_payload(models: dict, *, reset_params: bool = False) -> dict:
     are removed entirely (the save path drops blanks, so an absent key is a
     real inherit, whereas an empty string would be stored).
 
-    `reset_params` also restores temperature/max_tokens to the form defaults.
-    They cannot be removed -- the save path re-adds them from its Pydantic
-    defaults -- so "reset" here means "back to the documented default value",
-    and the caller is told as much rather than being promised a true inherit.
+    `reset_params` now removes temperature/max_tokens/thinking_mode outright
+    rather than rewriting them to the form defaults: since 2026-08-09 the save
+    path drops them when blank, so an absent key is a REAL inherit for these
+    too. Callers that still want the documented default value should set it
+    explicitly instead of relying on a reset.
 
-    Keys outside the model/sampling surface (e.g. thinking_mode) are preserved
-    untouched: this resets model routing, not the whole section.
+    Keys outside the model/sampling surface are preserved untouched: this
+    resets model routing, not the whole section.
     """
     out = dict(models or {})
 
+    # A slot the app never stored must STAY absent. Writing INHERIT into it
+    # would materialise an app-scope key (and a row) for an app that was
+    # already inheriting perfectly well -- turning a no-op reset into a real
+    # write, and reporting phantom "changes" for apps that had pinned nothing.
+    # A slot that IS present is blanked, because blank is what the save path
+    # drops on the way out.
     for slot, _role in MODEL_SLOTS:
-        out[slot] = INHERIT
+        if slot in out:
+            out[slot] = INHERIT
 
     for key in INHERITABLE_PARAMS:
         out.pop(key, None)
 
     if reset_params:
-        for key in FORCED_PARAMS:
-            out[key] = FORM_DEFAULTS[key]
+        for key in (*FORCED_PARAMS, "thinking_mode"):
+            out.pop(key, None)
 
     return out
 

@@ -10,7 +10,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app import (
-    chat, ActionResult, _registry_get, _registry_put, _resolve_app_id,
+    chat, ActionResult, _admin_put, _registry_get, _registry_put, _resolve_app_id,
     AUTH_GW, AUTH_SERVICE_TOKEN,
 )
 from models_records import ExtSettingsReceipt
@@ -30,9 +30,13 @@ class SaveModelsParams(BaseModel):
     intake_model: str = Field(default="", description="Intake model")
     analysis_model: str = Field(default="", description="Analysis model")
     router_model: str = Field(default="", description="Router model")
-    temperature: float = Field(default=0.7, ge=0, le=2)
-    max_tokens: int = Field(default=2048, ge=256, le=8192)
-    thinking_mode: str = Field(default="auto", description="auto, off, or on")
+    # Strings so blank = inherit, exactly like the sampling params below.
+    # Typed floats/ints here USED to force a value on every save (0.7/2048/auto),
+    # which silently pinned sampling config on every app that ever opened this
+    # tab and overrode the platform cascade. Blank now genuinely inherits.
+    temperature: str = Field(default="", description="Temperature 0-2; blank = inherit")
+    max_tokens: str = Field(default="", description="Max tokens 256-8192; blank = inherit")
+    thinking_mode: str = Field(default="", description="auto, off, or on; blank = inherit")
     # LCU-4 per-extension AI params (2026-04-30). Strings so blank = inherit.
     top_p: str = Field(default="", description="Top P 0.0-1.0; blank = inherit")
     presence_penalty: str = Field(default="", description="Presence penalty -2.0..2.0; blank = inherit")
@@ -156,15 +160,17 @@ async def fn_save_ext_general(ctx, params: SaveGeneralParams) -> ActionResult:
     description="Save extension AI model settings.",
 )
 async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
-    """Save extension model routing settings."""
+    """Save extension model routing settings.
+
+    Blank means INHERIT for every field here: the key is dropped from the
+    payload so the platform cascade falls through, rather than being pinned to
+    whatever the form happened to show.
+    """
     payload: dict = {
         "primary_model": params.primary_model,
         "intake_model": params.intake_model,
         "analysis_model": params.analysis_model,
         "router_model": params.router_model,
-        "temperature": params.temperature,
-        "max_tokens": params.max_tokens,
-        "thinking_mode": params.thinking_mode,
     }
     # LCU-4 (2026-04-30) — optional per-extension AI param overrides.
     # Blank string means "inherit" (drop key so kernel cascade falls through).
@@ -176,7 +182,72 @@ async def fn_save_ext_models(ctx, params: SaveModelsParams) -> ActionResult:
             payload[_k] = float(_raw)
         except (TypeError, ValueError):
             pass  # silently drop garbage; admin form has placeholder
-    return await _save_section(params.app_id, "models", payload)
+
+    # 2026-08-09 — temperature/max_tokens/thinking_mode are blank-able too, so
+    # "inherit" is expressible for the whole section. Ranges are enforced here
+    # because the fields are strings now (Pydantic ge/le no longer applies):
+    # an out-of-range or unparsable value is REFUSED rather than silently
+    # coerced, since silently storing a wrong number is what this fix removes.
+    _errors: list[str] = []
+
+    _temp = (params.temperature or "").strip()
+    if _temp:
+        try:
+            _val = float(_temp)
+        except (TypeError, ValueError):
+            _errors.append(f"temperature must be a number between 0 and 2 (got {_temp!r})")
+        else:
+            if 0 <= _val <= 2:
+                payload["temperature"] = _val
+            else:
+                _errors.append(f"temperature must be between 0 and 2 (got {_val})")
+
+    _max = (params.max_tokens or "").strip()
+    if _max:
+        try:
+            _ival = int(float(_max))
+        except (TypeError, ValueError):
+            _errors.append(f"max_tokens must be a whole number 256-8192 (got {_max!r})")
+        else:
+            if 256 <= _ival <= 8192:
+                payload["max_tokens"] = _ival
+            else:
+                _errors.append(f"max_tokens must be between 256 and 8192 (got {_ival})")
+
+    _think = (params.thinking_mode or "").strip()
+    if _think:
+        if _think in ("auto", "off", "on"):
+            payload["thinking_mode"] = _think
+        else:
+            _errors.append(f"thinking_mode must be auto, off or on (got {_think!r})")
+
+    if _errors:
+        return ActionResult.error("; ".join(_errors))
+
+    result = await _save_section(params.app_id, "models", payload)
+
+    # Blank = inherit only works if the omitted key actually LEAVES the store.
+    # Both Registry and the Gateway deep-merge a settings section, so an
+    # omitted key keeps its previous value and the admin can never un-pin
+    # anything. The Gateway supports pruning explicitly (I-PANEL-SLOT-PRUNE):
+    # replace_paths rewrites that subtree wholesale instead of merging.
+    # Best-effort and deliberately AFTER the authoritative write: the save has
+    # already succeeded, so a prune failure must not report the save as failed.
+    if result.status == "success" and AUTH_GW and AUTH_SERVICE_TOKEN:
+        try:
+            aid = await _resolve_app_id(params.app_id)
+            await _admin_put(
+                f"/v1/internal/config/app/{aid}?tenant_id=default&app_id={aid}",
+                {
+                    "config": {"models": payload},
+                    "replace_paths": ["models"],
+                    "updated_by": "admin-ext-settings",
+                },
+            )
+        except Exception:
+            pass  # Registry write stands; the cascade self-heals on next save
+
+    return result
 
 
 @chat.function(

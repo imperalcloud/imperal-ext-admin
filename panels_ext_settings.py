@@ -9,7 +9,7 @@ from typing import Any
 
 from imperal_sdk import ui
 
-from app import _registry_get, _resolve_app_id
+from app import _gw_request, _registry_get, _resolve_app_id
 
 
 # ── Data fetcher ──────────────────────────────────────────────────────
@@ -20,6 +20,33 @@ async def _fetch_settings(app_id: str) -> dict:
     if r.status_code == 200:
         return r.json()
     return {}
+
+
+async def _fetch_own_models(app_id: str) -> dict | None:
+    """Return ONLY what this app has explicitly stored for `models`.
+
+    `_fetch_settings` is the RESOLVED view: Registry merges its own
+    DEFAULT_CONFIG and the Gateway cascade into it, so a slot the admin never
+    touched comes back looking exactly like a deliberate choice. Rendering the
+    form off that is what made every app look pre-configured.
+
+    This reads the app-scope row straight out of the unified config store, so
+    an absent key means "inheriting" and can be shown as such. Best-effort: on
+    any failure we return None and the caller falls back to the resolved view
+    rather than blocking the tab.
+    """
+    aid = await _resolve_app_id(app_id)
+    try:
+        data = await _gw_request(
+            "GET",
+            f"/v1/internal/config/app/{aid}?tenant_id=default&app_id={aid}",
+        )
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    section = (data.get("config") or {}).get("models")
+    return section if isinstance(section, dict) else {}
 
 
 # ── Tab definitions ───────────────────────────────────────────────────
@@ -177,8 +204,11 @@ async def build_ext_settings(ctx: Any, app_id: str = "",
             build_skeleton_tab, build_alerts_tab, build_router_tab,
             build_session_tab, build_context_tab,
         )
+        # Only the AI Models tab needs the unresolved view, so only it pays for
+        # the extra read.
+        own_models = await _fetch_own_models(app_id) if tab == "models" else None
         tab_map = {
-            "models": lambda: build_models_tab(app_id, settings),
+            "models": lambda: build_models_tab(app_id, settings, own_models),
             "persona": lambda: build_persona_tab(app_id, settings),
             "skeleton": lambda: build_skeleton_tab(app_id, settings),
             "alerts": lambda: build_alerts_tab(app_id, settings),

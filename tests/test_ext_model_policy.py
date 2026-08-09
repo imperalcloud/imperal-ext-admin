@@ -103,15 +103,21 @@ def test_a_deliberate_param_value_is_distinguished_from_the_form_default():
     assert got.forced_params["temperature"] == 1.4
 
 
-def test_forced_params_are_flagged_as_unfixable_from_the_ui():
-    """The operator must not be told to 'just blank it' -- the UI cannot."""
+def test_forced_param_finding_now_points_at_the_fix():
+    """The old form could not express inherit; the current one can.
+
+    The finding must therefore stop describing the limitation as permanent and
+    tell the operator what actually clears it -- while still being explicit
+    that the stored value overrides the cascade until they do.
+    """
     got = read_policy("x", {"models": REPORTED})
     joined = " ".join(got.findings).lower()
     assert "temperature" in joined or "max_tokens" in joined
-    # Deliberately NOT promising "inherit": the form always writes these two,
-    # so the finding must say they override the cascade, not that blanking works.
-    assert "the form always writes them" in joined
     assert "overrides the platform cascade" in joined
+    # The actionable half: blanking the field is now a real inherit.
+    assert "blank them" in joined
+    # And the obsolete claim must be gone.
+    assert "the form always writes them" not in joined
 
 
 # ── the reset ────────────────────────────────────────────────────────────── #
@@ -137,11 +143,18 @@ def test_reset_preserves_unrelated_keys():
     assert out["thinking_mode"] == "off"
 
 
-def test_reset_params_restores_the_documented_defaults():
+def test_reset_params_removes_them_so_they_truly_inherit():
+    """A reset must hand these back to the platform, not re-pin the defaults.
+
+    Writing 0.7/2048 back would still be an app-scope override that shadows the
+    cascade forever. Since the save path drops blanks, absence is the only
+    honest "inherit".
+    """
     section = dict(REPORTED, temperature=1.9, max_tokens=8000)
     out = build_reset_payload(section, reset_params=True)
-    assert out["temperature"] == FORM_DEFAULTS["temperature"]
-    assert out["max_tokens"] == FORM_DEFAULTS["max_tokens"]
+    for key in FORCED_PARAMS:
+        assert key not in out
+    assert "thinking_mode" not in out
 
 
 def test_reset_is_idempotent():
