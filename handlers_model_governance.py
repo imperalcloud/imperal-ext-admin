@@ -30,6 +30,7 @@ from app import (
 )
 from models_ext_model_policy import (
     INHERIT,
+    MODEL_SLOTS,
     build_reset_payload,
     diff_policy,
     read_policy,
@@ -351,9 +352,19 @@ class ResetExtModelsParams(BaseModel):
     reset_sampling_params: bool = Field(
         default=False,
         description=(
-            "Also restore temperature/max_tokens to the documented defaults "
-            "(0.7 / 2048). They cannot be blanked — the save path always "
-            "writes them — so this restores the default VALUE, not inherit."
+            "Also hand temperature/max_tokens/thinking_mode back to the "
+            "platform. Since the save path drops blanks, these keys are "
+            "REMOVED outright — a real inherit, not a rewrite to 0.7 / 2048."
+        ),
+    )
+    include_pinned: bool = Field(
+        default=False,
+        description=(
+            "Also reset extensions that pin a model deliberately. Off by "
+            "default: a fleet-wide sweep is meant to clear leftover residue, "
+            "not to silently undo a choice someone made on purpose. Ignored "
+            "when app_id names a single extension — asking for one app IS the "
+            "explicit intent."
         ),
     )
     dry_run: bool = Field(
@@ -429,6 +440,7 @@ async def fn_reset_extension_models(ctx, params: ResetExtModelsParams) -> Action
                    for a in apps if isinstance(a, dict)]
 
     would_change, unchanged, failed = [], [], []
+    skipped_pinned: list[dict] = []
 
     for aid in targets:
         if not aid:
@@ -439,6 +451,20 @@ async def fn_reset_extension_models(ctx, params: ResetExtModelsParams) -> Action
             continue
 
         before = own
+
+        # A deliberate pin is a decision, not residue. A fleet-wide sweep that
+        # silently reverts it is indistinguishable from data loss to whoever
+        # made that choice -- so a bulk run skips pinned apps and SAYS it did.
+        # Naming a single app_id is itself the explicit intent, so that path is
+        # never skipped.
+        pinned_slots = [
+            slot for slot, _role in MODEL_SLOTS
+            if str(before.get(slot) or "").strip()
+        ]
+        if pinned_slots and not params.app_id and not params.include_pinned:
+            skipped_pinned.append({"app_id": aid, "pinned": sorted(pinned_slots)})
+            continue
+
         after = build_reset_payload(
             before, reset_params=params.reset_sampling_params
         )
@@ -487,6 +513,11 @@ async def fn_reset_extension_models(ctx, params: ResetExtModelsParams) -> Action
     )
     if failed:
         summary += f" · {len(failed)} failed"
+    if skipped_pinned:
+        summary += (
+            f" · {len(skipped_pinned)} skipped (deliberate pin — "
+            "pass include_pinned=true to reset those too)"
+        )
     if not applied and would_change:
         summary += " — preview only, pass dry_run=false and confirm=true to apply"
 
@@ -496,6 +527,7 @@ async def fn_reset_extension_models(ctx, params: ResetExtModelsParams) -> Action
             "changed": would_change,
             "unchanged": unchanged,
             "failed": failed,
+            "skipped_pinned": skipped_pinned,
             "inherit_value": INHERIT,
         },
         summary=summary,

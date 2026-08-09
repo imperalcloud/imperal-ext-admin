@@ -97,6 +97,11 @@ class ExtensionModelResetReceipt(sdl.Entity):
     changed: list[dict] = []
     unchanged: list[str] = []
     failed: list[dict] = []
+    # Apps left alone because they pin a model deliberately. Reported rather
+    # than quietly omitted: "45 reset, 1 clean" would hide the fact that a
+    # deliberate choice was skipped, and the operator could not tell whether
+    # it was protected or simply missed.
+    skipped_pinned: list[dict] = []
     inherit_value: Optional[str] = None
 
     @model_validator(mode="before")

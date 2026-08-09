@@ -337,3 +337,77 @@ async def test_own_models_reports_unreadable_rather_than_guessing(monkeypatch):
 
     monkeypatch.setattr(G, "_gw_request", _GwSpy("not a dict"))
     assert await G._own_models("x") is None
+
+
+# ── deliberate pins survive a fleet-wide sweep ───────────────────────────── #
+#
+# The production dry run that motivated this: a sweep meant to clear residue
+# from 44 apps also proposed un-pinning sharelock-v2 and admin. Reverting a
+# deliberate choice is data loss to whoever made it, so a BULK run protects
+# pinned apps; naming one app explicitly is still honoured.
+
+@pytest.mark.asyncio
+async def test_bulk_reset_skips_apps_with_a_deliberate_pin(ctx, monkeypatch):
+    registry_puts, gateway_puts = _wire(monkeypatch, own=OWN_DELIBERATE)
+    res = await G.fn_reset_extension_models(
+        ctx, _reset_params(dry_run=False, confirm=True, reset_sampling_params=True)
+    )
+    assert res.status == "success"
+    assert not registry_puts, "a deliberate pin was overwritten by a bulk sweep"
+    assert not gateway_puts, "a deliberate pin was pruned by a bulk sweep"
+    skipped = res.data["skipped_pinned"]
+    assert [s["app_id"] for s in skipped] == ["app-1"]
+    assert "analysis_model" in skipped[0]["pinned"]
+
+
+@pytest.mark.asyncio
+async def test_the_skip_is_visible_in_the_summary(ctx, monkeypatch):
+    """A silent skip is indistinguishable from a missed app."""
+    _wire(monkeypatch, own=OWN_DELIBERATE)
+    res = await G.fn_reset_extension_models(
+        ctx, _reset_params(dry_run=True, reset_sampling_params=True)
+    )
+    assert "skipped" in res.summary.lower()
+    assert "include_pinned" in res.summary
+
+
+@pytest.mark.asyncio
+async def test_include_pinned_still_resets_them(ctx, monkeypatch):
+    """The protection is a default, not a wall: opting in must work."""
+    registry_puts, gateway_puts = _wire(monkeypatch, own=OWN_DELIBERATE)
+    res = await G.fn_reset_extension_models(
+        ctx, _reset_params(dry_run=False, confirm=True,
+                           reset_sampling_params=True, include_pinned=True),
+    )
+    assert not res.data["skipped_pinned"]
+    assert registry_puts, "include_pinned=true did not reset the pinned app"
+    assert gateway_puts, "include_pinned=true did not prune the pinned app"
+
+
+@pytest.mark.asyncio
+async def test_naming_one_app_is_explicit_intent(ctx, monkeypatch):
+    """Asking for a single app IS the confirmation -- no opt-in needed."""
+    registry_puts, _ = _wire(monkeypatch, own=OWN_DELIBERATE)
+    res = await G.fn_reset_extension_models(
+        ctx, _reset_params(app_id="app-1", dry_run=False, confirm=True,
+                           reset_sampling_params=True),
+    )
+    assert not res.data["skipped_pinned"], "an explicitly named app was skipped"
+    assert registry_puts, "an explicitly named app was not reset"
+
+
+@pytest.mark.asyncio
+async def test_residue_is_still_swept_alongside_a_pinned_app(ctx, monkeypatch):
+    """Protecting one app must not stop the sweep for the others."""
+    def own(aid):
+        return OWN_DELIBERATE if aid == "pinned-app" else OWN_RESIDUE
+
+    registry_puts, _ = _wire(
+        monkeypatch, own=own, apps=("pinned-app", "residue-app"),
+    )
+    res = await G.fn_reset_extension_models(
+        ctx, _reset_params(dry_run=False, confirm=True, reset_sampling_params=True)
+    )
+    assert [s["app_id"] for s in res.data["skipped_pinned"]] == ["pinned-app"]
+    assert [c["app_id"] for c in res.data["changed"]] == ["residue-app"]
+    assert [p["path"] for p in registry_puts] == ["/v1/apps/residue-app/settings"]
