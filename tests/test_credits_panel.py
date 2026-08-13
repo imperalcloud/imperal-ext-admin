@@ -245,3 +245,72 @@ def test_section_says_so_when_the_gateway_is_silent(monkeypatch):
 
     assert "Alert" in kinds
     assert not _stats(tree), "no invented numbers when there is no data"
+
+
+# ── 5 · the same truth inside ONE user's profile ──────────────────────
+#
+# The profile page already shows a wallet balance. A balance is a single
+# number with no history: it cannot say whether those credits were PAID FOR
+# or HANDED OUT, which is precisely the per-user half of the owner ask. The
+# embedded section must therefore keep the same separation as the platform
+# card — and must stay SILENT rather than render a zeroed card, because an
+# empty card inside a person's profile reads as "this user has nothing",
+# a claim we cannot make when the gateway simply did not answer.
+
+# Live shape of GET /v1/internal/billing/credits/{user_id}.
+USER_LIVE = {
+    "user_id": "imp_u_XWnehlFBls",
+    "totals": {
+        "bought": 1250500, "granted": 12005000, "starter": 0,
+        "refunded": 37115, "spent": 11276916, "received": 13255500,
+        "net_spent": 11239801, "net": 2015699,
+        "rows": {"bought": 7, "granted": 11, "starter": 0,
+                 "refunded": 3420, "spent": 7733},
+    },
+    "purchases": [
+        {"at": "2026-08-11T09:18:12", "user_id": "imp_u_XWnehlFBls",
+         "email": "buyer@imperal.io", "credits": 1000000,
+         "reason": "grant_tokens", "kind": "grant",
+         "description": "Admin adjustment: grant_tokens", "app_id": ""},
+    ],
+    "recent": [],
+}
+
+
+def _user_section(payload):
+    node = PC.build_user_credits_section(payload)
+    return None if node is None else node.to_dict()
+
+
+def test_profile_section_keeps_bought_and_granted_apart():
+    """12.0M of this account's 13.2M was granted, not bought — show both."""
+    stats = _stats(_user_section(USER_LIVE))
+
+    _, (bought, _) = _stat_by_prefix(stats, "Bought")
+    _, (granted, _) = _stat_by_prefix(stats, "Granted by admins")
+
+    assert bought == "1,250,500"
+    assert granted == "12,005,000"
+    # The tempting single number (13,255,500) must never be shown as bought.
+    assert bought != "13,255,500"
+
+
+def test_profile_section_marks_a_grant_funded_account():
+    """A user living on admin grants must not look like a paying customer."""
+    rendered = str(_user_section(USER_LIVE))
+    assert "grant" in rendered.lower()
+
+
+def test_profile_section_renders_nothing_when_billing_is_silent():
+    """No payload → no card at all, so the profile is left untouched."""
+    assert PC.build_user_credits_section({}) is None
+
+
+def test_profile_section_renders_nothing_for_an_account_with_no_ledger():
+    """All-zero totals are not worth a card, and must not imply activity."""
+    empty = {"user_id": "imp_u_new", "totals": {
+        "bought": 0, "granted": 0, "starter": 0, "refunded": 0,
+        "spent": 0, "received": 0, "net_spent": 0, "net": 0, "rows": {}},
+        "purchases": [], "recent": []}
+
+    assert PC.build_user_credits_section(empty) is None

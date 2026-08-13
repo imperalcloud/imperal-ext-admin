@@ -99,6 +99,27 @@ async def _fetch_billing_mode(user_id: str, acting: str) -> dict:
         return {}
 
 
+async def _fetch_credits(user_id: str, acting: str) -> dict:
+    """This account's credit story: bought / granted / spent, plus its history.
+
+    Answers the per-user half of the owner ask (2026-08-13): "видеть наглядно
+    разницу сколько кредитов было куплено и потрачено ... по юзеру отдельно".
+    The wallet balance already on this page is ONE number with no history —
+    it cannot say whether those credits were paid for or handed out.
+
+    Local import, like _fetch_billing_mode above: panels never import sibling
+    modules at module scope, which also keeps this free of an import cycle
+    (panels_credits reaches back into this module for user emails).
+
+    Best-effort: never breaks the profile editor.
+    """
+    try:
+        from panels_credits import fetch_user_credits
+        return await fetch_user_credits(acting, user_id)
+    except Exception:
+        return {}
+
+
 def _role_default(roles, role_name, field, fallback) -> str:
     r = next((r for r in roles if r.get("name") == role_name), None)
     if r and r.get(field) is not None:
@@ -117,11 +138,13 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     if not isinstance(user, dict) or "error" in user:
         return ui.Alert(message=f"User {user_id} not found", type="error")
 
-    roles, all_scopes, extensions, user_exts, effective, billing, dev_profile, bmode = await asyncio.gather(
+    _acting = _panel_acting(ctx)
+    roles, all_scopes, extensions, user_exts, effective, billing, dev_profile, bmode, credits = await asyncio.gather(
         _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
         _fetch_user_extensions(user_id), _fetch_effective_scopes(user_id),
         _fetch_user_billing(user_id), _fetch_developer_profile(user_id),
-        _fetch_billing_mode(user_id, _panel_acting(ctx)),
+        _fetch_billing_mode(user_id, _acting),
+        _fetch_credits(user_id, _acting),
     )
     sub_data, bal_data = billing
 
@@ -351,6 +374,19 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             ),
         ])
     nodes.append(ui.Section(title="Billing Settlement", children=_settle_children))
+
+    # ── Credits (bought vs granted vs spent) ───────────────────────
+    # Sits right after settlement on purpose: "how they pay" and "what they
+    # actually got" belong together. Renders nothing at all when the billing
+    # gateway is silent — an empty card on a money screen reads as "zero",
+    # which is a different (and wrong) statement.
+    try:
+        from panels_credits import build_user_credits_section
+        _credits_section = build_user_credits_section(credits)
+        if _credits_section is not None:
+            nodes.append(_credits_section)
+    except Exception:  # never break the profile editor over a read-only card
+        pass
 
     nodes.append(ui.Section(
         title="Individual Limits",

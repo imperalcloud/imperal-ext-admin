@@ -413,3 +413,88 @@ async def build_credits(ctx, window_days: str | int = 30, **kwargs) -> object:
             variant="caption"))
 
     return ui.Stack(children=children, direction="v", gap=4)
+
+
+# ── Per-user section, embedded in the user profile ────────────────────
+
+
+def build_user_credits_section(credits: dict) -> ui.Section | None:
+    """ONE account's credits, rendered inside its profile page.
+
+    Answers the per-user half of the owner ask: the profile already shows a
+    wallet balance, but a balance is a single number with no history — it
+    cannot say whether those credits were PAID FOR or HANDED OUT, which is
+    exactly the distinction being asked for.
+
+    Lives here rather than in panels_user_profile so the bought-vs-granted
+    formatting has one home: if the classification ever changes, it changes
+    in one file, not two.
+
+    Returns None when there is nothing to show, so a billing outage leaves
+    the profile untouched instead of adding an empty or zeroed card.
+    """
+    if not credits:
+        return None
+
+    totals = credits.get("totals") or {}
+    rows = totals.get("rows") or {}
+    if not any(totals.get(k) for k in
+               ("bought", "granted", "starter", "spent", "net")):
+        return None
+
+    bought = int(totals.get("bought") or 0)
+    granted = int(totals.get("granted") or 0)
+
+    stats = [
+        ui.Stat(label=f"Bought · {rows.get('bought', 0)} top-ups",
+                value=_credits(bought), color="green"),
+        ui.Stat(label=f"Granted by admins · {rows.get('granted', 0)}",
+                value=_credits(granted), color="yellow"),
+        ui.Stat(label=f"Spent · {rows.get('spent', 0)} actions",
+                value=_credits(totals.get("net_spent")), color="red"),
+        ui.Stat(label="Left in wallet",
+                value=_credits(totals.get("net")), color="blue"),
+    ]
+
+    children: list = [ui.Stats(children=stats)]
+
+    # The one sentence an admin actually needs: did this account pay, or was
+    # it topped up by hand? Stated explicitly, because two identical balances
+    # can have completely different origins.
+    if bought and granted:
+        children.append(ui.Text(
+            f"{_credits(bought)} bought, {_credits(granted)} granted by "
+            "admins — the balance is not all paid-for.",
+            variant="caption"))
+    elif granted and not bought:
+        children.append(ui.Text(
+            "Every credit on this account was granted by an admin, none "
+            "were bought.", variant="caption"))
+    elif bought and not granted:
+        children.append(ui.Text(
+            "All credits on this account were bought.", variant="caption"))
+
+    purchases = credits.get("purchases") or []
+    if purchases:
+        items = []
+        for row in purchases[:15]:
+            kind = row.get("kind", "")
+            stamp, rel = _when(row.get("at"))
+            items.append(ui.ListItem(
+                id=f"{row.get('at', '')}-{row.get('reason', '')}",
+                title=f"+{_credits(row.get('credits'))} · {_kind_label(kind)}",
+                subtitle=f"{stamp} ({rel}) · {row.get('reason') or _DASH}",
+                badge=ui.Badge(label=_kind_label(kind),
+                               color=_KIND_COLOR.get(kind, "gray")),
+            ))
+        children.append(ui.Divider())
+        children.append(ui.Text(
+            f"Credit history · {len(purchases)} top-up(s) and grant(s)",
+            variant="caption"))
+        children.append(ui.List(items=items))
+    else:
+        children.append(ui.Text(
+            "No top-ups or grants recorded for this account.",
+            variant="caption"))
+
+    return ui.Section(title="Credits", collapsible=True, children=children)
