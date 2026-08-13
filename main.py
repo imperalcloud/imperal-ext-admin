@@ -32,6 +32,7 @@ import panels_system_pricing    # noqa: F401  # System Pricing panel
 import handlers_voice          # noqa: F401  # Voice: pricing/master/role-access handlers
 import panels_voice            # noqa: F401  # Voice panel
 import handlers_billing        # noqa: F401
+import handlers_billing_mode   # noqa: F401  # Manual billing control: HOW/WHEN a customer pays (card|manual|free, contract amount)
 import handlers_payment        # noqa: F401
 import handlers_developer      # noqa: F401
 import handlers_admin_reads    # noqa: F401  # Webbee read-gaps: payments/cards/limits/agencies/pending-apps/pending-payouts

@@ -23324,6 +23324,153 @@
       "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_user_billing_mode",
+      "description": "Show HOW a user's subscription settles: by card, manually/by invoice, or free - plus any contract amount, whether a card is required, and when the period ends. Use for: how does this customer pay, does this user need a card, enterprise billing arrangement.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Read how one user's subscription settles.",
+        "properties": {
+          "user_id": {
+            "description": "Who to look at — imperal_id (imp_u_*), email, or name.",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "GetUserBillingModeParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {},
+        "title": "BillingModeState",
+        "type": "object"
+      },
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_user_billing_mode",
+      "description": "Choose HOW and WHEN a customer pays: by card, manually by invoice/bank transfer (no card ever required), or free. Optionally set a contract amount to charge instead of the plan price, extend the paid period after an invoice is settled, or make the seat never expire. Built for enterprise contracts. Use for: this company pays by bank transfer, give them free access, enterprise without a card, extend their period.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:subscription_billing"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Declare how and when one user pays. Only what you pass is changed.",
+        "properties": {
+          "user_id": {
+            "description": "Who to change — imperal_id (imp_u_*), email, or name.",
+            "title": "User Id",
+            "type": "string"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How they pay: 'card' (automatic card renewal), 'manual' (invoice / bank transfer — no card, never auto-charged), or 'free' (comped). Omit to leave the mode as it is.",
+            "title": "Mode"
+          },
+          "contract_amount": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Amount to charge per period, in DOLLARS, instead of the plan price — this is what makes a price-0 enterprise contract chargeable. Only meaningful together with mode='card'.",
+            "title": "Contract Amount"
+          },
+          "clear_contract_amount": {
+            "default": false,
+            "description": "Drop the custom amount and fall back to the plan's own price.",
+            "title": "Clear Contract Amount",
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why, for the record — e.g. 'pays by bank transfer, contract INV-2026-04'.",
+            "title": "Note"
+          },
+          "extend_days": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Extend the paid period by N days — the manual equivalent of a renewal, for a customer who just paid an invoice.",
+            "title": "Extend Days"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Set the period end explicitly (ISO date/time). Pass 'never' for a seat that never expires (contract or comped access).",
+            "title": "Expires At"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "SetUserBillingModeParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "BillingModeReceipt",
+        "type": "object"
+      },
+      "event": "user_billing_mode_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
     }
   ],
   "signals": [],
