@@ -123,6 +123,32 @@ async def _fetch_analytics(acting: str, window_days: int, limit: int) -> dict:
         return {}
 
 
+async def fetch_user_billing_index(acting: str) -> dict:
+    """Per-user billing facts for the USER LIST — one call for every row.
+
+    /v1/users carries a plan NAME but no billing period, so the list cannot
+    say when anyone actually pays next. This map fills that gap without an
+    N+1 read per row.
+
+    Returns ``{"users": {user_id: {...}}, "orphaned_subscriptions": [...]}``.
+    Best-effort: a billing outage must degrade the user list to what it
+    showed before, never break it.
+    """
+    try:
+        # local import: panels never import handlers at module scope
+        from handlers_billing_mode import _admin_get
+        resp = await _admin_get("/v1/internal/billing/user-index", acting,
+                                timeout=8.0)
+        if resp.status_code != 200:
+            log.warning("billing user-index HTTP %s", resp.status_code)
+            return {}
+        payload = resp.json()
+        return payload if isinstance(payload, dict) else {}
+    except Exception as e:
+        log.warning("billing user-index fetch failed: %s", e)
+        return {}
+
+
 # ── Card builders ─────────────────────────────────────────────────────
 
 
