@@ -67,6 +67,38 @@ async def _fetch_user_billing(user_id: str) -> tuple[dict, dict]:
     return sub, bal
 
 
+def _panel_acting(ctx) -> str:
+    """The admin viewing this panel (mirrors handlers_billing_mode._acting)."""
+    try:
+        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
+    except Exception:
+        return ""
+
+
+async def _fetch_billing_mode(user_id: str, acting: str) -> dict:
+    """HOW this subscription settles: card / manual / free, plus the two answers
+    the gateway DERIVES from that (card_required, charges_automatically).
+
+    Deliberately NOT read through ``_gw_request``: this lives behind the
+    admin-only /v1/internal/billing/subscription-billing endpoint, which
+    requires the service token that the panel's own helper does not send —
+    reading it that way would 403 and render an empty section.
+
+    Best-effort like every other fetch here: never breaks the profile editor.
+    """
+    try:
+        from handlers_billing_mode import _admin_get  # local: panels never import handlers at module scope
+        resp = await _admin_get(
+            f"/v1/internal/billing/subscription-billing/{user_id}", acting,
+        )
+        if resp.status_code != 200:
+            return {}
+        payload = resp.json()
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
 def _role_default(roles, role_name, field, fallback) -> str:
     r = next((r for r in roles if r.get("name") == role_name), None)
     if r and r.get(field) is not None:
@@ -85,10 +117,11 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     if not isinstance(user, dict) or "error" in user:
         return ui.Alert(message=f"User {user_id} not found", type="error")
 
-    roles, all_scopes, extensions, user_exts, effective, billing, dev_profile = await asyncio.gather(
+    roles, all_scopes, extensions, user_exts, effective, billing, dev_profile, bmode = await asyncio.gather(
         _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
         _fetch_user_extensions(user_id), _fetch_effective_scopes(user_id),
         _fetch_user_billing(user_id), _fetch_developer_profile(user_id),
+        _fetch_billing_mode(user_id, _panel_acting(ctx)),
     )
     sub_data, bal_data = billing
 
@@ -211,7 +244,114 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     ))
     nodes.append(ui.Section(title="Developer", children=dev_children))
 
-    # ── Individual Limits ──────────────────────────────────────────
+    # ── Billing Settlement (owner control: HOW and WHEN they pay) ──
+    # Added 2026-08-13. The two billing-mode tools existed but had NO panel at
+    # all, so the owner could only reach them by asking Webbee in chat. Same
+    # rule as everywhere else: whether a card is required is the GATEWAY's
+    # answer (card_required), never re-derived here from a plan name — that
+    # re-derivation is exactly the bug that trapped 11 accounts in an
+    # add-card loop.
+    _mode = (bmode.get("billing_mode") or "card").lower()
+    _mode_label = {
+        "card": "By card — the saved card is charged on renewal",
+        "manual": "By invoice / bank transfer — no card, never auto-charged",
+        "free": "Free — comped access, never charged",
+    }.get(_mode, _mode)
+    _amount_cents = bmode.get("contract_amount_cents")
+    _amount_now = "" if _amount_cents in (None, "") else f"{int(_amount_cents) / 100:.2f}"
+
+    _settle_children: list = []
+    if not bmode:
+        _settle_children.append(ui.Alert(
+            type="info",
+            title="No active subscription",
+            message=(
+                "Settlement applies to an active subscription. Assign a plan "
+                "first, then choose how this customer pays."
+            ),
+        ))
+    else:
+        _settle_children.extend([
+            ui.Stack([
+                ui.Badge(
+                    label=_mode.upper(),
+                    color={"card": "blue", "manual": "orange", "free": "green"}.get(_mode, "gray"),
+                ),
+                ui.Badge(
+                    label=("card required" if bmode.get("card_required") else "no card needed"),
+                    color=("red" if bmode.get("card_required") else "green"),
+                ),
+                ui.Badge(
+                    label=("auto-charge on" if bmode.get("charges_automatically") else "auto-charge off"),
+                    color=("blue" if bmode.get("charges_automatically") else "gray"),
+                ),
+            ], direction="h", gap=2),
+            ui.Text(_mode_label, variant="caption"),
+            ui.KeyValue(items=[
+                {"key": "Contract amount",
+                 "value": (f"${_amount_now}/period" if _amount_now else "— uses the plan price")},
+                {"key": ("Period ends" if _mode in ("manual", "free") else "Renews"),
+                 "value": ("never expires" if bmode.get("never_expires")
+                           else (bmode.get("expires_at") or "—"))},
+                {"key": "Note", "value": bmode.get("billing_note") or "—"},
+            ], columns=2),
+            ui.Form(
+                action="set_user_billing_mode",
+                submit_label="Save Settlement",
+                defaults={"user_id": user_id},
+                children=[
+                    ui.Text("How they pay", variant="caption"),
+                    ui.Select(
+                        param_name="mode",
+                        value=_mode,
+                        options=[
+                            {"value": "card", "label": "Card — charge the saved card automatically"},
+                            {"value": "manual", "label": "Manual — invoice / bank transfer (no card)"},
+                            {"value": "free", "label": "Free — comped access"},
+                        ],
+                    ),
+                    ui.Text(
+                        "Contract amount in dollars per period — what finally makes a "
+                        "price-0 enterprise contract chargeable. Empty = use the plan price.",
+                        variant="caption",
+                    ),
+                    ui.Input(
+                        param_name="contract_amount",
+                        value=_amount_now,
+                        placeholder="e.g. 500.00",
+                    ),
+                    ui.Text(
+                        "Extend the paid period by N days — the manual equivalent of a "
+                        "renewal, for a customer who just paid an invoice.",
+                        variant="caption",
+                    ),
+                    ui.Input(param_name="extend_days", value="", placeholder="e.g. 30"),
+                    ui.Text(
+                        "Or set the period end explicitly — an ISO date, or 'never' for "
+                        "a seat that never expires.",
+                        variant="caption",
+                    ),
+                    ui.Input(
+                        param_name="expires_at",
+                        value="",
+                        placeholder="2027-01-31  ·  never",
+                    ),
+                    ui.Text("Why, for the record", variant="caption"),
+                    ui.Input(
+                        param_name="note",
+                        value=bmode.get("billing_note") or "",
+                        placeholder="pays by bank transfer, contract INV-2026-04",
+                    ),
+                    ui.Toggle(
+                        label="Drop the custom amount (fall back to the plan price)",
+                        value=False,
+                        param_name="clear_contract_amount",
+                    ),
+                ],
+            ),
+        ])
+    nodes.append(ui.Section(title="Billing Settlement", children=_settle_children))
+
     nodes.append(ui.Section(
         title="Individual Limits",
         children=[
