@@ -147,6 +147,8 @@ def _receipt(action: str, ok: list[str], failed: list[str], **extra) -> ActionRe
     "bulk_set_user_active",
     action_type="write",
     effects=["update:user_status"],
+    event="user_updated",  # V10: the same event the single-user tools emit — a
+                           # bulk call is N user updates, not a new kind of fact.
     data_model=BulkReceipt,
     description=(
         "Deactivate or reactivate SEVERAL users in one call. Use whenever the "
@@ -179,6 +181,7 @@ async def fn_bulk_set_user_active(ctx, params: BulkSetActiveParams) -> ActionRes
     "bulk_adjust_balance",
     action_type="write",
     effects=["update:user_balance"],
+    event="user_balance_adjusted",  # V10: money moved — it belongs on the ledger.
     data_model=BulkReceipt,
     description=(
         "Credit or deduct the SAME token amount for SEVERAL users at once "
@@ -221,6 +224,7 @@ async def fn_bulk_adjust_balance(ctx, params: BulkAdjustBalanceParams) -> Action
     "bulk_reset_conversation",
     action_type="write",
     effects=["update:user_session"],
+    event="user_conversation_reset",  # V10: same event as the single-user reset.
     data_model=BulkReceipt,
     description=(
         "Reset the chat history/session of SEVERAL users at once. Money, "

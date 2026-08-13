@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.13",
+  "sdk_version": "5.9.14",
   "app_id": "admin",
   "version": "5.11.0",
   "name": "Admin",
@@ -2661,6 +2661,255 @@
         "x-sdl": "entity"
       },
       "event": "user_updated",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "bulk_set_user_active",
+      "description": "Deactivate or reactivate SEVERAL users in one call. Use whenever the admin names more than one person ('deactivate X, Y and Z') instead of calling deactivate_user repeatedly.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:user_status"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Activate or deactivate several users.",
+        "properties": {
+          "user_ids": {
+            "description": "The users to act on. Each entry may be an imperal_id (imp_u_*), an email, a display name, or a partial of any of those — they are resolved the same way the single-user tools resolve them. Pass EVERY user the admin named in ONE call; do not loop.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "User Ids",
+            "type": "array"
+          },
+          "is_active": {
+            "description": "True = reactivate the listed users, False = deactivate them (reversible).",
+            "title": "Is Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_ids",
+          "is_active"
+        ],
+        "title": "BulkSetActiveParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "additionalProperties": true,
+        "description": "Uniform outcome shape for every bulk admin action.",
+        "properties": {
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "succeeded": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Succeeded",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "success_count": {
+            "default": 0,
+            "title": "Success Count",
+            "type": "integer"
+          },
+          "failure_count": {
+            "default": 0,
+            "title": "Failure Count",
+            "type": "integer"
+          }
+        },
+        "title": "BulkReceipt",
+        "type": "object"
+      },
+      "event": "user_updated",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "bulk_adjust_balance",
+      "description": "Credit or deduct the SAME token amount for SEVERAL users at once (positive = credit, negative = deduct). Use for compensations and mass corrections instead of calling adjust_balance repeatedly.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:user_balance"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Credit or deduct the SAME token amount for several users.",
+        "properties": {
+          "user_ids": {
+            "description": "The users to act on. Each entry may be an imperal_id (imp_u_*), an email, a display name, or a partial of any of those — they are resolved the same way the single-user tools resolve them. Pass EVERY user the admin named in ONE call; do not loop.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "User Ids",
+            "type": "array"
+          },
+          "amount": {
+            "description": "Token amount applied to EACH listed user (positive = credit, negative = deduct).",
+            "title": "Amount",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "admin_bulk_adjustment",
+            "description": "Reason recorded for every adjustment in the batch.",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_ids",
+          "amount"
+        ],
+        "title": "BulkAdjustBalanceParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "additionalProperties": true,
+        "description": "Uniform outcome shape for every bulk admin action.",
+        "properties": {
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "succeeded": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Succeeded",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "success_count": {
+            "default": 0,
+            "title": "Success Count",
+            "type": "integer"
+          },
+          "failure_count": {
+            "default": 0,
+            "title": "Failure Count",
+            "type": "integer"
+          }
+        },
+        "title": "BulkReceipt",
+        "type": "object"
+      },
+      "event": "user_balance_adjusted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "bulk_reset_conversation",
+      "description": "Reset the chat history/session of SEVERAL users at once. Money, usage, billing and installed apps are preserved. Use when clearing state for a group after an incident.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:user_session"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Target SEVERAL users at once.",
+        "properties": {
+          "user_ids": {
+            "description": "The users to act on. Each entry may be an imperal_id (imp_u_*), an email, a display name, or a partial of any of those — they are resolved the same way the single-user tools resolve them. Pass EVERY user the admin named in ONE call; do not loop.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "title": "BulkUsersParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "additionalProperties": true,
+        "description": "Uniform outcome shape for every bulk admin action.",
+        "properties": {
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "succeeded": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Succeeded",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "success_count": {
+            "default": 0,
+            "title": "Success Count",
+            "type": "integer"
+          },
+          "failure_count": {
+            "default": 0,
+            "title": "Failure Count",
+            "type": "integer"
+          }
+        },
+        "title": "BulkReceipt",
+        "type": "object"
+      },
+      "event": "user_conversation_reset",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -8679,22 +8928,20 @@
             "type": "string"
           },
           "temperature": {
-            "default": 0.7,
-            "maximum": 2,
-            "minimum": 0,
+            "default": "",
+            "description": "Temperature 0-2; blank = inherit",
             "title": "Temperature",
-            "type": "number"
+            "type": "string"
           },
           "max_tokens": {
-            "default": 2048,
-            "maximum": 8192,
-            "minimum": 256,
+            "default": "",
+            "description": "Max tokens 256-8192; blank = inherit",
             "title": "Max Tokens",
-            "type": "integer"
+            "type": "string"
           },
           "thinking_mode": {
-            "default": "auto",
-            "description": "auto, off, or on",
+            "default": "",
+            "description": "auto, off, or on; blank = inherit",
             "title": "Thinking Mode",
             "type": "string"
           },
@@ -12251,7 +12498,7 @@
           },
           "resolve_model": {
             "default": "",
-            "description": "Universal Brain reasoning model (purpose=resolve) — the agentic loop behind chat and every automation run. Blank = inherit the global default model.",
+            "description": "Universal Brain reasoning model (purpose=resolve) — the agentic loop behind chat and every automation run. Blank does NOT mean the global default: the kernel makes the brain inherit whatever the ROUTING model is, so leaving this blank lets a routing change silently re-price every automation run. Pick a model explicitly to pin the cost.",
             "title": "Resolve Model",
             "type": "string"
           },
@@ -12259,6 +12506,18 @@
             "default": "",
             "description": "Universal Brain reasoning provider (auto-inferred from the model id when left blank)",
             "title": "Resolve Provider",
+            "type": "string"
+          },
+          "resolve_fallback_model": {
+            "default": "",
+            "description": "Universal Brain failover model — used for ONE retry only when the brain's primary errors (purpose=resolve). Applies to chat AND every unattended automation run. Blank = platform reasoning-grade default.",
+            "title": "Resolve Fallback Model",
+            "type": "string"
+          },
+          "resolve_fallback_provider": {
+            "default": "",
+            "description": "Universal Brain failover provider (auto-inferred from the fallback model id when left blank)",
+            "title": "Resolve Fallback Provider",
             "type": "string"
           },
           "webbeesmart_model": {
@@ -16506,6 +16765,534 @@
         "type": "object"
       },
       "event": "user_plan_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_user_billing_mode",
+      "description": "Show HOW a user's subscription settles: by card, manually/by invoice, or free — plus any contract amount, whether a card is required, and when the period ends. Use for: how does this customer pay, does this user need a card, enterprise billing arrangement.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Read how one user's subscription settles.",
+        "properties": {
+          "user_id": {
+            "description": "Who to look at — imperal_id (imp_u_*), email, or name.",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "GetUserBillingModeParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "get_user_billing_mode / set_user_billing_mode return shape — a single\nsettlement entity (kind='billingmode').\n\nFederal I-EXT-RECORD-FIELD-NAMING-SYMMETRIC: these are the ACTUAL keys the\ngateway returns from GET/PUT /v1/internal/billing/subscription-billing,\nverified against a live response on 2026-08-13 rather than assumed:\n{user_id, plan, status, billing_mode, card_required, charges_automatically,\ncontract_amount_cents, billing_note, expires_at, never_expires} plus\n``action`` which only the PUT path adds.\n\nWhy this entity exists at all: whether a customer needs a card used to be\nDERIVED (from plan names in the panel, from plans.price > 0 in the sweep),\nwhich trapped 11 live accounts in an add-card loop. ``billing_mode`` is the\ndeclared contract that replaced that guess, so the typed shape has to carry\nboth the mode AND the two computed answers (card_required,\ncharges_automatically) the gateway derives from it — a reader must never\nhave to re-derive them and risk disagreeing.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plan"
+          },
+          "billing_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Billing Mode"
+          },
+          "card_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Card Required"
+          },
+          "charges_automatically": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Charges Automatically"
+          },
+          "contract_amount_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contract Amount Cents"
+          },
+          "billing_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Billing Note"
+          },
+          "expires_at": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "never_expires": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Never Expires"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BillingModeRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_user_billing_mode",
+      "description": "Choose HOW and WHEN a customer pays: by card, manually by invoice/bank transfer (no card required), or free. Optionally set a custom contract amount, extend the paid period after an invoice is settled, or make the seat never expire. Use for: this enterprise pays by invoice, let this company sit free, charge this enterprise $500/month, extend their period.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:subscription_billing"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Declare how and when one user pays. Only what you pass is changed.",
+        "properties": {
+          "user_id": {
+            "description": "Who to change — imperal_id (imp_u_*), email, or name.",
+            "title": "User Id",
+            "type": "string"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How they pay: 'card' (automatic card renewal), 'manual' (invoice / bank transfer — no card, never auto-charged), or 'free' (comped). Omit to leave the mode as it is.",
+            "title": "Mode"
+          },
+          "contract_amount": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Amount to charge per period, in DOLLARS, instead of the plan price — this is what makes a price-0 enterprise contract chargeable. Only meaningful together with mode='card'.",
+            "title": "Contract Amount"
+          },
+          "clear_contract_amount": {
+            "default": false,
+            "description": "Drop the custom amount and fall back to the plan's own price.",
+            "title": "Clear Contract Amount",
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why, for the record — e.g. 'pays by bank transfer, contract INV-2026-04'.",
+            "title": "Note"
+          },
+          "extend_days": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Extend the paid period by N days — the manual equivalent of a renewal, for a customer who just paid an invoice.",
+            "title": "Extend Days"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Set the period end explicitly (ISO date/time). Pass 'never' for a seat that never expires (contract or comped access).",
+            "title": "Expires At"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "SetUserBillingModeParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "get_user_billing_mode / set_user_billing_mode return shape — a single\nsettlement entity (kind='billingmode').\n\nFederal I-EXT-RECORD-FIELD-NAMING-SYMMETRIC: these are the ACTUAL keys the\ngateway returns from GET/PUT /v1/internal/billing/subscription-billing,\nverified against a live response on 2026-08-13 rather than assumed:\n{user_id, plan, status, billing_mode, card_required, charges_automatically,\ncontract_amount_cents, billing_note, expires_at, never_expires} plus\n``action`` which only the PUT path adds.\n\nWhy this entity exists at all: whether a customer needs a card used to be\nDERIVED (from plan names in the panel, from plans.price > 0 in the sweep),\nwhich trapped 11 live accounts in an add-card loop. ``billing_mode`` is the\ndeclared contract that replaced that guess, so the typed shape has to carry\nboth the mode AND the two computed answers (card_required,\ncharges_automatically) the gateway derives from it — a reader must never\nhave to re-derive them and risk disagreeing.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plan"
+          },
+          "billing_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Billing Mode"
+          },
+          "card_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Card Required"
+          },
+          "charges_automatically": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Charges Automatically"
+          },
+          "contract_amount_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contract Amount Cents"
+          },
+          "billing_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Billing Note"
+          },
+          "expires_at": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "never_expires": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Never Expires"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "BillingModeRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "user_billing_mode_set",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -23169,8 +23956,14 @@
           },
           "reset_sampling_params": {
             "default": false,
-            "description": "Also restore temperature/max_tokens to the documented defaults (0.7 / 2048). They cannot be blanked — the save path always writes them — so this restores the default VALUE, not inherit.",
+            "description": "Also hand temperature/max_tokens/thinking_mode back to the platform. Since the save path drops blanks, these keys are REMOVED outright — a real inherit, not a rewrite to 0.7 / 2048.",
             "title": "Reset Sampling Params",
+            "type": "boolean"
+          },
+          "include_pinned": {
+            "default": false,
+            "description": "Also reset extensions that pin a model deliberately. Off by default: a fleet-wide sweep is meant to clear leftover residue, not to silently undo a choice someone made on purpose. Ignored when app_id names a single extension — asking for one app IS the explicit intent.",
+            "title": "Include Pinned",
             "type": "boolean"
           },
           "dry_run": {
@@ -23298,6 +24091,15 @@
             "title": "Failed",
             "type": "array"
           },
+          "skipped_pinned": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Skipped Pinned",
+            "type": "array"
+          },
           "inherit_value": {
             "anyOf": [
               {
@@ -23320,153 +24122,6 @@
         "x-sdl": "entity"
       },
       "event": "extension_configured",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "get_user_billing_mode",
-      "description": "Show HOW a user's subscription settles: by card, manually/by invoice, or free - plus any contract amount, whether a card is required, and when the period ends. Use for: how does this customer pay, does this user need a card, enterprise billing arrangement.",
-      "action_type": "read",
-      "chain_callable": true,
-      "effects": [],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Read how one user's subscription settles.",
-        "properties": {
-          "user_id": {
-            "description": "Who to look at — imperal_id (imp_u_*), email, or name.",
-            "title": "User Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id"
-        ],
-        "title": "GetUserBillingModeParams",
-        "type": "object"
-      },
-      "return_schema": {
-        "properties": {},
-        "title": "BillingModeState",
-        "type": "object"
-      },
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "set_user_billing_mode",
-      "description": "Choose HOW and WHEN a customer pays: by card, manually by invoice/bank transfer (no card ever required), or free. Optionally set a contract amount to charge instead of the plan price, extend the paid period after an invoice is settled, or make the seat never expire. Built for enterprise contracts. Use for: this company pays by bank transfer, give them free access, enterprise without a card, extend their period.",
-      "action_type": "write",
-      "chain_callable": true,
-      "effects": [
-        "update:subscription_billing"
-      ],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Declare how and when one user pays. Only what you pass is changed.",
-        "properties": {
-          "user_id": {
-            "description": "Who to change — imperal_id (imp_u_*), email, or name.",
-            "title": "User Id",
-            "type": "string"
-          },
-          "mode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "How they pay: 'card' (automatic card renewal), 'manual' (invoice / bank transfer — no card, never auto-charged), or 'free' (comped). Omit to leave the mode as it is.",
-            "title": "Mode"
-          },
-          "contract_amount": {
-            "anyOf": [
-              {
-                "minimum": 0,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Amount to charge per period, in DOLLARS, instead of the plan price — this is what makes a price-0 enterprise contract chargeable. Only meaningful together with mode='card'.",
-            "title": "Contract Amount"
-          },
-          "clear_contract_amount": {
-            "default": false,
-            "description": "Drop the custom amount and fall back to the plan's own price.",
-            "title": "Clear Contract Amount",
-            "type": "boolean"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "maxLength": 255,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Why, for the record — e.g. 'pays by bank transfer, contract INV-2026-04'.",
-            "title": "Note"
-          },
-          "extend_days": {
-            "anyOf": [
-              {
-                "minimum": 0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Extend the paid period by N days — the manual equivalent of a renewal, for a customer who just paid an invoice.",
-            "title": "Extend Days"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Set the period end explicitly (ISO date/time). Pass 'never' for a seat that never expires (contract or comped access).",
-            "title": "Expires At"
-          }
-        },
-        "required": [
-          "user_id"
-        ],
-        "title": "SetUserBillingModeParams",
-        "type": "object"
-      },
-      "return_schema": {
-        "properties": {
-          "action": {
-            "default": "saved",
-            "title": "Action",
-            "type": "string"
-          }
-        },
-        "title": "BillingModeReceipt",
-        "type": "object"
-      },
-      "event": "user_billing_mode_set",
       "background": false,
       "long_running": false,
       "scopes": [],

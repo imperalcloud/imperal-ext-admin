@@ -93,6 +93,52 @@ class BillingHealthRecord(sdl.Entity):
 BillingHealthResponse = BillingHealthRecord
 
 
+# --- manual billing control (how a subscription settles) ---
+
+class BillingModeRecord(sdl.Entity):
+    """get_user_billing_mode / set_user_billing_mode return shape — a single
+    settlement entity (kind='billingmode').
+
+    Federal I-EXT-RECORD-FIELD-NAMING-SYMMETRIC: these are the ACTUAL keys the
+    gateway returns from GET/PUT /v1/internal/billing/subscription-billing,
+    verified against a live response on 2026-08-13 rather than assumed:
+    {user_id, plan, status, billing_mode, card_required, charges_automatically,
+    contract_amount_cents, billing_note, expires_at, never_expires} plus
+    ``action`` which only the PUT path adds.
+
+    Why this entity exists at all: whether a customer needs a card used to be
+    DERIVED (from plan names in the panel, from plans.price > 0 in the sweep),
+    which trapped 11 live accounts in an add-card loop. ``billing_mode`` is the
+    declared contract that replaced that guess, so the typed shape has to carry
+    both the mode AND the two computed answers (card_required,
+    charges_automatically) the gateway derives from it — a reader must never
+    have to re-derive them and risk disagreeing.
+    """
+    user_id: Optional[str] = None
+    plan: Optional[str] = None
+    status: Optional[str] = None
+    billing_mode: Optional[str] = None
+    card_required: Optional[bool] = None
+    charges_automatically: Optional[bool] = None
+    contract_amount_cents: Optional[int] = None
+    billing_note: Optional[str] = None
+    expires_at: Optional[Any] = None
+    never_expires: Optional[bool] = None
+    action: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data["id"] = data.get("id") or data.get("user_id") or ""
+            data.setdefault("title", data.get("user_id") or "Billing mode")
+            data.setdefault("kind", "billingmode")
+            mode = data.get("billing_mode")
+            if mode:
+                data.setdefault("status", str(mode))
+        return data
+
+
 # --- payment provider config ---
 
 class PaymentConfigRecord(sdl.Entity):

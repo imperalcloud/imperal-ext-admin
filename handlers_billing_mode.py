@@ -36,6 +36,7 @@ from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put,
 )
 from handlers_billing import _normalize_to_imperal_id
+from models_billing import BillingModeRecord
 
 log = logging.getLogger("admin")
 
@@ -106,6 +107,7 @@ class GetUserBillingModeParams(BaseModel):
 @chat.function(
     "get_user_billing_mode",
     action_type="read",
+    data_model=BillingModeRecord,
     description=(
         "Show HOW a user's subscription settles: by card, manually/by invoice, "
         "or free — plus any contract amount, whether a card is required, and "
@@ -197,6 +199,7 @@ class SetUserBillingModeParams(BaseModel):
     action_type="write",
     effects=["update:subscription_billing"],
     event="user_billing_mode_set",
+    data_model=BillingModeRecord,
     description=(
         "Choose HOW and WHEN a customer pays: by card, manually by invoice/bank "
         "transfer (no card required), or free. Optionally set a custom contract "

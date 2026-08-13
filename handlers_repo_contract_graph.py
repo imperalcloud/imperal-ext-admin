@@ -107,6 +107,13 @@ def _graph(maps: list[dict], params: ContractGraphParam) -> dict:
                  "cross-repo links. Works identically from panel, Telegram, and terminal."),
 )
 async def fn_get_cross_repo_contract_graph(ctx, params: ContractGraphParam) -> ActionResult:
+    """Read the caller's cross-repository HTTP contract graph.
+
+    Returns the exact routes, handlers, models/tables and Git provenance Webbee
+    has indexed, plus the deterministic links between repositories, so a change
+    on one side of an HTTP boundary can be traced to the code on the other.
+    Identical on every surface (panel, Telegram, terminal).
+    """
     uid = _caller(ctx)
     if not uid:
         return ActionResult.error("Could not identify the calling user.")
