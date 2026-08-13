@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 
 from imperal_sdk._shared_http import shared_http
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put,
@@ -151,6 +151,44 @@ async def fn_get_user_billing_mode(ctx, params: GetUserBillingModeParams) -> Act
 
 class SetUserBillingModeParams(BaseModel):
     """Declare how and when one user pays. Only what you pass is changed."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_means_untouched(cls, data):
+        """An empty panel field means "leave this alone", not "invalid input".
+
+        Fixed 2026-08-13 after a real panel failure: saving the Billing
+        Settlement form with the optional boxes left empty raised
+            contract_amount: Input should be a valid number ... input_value=''
+            extend_days:     Input should be a valid integer ... input_value=''
+        HTML forms have no concept of null — an untouched box arrives as the
+        empty string, so Pydantic rejected the whole submit before the handler
+        (which already treats None as "not supplied") ever ran. The owner could
+        therefore only change the mode by ALSO filling in every other field.
+
+        The rest of the extension solves this by typing such fields as
+        ``Optional[str]`` (see UpdateUserLimitsParams) and coercing later, but
+        this tool is also called from chat, where the model legitimately sends a
+        real 500 or 30. Normalising here keeps BOTH callers honest: the panel's
+        '' becomes None, and a genuine number stays a number with its ge=0
+        validation intact.
+
+        clear_contract_amount is included deliberately: an unchecked toggle can
+        arrive as '' too, which would fail bool parsing for exactly the same
+        reason.
+        """
+        if not isinstance(data, dict):
+            return data
+        cleaned = dict(data)
+        for key in ("mode", "contract_amount", "note", "extend_days", "expires_at"):
+            value = cleaned.get(key)
+            if isinstance(value, str) and not value.strip():
+                cleaned[key] = None
+        toggle = cleaned.get("clear_contract_amount")
+        if isinstance(toggle, str) and not toggle.strip():
+            cleaned["clear_contract_amount"] = False
+        return cleaned
+
     user_id: str = Field(
         description="Who to change — imperal_id (imp_u_*), email, or name.",
     )
