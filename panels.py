@@ -34,6 +34,7 @@ from panels_extensions import build_extensions
 from panels_roles import build_roles
 from panels_scopes import build_scopes
 from panels_audit import build_audit
+from panels_billing_analytics import build_billing_analytics
 from panels_ext_settings import build_ext_settings
 from panels_ext_access_policy import build_ext_access_policy
 from panels_ext_users import build_ext_users
@@ -53,6 +54,8 @@ log = logging.getLogger("admin")
 
 _SECTIONS = [
     {"id": "dashboard",  "label": "Dashboard",   "icon": "LayoutDashboard"},
+    {"id": "billing_analytics", "label": "Billing Analytics",
+     "icon": "TrendingUp"},
     {"id": "management", "label": "Users",       "icon": "Users"},
     {"id": "extensions", "label": "Extensions",  "icon": "Puzzle"},
     {"id": "roles",      "label": "Roles",       "icon": "Shield"},
@@ -120,6 +123,7 @@ _BUILDERS = {
     "roles":             build_roles,
     "scopes":            build_scopes,
     "audit":             build_audit,
+    "billing_analytics": build_billing_analytics,
     "email":             build_email,
     "system":            build_system,
     "llm":               build_llm,

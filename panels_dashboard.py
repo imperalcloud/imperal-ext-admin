@@ -3,6 +3,11 @@
 Mirrors React DashboardWidgets — Card-wrapped stats sections.
 Action stats from /v1/internal/actions/stats?admin=true (same as React).
 LLM usage from /v1/internal/config/llm/usage.
+
+Money (2026-08-13): the Dashboard answered "is the platform alive" but never
+"will money arrive". The Revenue card below is the headline of the full
+Billing Analytics section — same single aggregate endpoint, no second source
+of truth, so the two screens can never disagree.
 """
 from __future__ import annotations
 
@@ -10,6 +15,9 @@ import asyncio
 
 from imperal_sdk import ui
 
+from panels_billing_analytics import (
+    _fetch_analytics, _panel_acting, _money,
+)
 from panels_sections import (
     _fetch_users, _fetch_roles, _fetch_extensions,
     _fetch_llm_usage, _fetch_action_stats,
@@ -19,9 +27,10 @@ from panels_sections import (
 
 async def build_dashboard(ctx):
     """Dashboard: Card-wrapped stats + actions + LLM usage + status."""
-    users, roles, extensions, llm, actions = await asyncio.gather(
+    users, roles, extensions, llm, actions, billing = await asyncio.gather(
         _fetch_users(), _fetch_roles(), _fetch_extensions(),
         _fetch_llm_usage(), _fetch_action_stats(),
+        _fetch_analytics(_panel_acting(ctx), 30, 1),
     )
 
     active_count = sum(1 for u in users if u.get("is_active"))
@@ -39,6 +48,7 @@ async def build_dashboard(ctx):
         ], columns=2)),
     ]
 
+    _append_revenue_card(children, billing)
     _append_actions_card(children, actions)
     _append_llm_today_card(children, llm)
     _append_llm_month_card(children, actions)
@@ -48,6 +58,49 @@ async def build_dashboard(ctx):
 
 
 # ── Section builders ──────────────────────────────────────────────────
+
+
+def _append_revenue_card(children: list, billing: dict) -> None:
+    """Money headline — the four figures an owner checks first.
+
+    Deliberately NOT a second calculation: these are the exact fields the
+    Billing Analytics section renders, so the Dashboard cannot drift from it.
+    Omitted entirely when the billing gateway gives nothing, because a
+    revenue card silently showing $0.00 would be worse than no card at all.
+
+    "Paying" counts a real saved card on an active, non-cancelled
+    subscription — never a plan name (see panels_billing_analytics).
+    """
+    if not billing:
+        return
+
+    paid = billing.get("paid") or {}
+    buckets = ((billing.get("upcoming") or {}).get("buckets") or {})
+    no_card = int(paid.get("card_mode_without_card") or 0)
+
+    children.append(ui.Card(
+        title="Revenue",
+        content=ui.Stack(children=[
+            ui.Stats(children=[
+                ui.Stat(label="Paying (card on file)",
+                        value=str(paid.get("paying_with_card") or 0),
+                        color="green"),
+                ui.Stat(label="MRR committed",
+                        value=_money(paid.get("mrr_cents")), color="green"),
+                ui.Stat(label="Due next 7 days",
+                        value=_money((buckets.get("next_7d") or {}).get("cents")),
+                        color="yellow"),
+                ui.Stat(label="Card mode, NO card", value=str(no_card),
+                        color="red" if no_card else "gray"),
+            ], columns=2),
+            ui.Button(
+                label="Open Billing Analytics",
+                variant="secondary",
+                on_click=ui.Call("__panel__tools",
+                                 section="billing_analytics"),
+            ),
+        ], direction="v", gap=3),
+    ))
 
 
 def _append_actions_card(children: list, actions: dict) -> None:
