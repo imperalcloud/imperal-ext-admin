@@ -165,6 +165,11 @@ def build_llm_form(
     # compaction knobs live in imperal:config:llm (cfg), NOT tenant_defaults —
     # panels_llm.py reads them straight off cfg and passes them here.
     coding_thread_config: dict | None = None,
+    # ORPHAN READER FIX (2026-08-18): knowledge_pick_max_tokens lives in
+    # imperal:config:llm (cfg) like the coding-thread knobs above — the kernel
+    # reads it through the SAME get_admin_llm_config_field cascade, so it must
+    # NOT be routed via tenant_defaults. panels_llm.py passes cfg straight in.
+    knowledge_config: dict | None = None,
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -269,6 +274,10 @@ def build_llm_form(
         "coding_thread_max_rounds": int((coding_thread_config or {}).get("coding_thread_max_rounds", 6)),
         "coding_thread_time_budget_s": int((coding_thread_config or {}).get("coding_thread_time_budget_s", 100)),
         "coding_thread_fold_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_max_tokens", 4096)),
+        # Docs router budget. Fallback mirrors the kernel's own
+        # _DEFAULT_PICK_MAX_TOKENS (200) so a blank store renders the value the
+        # kernel actually runs with — not an aspirational number.
+        "knowledge_pick_max_tokens": int((knowledge_config or {}).get("knowledge_pick_max_tokens", 200)),
         # Phase 16 (2026-05-17): orphans wired from System tab
         "narrator_structured_data_chars": int(_td.get("narrator_structured_data_chars", 8000)),
         "default_max_result_tokens": int(_td.get("default_max_result_tokens", 3000)),
@@ -534,6 +543,37 @@ def build_llm_form(
 
             # ── 6b · Webbee Code Thread Compaction ────────────────
             build_coding_thread_section(defaults),
+
+            # ── 6c · Docs Knowledge (search_docs) ─────────────────
+            ui.Section(title="\U0001f4da Docs Knowledge (search_docs)",
+                       collapsible=True, children=[
+                ui.Text(
+                    "Webbee answers product questions by retrieving from the "
+                    "live docs corpus in two stages: a ROUTER LLM picks which "
+                    "sections fit the question, then only those sections are "
+                    "read. This is the router's response budget. Changes apply "
+                    "within 60s (config cache TTL) — no worker restart needed.",
+                    variant="caption",
+                ),
+                ui.Text(
+                    "knowledge_pick_max_tokens — UNIT: tokens. Kernel fallback "
+                    "when unset: 200. That is too small for a REASONING router "
+                    "model (e.g. gpt-5-mini): its thinking tokens count against "
+                    "this budget, and when they consume it the reply arrives "
+                    "with an EMPTY text block — no error, nothing logged — so "
+                    "retrieval silently returns nothing and Webbee reports 'no "
+                    "documentation found' for docs that DO exist. Measured "
+                    "2026-08-18: ~25% of calls (3 of 12 identical probes). "
+                    "Recommended 1500. Consumer: activities/knowledge.py:_pick_llm.",
+                    variant="caption",
+                ),
+                ui.Slider(
+                    min=200, max=8000, step=100,
+                    value=defaults["knowledge_pick_max_tokens"],
+                    label="knowledge_pick_max_tokens (tokens)",
+                    param_name="knowledge_pick_max_tokens",
+                ),
+            ]),
 
             # ── 7 · Feature Flags ─────────────────────────────────
             ui.Section(title="\U0001f6a9 Feature Flags (Kernel)", collapsible=True,

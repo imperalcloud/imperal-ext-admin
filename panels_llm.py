@@ -230,6 +230,11 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             # tenant_defaults -- same store the kernel's get_admin_llm_config_field
             # cascade reads.
             coding_thread_config=cfg,
+            # ORPHAN READER FIX (2026-08-18): knowledge_pick_max_tokens is read
+            # by the kernel from THIS store (imperal:config:llm) via
+            # get_admin_llm_config_field -- so the form must read/write cfg, not
+            # tenant_defaults, or the control would save somewhere nothing reads.
+            knowledge_config=cfg,
         ),
         ui.Divider(),
         ui.Section(

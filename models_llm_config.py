@@ -585,6 +585,35 @@ class SaveLlmConfigParams(BaseModel):
         ),
     )
 
+    # ── Docs knowledge retrieval (2026-08-18) ────────────────────────────────
+    # ORPHAN READER FIX: the kernel has read this knob since the knowledge
+    # subsystem shipped (activities/knowledge.py:131 via
+    # get_admin_llm_config_field) but NO panel field ever wrote it, so the
+    # hardcoded fallback (_DEFAULT_PICK_MAX_TOKENS = 200) was the only value
+    # search_docs ever ran with -- unreachable from the panel entirely.
+    #
+    # WHY 200 BREAKS IT (measured live, 2026-08-18): the Stage-1 "which doc
+    # sections answer this?" router runs on purpose="routing", currently a
+    # REASONING model (gpt-5-mini). Reasoning tokens count against max_tokens,
+    # so when they consume the whole 200-token budget the reply carries NO text
+    # block at all: content=[], stop_reason='end_turn', no exception, nothing
+    # logged. _pick_llm returns "" -> parse_picked_ids -> [] -> the activity
+    # returns None -> the brain is told "no documentation found" while the
+    # section exists. 12 identical probes for "Webbee Code": 9 OK, 3 empty
+    # (out_tokens exactly 200 on every failure) == ~25% silent blindness.
+    knowledge_pick_max_tokens: Optional[int] = Field(
+        default=None, ge=200, le=8000,
+        description=(
+            "UNIT: tokens. max_tokens for the Stage-1 docs ROUTER LLM that "
+            "picks which documentation sections answer a question "
+            "(search_docs). Kernel fallback when unset: 200 -- too small for "
+            "a reasoning model, whose thinking tokens then eat the whole "
+            "budget and the reply arrives with an EMPTY text block (measured "
+            "~25% of calls -> 'no documentation found' on docs that exist). "
+            "Recommended 1500. Reads at activities/knowledge.py:_pick_llm."
+        ),
+    )
+
     # ── Per-purpose AI params (LCU-4, 2026-04-30) — empty string = inherit
     purpose_code_temperature: str = Field(default="", description="Per-purpose temperature for code (coding brain; blank = inherit)")
     purpose_code_top_p: str = Field(default="", description="Per-purpose top_p for code")
