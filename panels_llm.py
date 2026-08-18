@@ -235,6 +235,12 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             # get_admin_llm_config_field -- so the form must read/write cfg, not
             # tenant_defaults, or the control would save somewhere nothing reads.
             knowledge_config=cfg,
+            # ORPHAN READER FIXES (2026-08-18): the kernel feature flags
+            # (hub_brain_first_enabled, panel_diet_enabled, frame_v2_enabled)
+            # live in cfg (imperal:config:llm) -- the SAME store the kernel's
+            # get_admin_llm_config_field cascade reads and fn_save_llm_config
+            # writes -- NOT tenant_defaults.
+            kernel_flags_config=cfg,
         ),
         ui.Divider(),
         ui.Section(

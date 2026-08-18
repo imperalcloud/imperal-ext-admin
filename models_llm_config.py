@@ -94,6 +94,50 @@ class SaveLlmConfigParams(BaseModel):
             "Default False (opt-in). Reads at responses/judge.py:is_judge_enabled."
         ),
     )
+    # ── ORPHAN READER FIXES · kernel feature flags (2026-08-18) ──────────────
+    # All three were read by the kernel through the SAME
+    # get_admin_llm_config_field cascade as judge_enabled above, but had NO
+    # panel field -- so the store key never existed and the kernel always fell
+    # through to its env/literal default. Unreachable from the panel, which is
+    # exactly how knowledge_pick_max_tokens silently broke search_docs.
+    #
+    # Each one is store -> env -> literal, and reads `None` as "not set", so
+    # leaving these blank keeps today's behaviour byte-for-byte.
+    hub_brain_first_enabled: Optional[bool] = Field(
+        default=None,
+        description=(
+            "BOOLEAN. hub-brain-first-v1 routing kill-switch: when True an "
+            "interactive turn with no open confirmation card may skip the "
+            "classify_intent LLM gate and go straight to the brain (lower "
+            "latency, one less LLM call). BYOLLM tenants always keep the "
+            "classifier regardless. Kernel default True; env fallback "
+            "IMPERAL_HUB_BRAIN_FIRST_ENABLED. Flipping this rolls routing back "
+            "within 60s with NO redeploy -- it is the runtime kill-switch. "
+            "Reads at activities/brain_first.py:_read_brain_first_flag."
+        ),
+    )
+    panel_diet_enabled: Optional[bool] = Field(
+        default=None,
+        description=(
+            "BOOLEAN. Panel-diet tool-catalogue trimming: when True the agentic "
+            "catalogue sent to the brain is slimmed for panel turns (fewer "
+            "prompt tokens per turn). Kernel default True; env fallback. "
+            "Fail-soft -- any resolver error also lands on True. Reads at "
+            "activities/agentic_catalog.py:107."
+        ),
+    )
+    frame_v2_enabled: Optional[bool] = Field(
+        default=None,
+        description=(
+            "BOOLEAN. Facts-only frame-v2 DUAL emission (I-FRAMES-FACTS-ONLY): "
+            "when True, surfaces whose profile declares frame_version='v2' also "
+            "receive the new v2 frame alongside the existing v1 one. Kernel "
+            "default False (opt-in); env fallback IMPERAL_FRAME_V2_ENABLED. A "
+            "config hiccup can only ever suppress the NEW twin, never the v1 "
+            "emit clients rely on. Reads at "
+            "activities/agentic_catalog.py:_read_frame_v2_flag."
+        ),
+    )
     failover_enabled: Optional[bool] = Field(default=None, description="Enable failover")
     failover_provider: str = Field(default="", description="Failover provider")
     failover_model: str = Field(default="", description="Failover model")
@@ -557,8 +601,8 @@ class SaveLlmConfigParams(BaseModel):
         description=(
             "UNIT: rounds. Max fold rounds ONE compact_coding_thread activity call "
             "may run (catch-up folding: keeps compacting until under budget or this "
-            "cap). Default 6. Higher = a badly-behind thread converges fully in "
-            "one call; lower = spreads catch-up over more activity invocations. "
+            "cap). Kernel default 12. Higher = a badly-behind thread converges fully "
+            "in one call; lower = spreads catch-up over more activity invocations. "
             "Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS."
         ),
     )
@@ -571,17 +615,37 @@ class SaveLlmConfigParams(BaseModel):
             "activities/coding_thread.py:_COMPACT_TIME_BUDGET_S."
         ),
     )
+    # le raised 16000 -> 65536 (2026-08-18): the kernel's own constant is
+    # 24576, so the OLD ceiling made the real running value impossible to
+    # enter -- a panel bound that silently contradicted the kernel.
     coding_thread_fold_max_tokens: Optional[int] = Field(
-        default=None, ge=1024, le=16_000,
+        default=None, ge=1024, le=65_536,
         description=(
             "UNIT: tokens. Response cap for the digest-fold LLM call. "
             "I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy "
             "spans (~1-2 tokens/char) truncating the digest JSON mid-string at the "
             "old fixed 4096, so the fold silently skipped and the thread never "
             "shrank. On any truncation/parse failure the call now automatically "
-            "retries ONCE at 2x this value before falling back to a mechanical "
-            "(no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Default "
-            "4096. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS."
+            "retries ONCE at coding_thread_fold_retry_max_tokens before falling "
+            "back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, "
+            "never stalls. Kernel default 24576. Reads at "
+            "activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS."
+        ),
+    )
+    # ORPHAN READER FIX (2026-08-18): the 7th coding-thread knob. Its six
+    # sisters all got a panel field when the section shipped; this one was
+    # missed, so the retry cap stayed frozen at the kernel literal while the
+    # base cap next to it was tunable -- the exact asymmetry that makes a
+    # "raise the fold budget" change behave unpredictably.
+    coding_thread_fold_retry_max_tokens: Optional[int] = Field(
+        default=None, ge=1024, le=131_072,
+        description=(
+            "UNIT: tokens. Response cap for the ONE automatic RETRY of a fold "
+            "digest call whose first attempt came back truncated/unparseable "
+            "(dense-token spans truncate sooner). Must exceed "
+            "coding_thread_fold_max_tokens or the retry cannot fit what the "
+            "first attempt could not. Kernel default 49152 (2x the 24576 base). "
+            "Reads at activities/coding_thread.py:_COMPACT_FOLD_RETRY_MAX_TOKENS."
         ),
     )
 

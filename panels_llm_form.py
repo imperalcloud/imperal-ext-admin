@@ -170,6 +170,10 @@ def build_llm_form(
     # reads it through the SAME get_admin_llm_config_field cascade, so it must
     # NOT be routed via tenant_defaults. panels_llm.py passes cfg straight in.
     knowledge_config: dict | None = None,
+    # ORPHAN READER FIXES (2026-08-18): the kernel feature flags below live in
+    # imperal:config:llm (cfg) -- the store get_admin_llm_config_field reads and
+    # the store fn_save_llm_config writes. NOT tenant_defaults.
+    kernel_flags_config: dict | None = None,
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -187,6 +191,7 @@ def build_llm_form(
     _all_models, _provider_models = catalog_to_options(model_catalog or FALLBACK_CATALOG)
 
     _td = tenant_defaults or {}
+    _kf = kernel_flags_config or {}
     defaults = {
         "provider": provider,
         "model": model,
@@ -238,8 +243,21 @@ def build_llm_form(
         "semantic_verifier_max_tokens": int(_td.get("semantic_verifier_max_tokens", 128)),
         "action_narrator_max_tokens": int(_td.get("action_narrator_max_tokens", 1024)),
         # Federalization 2026-05-19 — feature flags (was env-only)
-        "step_reclassify_enabled": bool(_td.get("step_reclassify_enabled", True)),
-        "judge_enabled": bool(_td.get("judge_enabled", False)),
+        # FLAG READ PATH (fixed 2026-08-18): these two are SAVED into
+        # imperal:config:llm (they are not in the handler's skip_fields), but
+        # were READ back from tenant_defaults -- so a saved value never showed
+        # up in the form again. Read cfg FIRST, keep _td as the fallback so
+        # anything an older build wrote there still renders.
+        "step_reclassify_enabled": bool(_kf.get("step_reclassify_enabled", _td.get("step_reclassify_enabled", True))),
+        "judge_enabled": bool(_kf.get("judge_enabled", _td.get("judge_enabled", False))),
+        # Orphan flags wired 2026-08-18. Fallbacks mirror the KERNEL's own
+        # defaults so a blank store renders real behaviour, not a guess:
+        #   hub_brain_first_enabled -> True  (activities/brain_first.py)
+        #   panel_diet_enabled      -> True  (activities/agentic_catalog.py)
+        #   frame_v2_enabled        -> False (dual-emit is opt-in)
+        "hub_brain_first_enabled": bool(_kf.get("hub_brain_first_enabled", True)),
+        "panel_diet_enabled": bool(_kf.get("panel_diet_enabled", True)),
+        "frame_v2_enabled": bool(_kf.get("frame_v2_enabled", False)),
         "failover_enabled": bool(failover_enabled),
         "failover_provider": failover_provider or "openai",
         "failover_model": failover_model,
@@ -271,9 +289,12 @@ def build_llm_form(
         "coding_thread_window_budget_chars": int((coding_thread_config or {}).get("coding_thread_window_budget_chars", 250000)),
         "coding_thread_keep_recent": int((coding_thread_config or {}).get("coding_thread_keep_recent", 20)),
         "coding_thread_input_cap": int((coding_thread_config or {}).get("coding_thread_input_cap", 120000)),
-        "coding_thread_max_rounds": int((coding_thread_config or {}).get("coding_thread_max_rounds", 6)),
+        "coding_thread_max_rounds": int((coding_thread_config or {}).get("coding_thread_max_rounds", 12)),
         "coding_thread_time_budget_s": int((coding_thread_config or {}).get("coding_thread_time_budget_s", 100)),
-        "coding_thread_fold_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_max_tokens", 4096)),
+        "coding_thread_fold_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_max_tokens", 24576)),
+        # Kernel constant is 49152 (activities/coding_thread.py:181). The panel
+        # must show what the kernel RUNS with, never a prettier number.
+        "coding_thread_fold_retry_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_retry_max_tokens", 49152)),
         # Docs router budget. Fallback mirrors the kernel's own
         # _DEFAULT_PICK_MAX_TOKENS (200) so a blank store renders the value the
         # kernel actually runs with — not an aspirational number.
@@ -604,6 +625,52 @@ def build_llm_form(
                     "When ON: every narrator output is reviewed by a judge LLM "
                     "that flags fabricated entities/IDs. Default OFF (opt-in). "
                     "Higher cost per chat turn.",
+                    variant="caption",
+                ),
+
+                # ── Orphan flags wired 2026-08-18 ─────────────────
+                # The kernel already read all three through the SAME
+                # get_admin_llm_config_field cascade as the two toggles above,
+                # but no panel field ever wrote them -- so the store key never
+                # existed and only the kernel's env/literal default could ever
+                # apply. Leaving a toggle at its rendered value is a no-op.
+                ui.Divider(),
+                ui.Toggle(
+                    label="Brain-First Routing (skip the classifier gate)",
+                    value=bool(defaults["hub_brain_first_enabled"]),
+                    param_name="hub_brain_first_enabled",
+                ),
+                ui.Text(
+                    "When ON: an interactive turn with no open confirmation card "
+                    "goes straight to the brain, skipping the classify_intent LLM "
+                    "gate — one less LLM call and lower latency per turn. BYOLLM "
+                    "tenants always keep the classifier. Kernel default ON. This "
+                    "is the runtime kill-switch: turning it OFF rolls routing "
+                    "back within 60s with no redeploy.",
+                    variant="caption",
+                ),
+                ui.Toggle(
+                    label="Panel Diet (slim tool catalogue on panel turns)",
+                    value=bool(defaults["panel_diet_enabled"]),
+                    param_name="panel_diet_enabled",
+                ),
+                ui.Text(
+                    "When ON: the agentic tool catalogue sent to the brain is "
+                    "trimmed for panel turns — fewer prompt tokens on every turn. "
+                    "Kernel default ON. Turn OFF only to rule the diet out while "
+                    "debugging a tool the brain claims not to see.",
+                    variant="caption",
+                ),
+                ui.Toggle(
+                    label="Frame v2 Dual Emit (facts-only frames)",
+                    value=bool(defaults["frame_v2_enabled"]),
+                    param_name="frame_v2_enabled",
+                ),
+                ui.Text(
+                    "When ON: surfaces whose profile declares frame_version=v2 "
+                    "ALSO receive the facts-only v2 frame alongside the existing "
+                    "v1 emit — v1 is never replaced, so this cannot break a "
+                    "surface. Kernel default OFF (opt-in dual emission).",
                     variant="caption",
                 ),
             ]),

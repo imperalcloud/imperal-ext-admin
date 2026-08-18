@@ -86,7 +86,7 @@ def build_coding_thread_section(defaults: dict):
             ui.Text(
                 "coding_thread_max_rounds — UNIT: rounds. Max fold rounds ONE "
                 "compact_coding_thread invocation runs (catch-up folding for a "
-                "thread that fell far behind budget). Default 6.",
+                "thread that fell far behind budget). Kernel default 12.",
                 variant="caption",
             ),
             ui.Slider(
@@ -111,18 +111,43 @@ def build_coding_thread_section(defaults: dict):
 
             ui.Text(
                 "coding_thread_fold_max_tokens — UNIT: tokens. Base response cap "
-                "for the fold digest LLM call. Default 4096 — on a truncated/"
-                "unparseable reply the kernel automatically retries ONCE at 2x "
-                "this cap before falling back to the mechanical digest, so "
-                "raising this lowers how often that retry is even needed "
-                "(Cyrillic-heavy / other dense-token spans truncate sooner).",
+                "for the fold digest LLM call. Kernel default 24576 — on a "
+                "truncated/unparseable reply the kernel automatically retries "
+                "ONCE at coding_thread_fold_retry_max_tokens before falling back "
+                "to the mechanical digest, so raising this lowers how often that "
+                "retry is even needed (Cyrillic-heavy / other dense-token spans "
+                "truncate sooner).",
                 variant="caption",
             ),
             ui.Slider(
-                min=1024, max=16000, step=256,
+                # max raised 16000 -> 65536 (2026-08-18): the kernel's own
+                # constant is 24576, so the old ceiling made the REAL running
+                # value impossible to enter from the panel.
+                min=1024, max=65_536, step=256,
                 value=defaults["coding_thread_fold_max_tokens"],
                 label="coding_thread_fold_max_tokens (tokens)",
                 param_name="coding_thread_fold_max_tokens",
+            ),
+
+            # ORPHAN READER FIX (2026-08-18): the kernel has read this key
+            # since the retry path shipped (activities/coding_thread.py:197,
+            # same _resolve_compact_setting table as its six sisters above) but
+            # it was the ONE row of that table with no panel control -- so the
+            # retry budget was stuck at the literal 49152 forever.
+            ui.Text(
+                "coding_thread_fold_retry_max_tokens — UNIT: tokens. Response "
+                "cap for the ONE automatic retry after a truncated/unparseable "
+                "fold. Kernel default 49152 (2x the base cap). If this retry "
+                "also fails the kernel falls back to a mechanical no-LLM digest, "
+                "so the thread ALWAYS shrinks — this knob only decides how often "
+                "that cheaper fallback is reached.",
+                variant="caption",
+            ),
+            ui.Slider(
+                min=1024, max=131_072, step=1024,
+                value=defaults["coding_thread_fold_retry_max_tokens"],
+                label="coding_thread_fold_retry_max_tokens (tokens)",
+                param_name="coding_thread_fold_retry_max_tokens",
             ),
         ],
     )
