@@ -29,6 +29,7 @@ from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 _PROVIDERS = [
     {"value": "anthropic", "label": "Anthropic"},
     {"value": "openai", "label": "OpenAI"},
+    {"value": "qwen", "label": "Qwen (DashScope)"},
     {"value": "google", "label": "Google"},
     {"value": "custom", "label": "Custom (OpenAI-compatible)"},
 ]
@@ -493,6 +494,11 @@ def build_llm_form(
                 ui.Input(
                     placeholder="sk-…  (leave blank to keep current)",
                     param_name="api_key", value="",
+                ),
+                ui.Text("Qwen (DashScope) API Key — used when provider = Qwen; kept in its own slot so it never collides with the key above", variant="caption"),
+                ui.Input(
+                    placeholder="sk-…  (leave blank to keep current)",
+                    param_name="qwen_api_key", value="",
                 ),
                 ui.Text("Base URL (custom providers only)", variant="caption"),
                 ui.Input(

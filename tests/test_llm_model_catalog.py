@@ -207,4 +207,84 @@ def test_provider_inference_covers_openai_families():
     assert plm.provider_for_model("o3-mini") == "openai"
     assert plm.provider_for_model("claude-opus-4-6") == "anthropic"
     assert plm.provider_for_model("gemini-2.0") == "google"
+    assert plm.provider_for_model("qwen3-max") == "qwen"
+    assert plm.provider_for_model("qwen-plus") == "qwen"
     assert plm.provider_for_model("mystery-model") == ""
+
+
+# ------------------------------------------------------------- qwen (DashScope)
+
+def test_qwen_filter_keeps_chat_models_only():
+    ids = [
+        "qwen3-max", "qwen-max", "qwen-plus", "qwen-turbo",
+        "qwen3-coder-plus", "qwen-vl-max", "qwen-audio-turbo",
+        "text-embedding-v3", "gte-rerank", "wan2.1-t2v-turbo",
+        "qwen2.5-math-72b-instruct",
+    ]
+    kept = plm._filter_qwen(ids)
+    assert "qwen3-max" in kept and "qwen-plus" in kept
+    assert "qwen3-coder-plus" in kept  # chat model, NOT excluded
+    assert "qwen-vl-max" not in kept
+    assert "qwen-audio-turbo" not in kept
+    assert "text-embedding-v3" not in kept
+    assert "wan2.1-t2v-turbo" not in kept
+
+
+@pytest.mark.asyncio
+async def test_qwen_catalogue_from_panel_entered_key(monkeypatch):
+    """Qwen's key lives in the LLM Config Store (panel-entered), not env."""
+    store = json.dumps({"provider": "openai", "qwen_api_key": "sk-qw-test"})
+    fake = _FakeRedis()
+    fake.store["imperal:config:llm"] = store
+
+    async def _fake_redis():
+        return fake
+    monkeypatch.setattr(plm, "_redis", _fake_redis)
+    _set_keys(monkeypatch)
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    async def fake_qwen(key, base_url=""):
+        assert key == "sk-qw-test"
+        return ["qwen3-max", "qwen-plus"]
+    monkeypatch.setattr(plm, "_fetch_qwen", fake_qwen)
+
+    catalog = await plm.fetch_model_catalog()
+    assert catalog["qwen"] == ["qwen3-max", "qwen-plus"]
+
+
+@pytest.mark.asyncio
+async def test_qwen_absent_without_key(monkeypatch):
+    """No qwen key in the store => qwen stays out (never invented)."""
+    fake = _FakeRedis()
+    fake.store["imperal:config:llm"] = json.dumps({"provider": "openai"})
+
+    async def _fake_redis():
+        return fake
+    monkeypatch.setattr(plm, "_redis", _fake_redis)
+    _set_keys(monkeypatch)
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    async def explode(key, base_url=""):
+        raise AssertionError("qwen fetch must not run without a key")
+    monkeypatch.setattr(plm, "_fetch_qwen", explode)
+
+    catalog = await plm.fetch_model_catalog()
+    assert "qwen" not in catalog
+
+
+@pytest.mark.asyncio
+async def test_qwen_fetch_failure_backfills_fallback(monkeypatch, no_redis):
+    """Same degraded-backfill protection as anthropic/openai."""
+    _set_keys(monkeypatch)
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    async def fake_key():
+        return "sk-qw-test", ""
+    monkeypatch.setattr(plm, "_qwen_key_from_store", fake_key)
+
+    async def boom(key, base_url=""):
+        raise TimeoutError()
+    monkeypatch.setattr(plm, "_fetch_qwen", boom)
+
+    catalog = await plm.fetch_model_catalog()
+    assert catalog["qwen"] == plm.FALLBACK_CATALOG["qwen"]

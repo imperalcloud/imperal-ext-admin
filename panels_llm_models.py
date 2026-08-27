@@ -6,7 +6,7 @@ chat-capable text models, cached in Redis (1h). A tiny static fallback is
 used ONLY if every live + cache path fails, so the form never breaks.
 
 Public API:
-  - provider_for_model(model)        -> "anthropic" | "openai" | "google" | ""
+  - provider_for_model(model)        -> "anthropic" | "openai" | "qwen" | "google" | ""
   - async fetch_model_catalog()      -> {provider: [model_id, ...]}
   - catalog_to_options(catalog)      -> (all_models, provider_models)  # ui Select opts
   - FALLBACK_CATALOG                 -> resilience-only minimal catalogue
@@ -34,6 +34,7 @@ _CACHE_TTL_DEGRADED = 120  # seconds (2m)
 # Provider inference by model-id prefix (rule-based, not an enumerated list).
 _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("claude", "anthropic"),
+    ("qwen", "qwen"),
     ("gpt", "openai"),
     ("o1", "openai"),
     ("o3", "openai"),
@@ -56,7 +57,10 @@ _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
 FALLBACK_CATALOG: dict[str, list[str]] = {
     "anthropic": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     "openai": ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3"],
+    "qwen": ["qwen3-max", "qwen-max", "qwen-plus", "qwen-turbo"],
 }
+
+_QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
 
 def provider_for_model(model: str) -> str:
@@ -87,6 +91,26 @@ def _filter_anthropic(ids: list[str]) -> list[str]:
     return sorted({i for i in ids if i.startswith("claude-")})
 
 
+# DashScope lists 160+ ids incl. vision/audio/embedding/rerank families.
+_QWEN_EXCLUDE = (
+    "vl", "audio", "tts", "asr", "ocr", "embedding", "rerank", "mt-",
+    "image", "video", "wan", "math",
+)
+
+
+def _filter_qwen(ids: list[str]) -> list[str]:
+    """Keep chat-capable qwen text models (incl. qwen3-coder, a chat model)."""
+    out: set[str] = set()
+    for i in ids:
+        low = i.lower()
+        if not low.startswith("qwen"):
+            continue
+        if any(tok in low for tok in _QWEN_EXCLUDE):
+            continue
+        out.add(i)
+    return sorted(out)
+
+
 async def _fetch_anthropic(key: str) -> list[str]:
     async with shared_http(timeout=12.0) as c:
         r = await c.get(
@@ -105,6 +129,54 @@ async def _fetch_openai(key: str) -> list[str]:
         )
         r.raise_for_status()
         return _filter_openai([m.get("id", "") for m in r.json().get("data", [])])
+
+
+async def _fetch_qwen(key: str, base_url: str = "") -> list[str]:
+    """DashScope OpenAI-compatible /models (key admin-entered via the panel)."""
+    url = (base_url or _QWEN_DEFAULT_BASE_URL).rstrip("/") + "/models"
+    async with shared_http(timeout=12.0) as c:
+        r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
+        r.raise_for_status()
+        return _filter_qwen([m.get("id", "") for m in r.json().get("data", [])])
+
+
+async def _qwen_key_from_store() -> tuple[str, str]:
+    """(key, base_url) for Qwen from the LLM Config Store, or ("", "").
+
+    The Qwen key is entered in the PANEL (never env), so the catalogue
+    reads it from Redis: dedicated qwen_api_key slot first, then the shared
+    api_key slot iff the configured provider IS qwen. Fernet-wrapped values
+    are unwrapped with the same env keys the kernel uses; a missing crypto
+    key degrades to "" (qwen simply stays out of the dropdown), never raises.
+    """
+    r = await _redis()
+    if r is None:
+        return "", ""
+    try:
+        raw = await r.get("imperal:config:llm") or "{}"
+        cfg = json.loads(raw)
+    except Exception:
+        return "", ""
+    finally:
+        try:
+            await r.aclose()
+        except Exception:
+            pass
+    key = str(cfg.get("qwen_api_key") or "")
+    if not key and cfg.get("provider") == "qwen":
+        key = str(cfg.get("api_key") or "")
+    if not key:
+        return "", ""
+    if key.startswith("gAAAAA"):  # Fernet-wrapped — mirror kernel llm/secrets.py
+        try:
+            from cryptography.fernet import Fernet
+            fkey = os.getenv("IMPERAL_ENCRYPTION_KEY", "") or os.getenv("IMAP_ENCRYPTION_KEY", "")
+            if fkey:
+                key = Fernet(fkey.encode()).decrypt(key.encode()).decode()
+        except Exception:
+            return "", ""
+    base = str(cfg.get("base_url") or "") if cfg.get("provider") == "qwen" else ""
+    return key, base
 
 
 async def _redis():
@@ -153,6 +225,16 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: openai fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
+    # Qwen: key is PANEL-entered (lives in the LLM Config Store, not env).
+    qk, qbase = await _qwen_key_from_store()
+    if qk:
+        try:
+            catalog["qwen"] = await _fetch_qwen(qk, qbase)
+        except Exception as e:
+            log.warning(
+                "model_catalog: qwen fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
 
     catalog = {p: m for p, m in catalog.items() if m}
     if not catalog:
@@ -170,7 +252,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
     # Anthropic and cannot pick a GPT model at all. Backfill from the static
     # fallback so every configured provider stays selectable, and mark the
     # result degraded so it is cached briefly instead of for an hour.
-    expected = {p for p, key in (("anthropic", ak), ("openai", ok)) if key}
+    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk)) if key}
     missing = sorted(expected - set(catalog))
     for prov in missing:
         fb = FALLBACK_CATALOG.get(prov)

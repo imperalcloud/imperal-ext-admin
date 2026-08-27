@@ -67,6 +67,9 @@ def _env_providers() -> list[str]:
     if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
         avail.append("google")
     avail.append("custom")
+    # Qwen's key is PANEL-entered (LLM Config Store, not env) — always offered;
+    # the kernel resolver skips the config until a key actually exists.
+    avail.append("qwen")
     return avail or ["anthropic", "custom"]
 
 
@@ -92,6 +95,14 @@ async def _run_test(cfg: dict, target: str) -> dict:
         env_key = key_map.get(provider)
         if env_key and not os.getenv(env_key):
             return {"ok": False, "message": f"No API key for {provider}"}
+        if provider == "qwen":
+            # Panel-entered key lives in the LLM Config Store (qwen_api_key
+            # slot, or the shared api_key slot when qwen IS the provider).
+            qk = str(cfg.get("qwen_api_key") or "")
+            if not qk and cfg.get("provider") == "qwen":
+                qk = str(cfg.get("api_key") or "")
+            if not qk:
+                return {"ok": False, "message": "No API key for qwen — enter it in the Qwen API Key field"}
         return {"ok": True, "message": f"{provider}/{model} \u2014 configured OK"}
     except Exception as e:
         return {"ok": False, "message": str(e)}
