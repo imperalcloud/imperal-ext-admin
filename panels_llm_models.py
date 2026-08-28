@@ -144,10 +144,14 @@ async def _qwen_key_from_store() -> tuple[str, str]:
     """(key, base_url) for Qwen from the LLM Config Store, or ("", "").
 
     The Qwen key is entered in the PANEL (never env), so the catalogue
-    reads it from Redis: dedicated qwen_api_key slot first, then the shared
-    api_key slot iff the configured provider IS qwen. Fernet-wrapped values
-    are unwrapped with the same env keys the kernel uses; a missing crypto
-    key degrades to "" (qwen simply stays out of the dropdown), never raises.
+    reads it from Redis with the SAME precedence the kernel's
+    config_from_store uses: a dedicated qwen_api_key slot first (legacy
+    stores — the panel's separate Qwen field was retired 2026-08-28), then
+    the shared api_key slot iff the configured provider IS qwen (the one
+    API Key input now serves whichever provider is selected). Fernet-wrapped
+    values are unwrapped with the same env keys the kernel uses; a missing
+    crypto key degrades to "" (qwen simply has no LIVE models to list — the
+    static backfill in fetch_model_catalog still offers it), never raises.
     """
     r = await _redis()
     if r is None:
@@ -262,6 +266,23 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: %s unavailable — serving fallback list (%d models)",
                 prov, len(fb),
             )
+
+    # 2c. QWEN IS THE ONLY provider offered without a key. Its key is
+    # PANEL-entered (the LLM Config Store, never env), so on a fresh install
+    # the admin must be able to pick "Qwen (DashScope)" AND one of its models
+    # in the SAME save that enters the key; refusing to list them made Qwen
+    # unselectable until a second save -- the exact asymmetry the provider
+    # select already avoids with its unconditional "qwen" entry here. The
+    # static ids are the provider's own, and the kernel still refuses to build
+    # a config with no key, so an early pick degrades safely instead of
+    # mis-routing. fn_save_llm_config drops this cache on every save, so the
+    # LIVE list replaces the static one as soon as the key exists.
+    #
+    # Env-keyed providers are deliberately NOT backfilled: no env key means
+    # the deployment switched that provider off on purpose (federal
+    # test_unconfigured_provider_is_not_backfilled).
+    if "qwen" not in catalog:
+        catalog["qwen"] = list(FALLBACK_CATALOG.get("qwen", []))
 
     # 3. Cache the live result (short TTL when degraded, so we retry soon)
     if r is not None:

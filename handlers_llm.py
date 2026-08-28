@@ -125,6 +125,11 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                          # failover pair -- the retry target for chat AND every
                          # unattended automation run; same infer+clear logic.
                          "resolve", "resolve_fallback",
+                         # The global failover pair is cross-provider too: pick
+                         # qwen-plus there while the default is openai and the
+                         # stored provider must follow the model, or the kernel
+                         # pairs an openai provider with a qwen model -> 404.
+                         "failover",
                          "routing", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 3.1 -- new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
@@ -179,6 +184,10 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
 
         current.update(updates)
         await r.set("imperal:config:llm", json.dumps(current))
+        # The live model catalogue is derived from the keys in THIS store (a
+        # Qwen key is panel-entered, not env), so a saved key must not wait out
+        # the cache TTL before its provider's models appear in the dropdowns.
+        await r.delete("imperal:config:llm:model_catalog")
         await r.aclose()
         # Drop stale `llm_config` / `tenant_defaults` entries so the next
         # panel render re-fetches Redis instead of serving the pre-save copy.

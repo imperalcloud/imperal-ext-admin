@@ -490,15 +490,10 @@ def build_llm_form(
                     options=_provider_models,
                     value=model, param_name="model",
                 ),
-                ui.Text("API Key", variant="caption"),
+                ui.Text("API Key — for the provider selected above (incl. Qwen/DashScope)", variant="caption"),
                 ui.Input(
                     placeholder="sk-…  (leave blank to keep current)",
                     param_name="api_key", value="",
-                ),
-                ui.Text("Qwen (DashScope) API Key — used when provider = Qwen; kept in its own slot so it never collides with the key above", variant="caption"),
-                ui.Input(
-                    placeholder="sk-…  (leave blank to keep current)",
-                    param_name="qwen_api_key", value="",
                 ),
                 ui.Text("Base URL (custom providers only)", variant="caption"),
                 ui.Input(

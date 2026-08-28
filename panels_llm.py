@@ -67,8 +67,11 @@ def _env_providers() -> list[str]:
     if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
         avail.append("google")
     avail.append("custom")
-    # Qwen's key is PANEL-entered (LLM Config Store, not env) — always offered;
-    # the kernel resolver skips the config until a key actually exists.
+    # Qwen's key is PANEL-entered (LLM Config Store, not env) — always offered,
+    # and deliberately WITHOUT the "(no API key)" marker the env-backed
+    # providers get: the admin types that key in this very form, so calling it
+    # unavailable would be misleading. The kernel resolver still skips the
+    # config until a key actually exists, so an early pick degrades safely.
     avail.append("qwen")
     return avail or ["anthropic", "custom"]
 
@@ -96,13 +99,27 @@ async def _run_test(cfg: dict, target: str) -> dict:
         if env_key and not os.getenv(env_key):
             return {"ok": False, "message": f"No API key for {provider}"}
         if provider == "qwen":
-            # Panel-entered key lives in the LLM Config Store (qwen_api_key
-            # slot, or the shared api_key slot when qwen IS the provider).
-            qk = str(cfg.get("qwen_api_key") or "")
+            # Qwen's key is PANEL-entered (LLM Config Store, never env), so the
+            # env check above cannot see it. Resolve it with the SAME precedence
+            # the kernel uses (config_resolver.config_from_store and
+            # brain_failover._pair_from_store), otherwise Test Connection reports
+            # "no key" for a pair the kernel would actually run:
+            #   1. the pair's own key (Failover API Key when testing failover);
+            #   2. the shared API Key input, when qwen IS the configured default
+            #      provider "that field now serves whichever provider is selected;
+            #   3. a legacy dedicated qwen_api_key slot still present in an old store.
+            _is_failover = target == "failover"
+            qk = str((cfg.get("failover_api_key") if _is_failover else "") or "")
             if not qk and cfg.get("provider") == "qwen":
                 qk = str(cfg.get("api_key") or "")
             if not qk:
-                return {"ok": False, "message": "No API key for qwen — enter it in the Qwen API Key field"}
+                qk = str(cfg.get("qwen_api_key") or "")
+            if not qk:
+                return {"ok": False, "message": (
+                    "No API key for qwen — enter it in the "
+                    + ("Failover API Key" if _is_failover else "API Key")
+                    + (" field" if _is_failover else " field (or set Qwen as the default provider)")
+                )}
         return {"ok": True, "message": f"{provider}/{model} \u2014 configured OK"}
     except Exception as e:
         return {"ok": False, "message": str(e)}

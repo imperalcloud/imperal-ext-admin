@@ -253,8 +253,16 @@ async def test_qwen_catalogue_from_panel_entered_key(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_qwen_absent_without_key(monkeypatch):
-    """No qwen key in the store => qwen stays out (never invented)."""
+async def test_qwen_offered_without_key_but_never_fetched(monkeypatch):
+    """Qwen is SELECTABLE before its key exists, but no live call is made.
+
+    Its key is panel-entered, so the admin must be able to choose provider AND
+    model in the same save that types the key in -- the dropdowns therefore
+    carry the static qwen ids. "Never invented" still holds for the FETCH:
+    without a key the provider API is not contacted (the explode() stub), and
+    the kernel refuses to build a config with no key, so the early pick is
+    inert until the key lands.
+    """
     fake = _FakeRedis()
     fake.store["imperal:config:llm"] = json.dumps({"provider": "openai"})
 
@@ -269,7 +277,7 @@ async def test_qwen_absent_without_key(monkeypatch):
     monkeypatch.setattr(plm, "_fetch_qwen", explode)
 
     catalog = await plm.fetch_model_catalog()
-    assert "qwen" not in catalog
+    assert catalog["qwen"] == plm.FALLBACK_CATALOG["qwen"]
 
 
 @pytest.mark.asyncio
