@@ -57,7 +57,7 @@ _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
 FALLBACK_CATALOG: dict[str, list[str]] = {
     "anthropic": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     "openai": ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3"],
-    "qwen": ["qwen3-max", "qwen-max", "qwen-plus", "qwen-turbo"],
+    "qwen": ["qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
 }
 
 _QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -92,10 +92,17 @@ def _filter_anthropic(ids: list[str]) -> list[str]:
 
 
 # DashScope lists 160+ ids incl. vision/audio/embedding/rerank families.
+# Non-chat Qwen families (vision/audio/speech/translation/embedding/image-gen).
+# Everything else the key can see IS offered — the catalogue is the provider's
+# own /models answer, not a curated list.
 _QWEN_EXCLUDE = (
     "vl", "audio", "tts", "asr", "ocr", "embedding", "rerank", "mt-",
-    "image", "video", "wan", "math",
+    "image", "video", "wan", "math", "omni", "livetranslate", "s2s",
+    "character", "captioner", "tingwu",
 )
+# Pinned snapshots (qwen-plus-2025-09-11, qwen3-max-2026-01-23, ...): the stable
+# alias already covers them, and 6 dated copies of one model bury the list.
+_QWEN_DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
 
 def _filter_qwen(ids: list[str]) -> list[str]:
@@ -103,9 +110,11 @@ def _filter_qwen(ids: list[str]) -> list[str]:
     out: set[str] = set()
     for i in ids:
         low = i.lower()
-        if not low.startswith("qwen"):
+        if not low.startswith(("qwen", "qwq")):
             continue
         if any(tok in low for tok in _QWEN_EXCLUDE):
+            continue
+        if _QWEN_DATE_SUFFIX.search(low):
             continue
         out.add(i)
     return sorted(out)
