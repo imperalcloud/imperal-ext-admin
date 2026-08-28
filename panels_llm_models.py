@@ -64,9 +64,21 @@ FALLBACK_CATALOG: dict[str, list[str]] = {
     "anthropic": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     "openai": ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3"],
     "qwen": ["qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
+    # Provider dropdown has always offered "google" (_env_providers in
+    # panels_llm.py, gated on GOOGLE_API_KEY/GEMINI_API_KEY) and the kernel
+    # fully resolves it (llm/provider.py _GOOGLE_BASE_URL + param-support
+    # set) -- but the catalogue had no fetcher and no fallback list, so
+    # picking Google always left the Model Select empty. Static ids here are
+    # the provider's own; _fetch_google below replaces this with the live
+    # list as soon as a key is configured.
+    "google": ["gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
 }
 
 _QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+# Same OpenAI-compatible surface the kernel resolver targets for provider
+# "google" (llm/provider.py:_GOOGLE_BASE_URL) -- one source of truth for the
+# endpoint shape, catalogue and runtime calls both hit it the same way.
+_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 def provider_for_model(model: str) -> str:
@@ -138,6 +150,26 @@ def _filter_qwen(ids: list[str]) -> list[str]:
     return sorted(out)
 
 
+# Google's OpenAI-compatible /models answer also lists embedding/imagen/veo/
+# TTS ids alongside the gemini-* chat family.
+_GOOGLE_EXCLUDE = (
+    "embedding", "imagen", "veo", "tts", "aqa", "learnlm", "gemma",
+)
+
+
+def _filter_google(ids: list[str]) -> list[str]:
+    """Keep chat-capable gemini-* models; drop embedding/image/video/audio ids."""
+    out: set[str] = set()
+    for i in ids:
+        low = i.lower().removeprefix("models/")
+        if not low.startswith("gemini"):
+            continue
+        if any(tok in low for tok in _GOOGLE_EXCLUDE):
+            continue
+        out.add(low)
+    return sorted(out)
+
+
 async def _fetch_anthropic(key: str) -> list[str]:
     async with shared_http(timeout=12.0) as c:
         r = await c.get(
@@ -165,6 +197,18 @@ async def _fetch_qwen(key: str, base_url: str = "") -> list[str]:
         r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
         r.raise_for_status()
         return _filter_qwen([m.get("id", "") for m in r.json().get("data", [])])
+
+
+async def _fetch_google(key: str) -> list[str]:
+    """Google's OpenAI-compatible /models -- same endpoint shape as the
+    kernel resolver targets for provider "google" (llm/provider.py:
+    _GOOGLE_BASE_URL), so a live-fetched id is guaranteed to also resolve
+    at runtime."""
+    url = _GOOGLE_BASE_URL.rstrip("/") + "/models"
+    async with shared_http(timeout=12.0) as c:
+        r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
+        r.raise_for_status()
+        return _filter_google([m.get("id", "") for m in r.json().get("data", [])])
 
 
 async def _qwen_key_from_store() -> tuple[str, str]:
@@ -266,6 +310,15 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: qwen fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
+    gk = os.getenv("GOOGLE_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
+    if gk:
+        try:
+            catalog["google"] = await _fetch_google(gk)
+        except Exception as e:
+            log.warning(
+                "model_catalog: google fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
 
     catalog = {p: m for p, m in catalog.items() if m}
     if not catalog:
@@ -283,7 +336,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
     # Anthropic and cannot pick a GPT model at all. Backfill from the static
     # fallback so every configured provider stays selectable, and mark the
     # result degraded so it is cached briefly instead of for an hour.
-    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk)) if key}
+    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk), ("google", gk)) if key}
     missing = sorted(expected - set(catalog))
     for prov in missing:
         fb = FALLBACK_CATALOG.get(prov)

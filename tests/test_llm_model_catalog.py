@@ -330,3 +330,83 @@ async def test_qwen_fetch_failure_backfills_fallback(monkeypatch, no_redis):
 
     catalog = await plm.fetch_model_catalog()
     assert catalog["qwen"] == plm.FALLBACK_CATALOG["qwen"]
+
+
+# ------------------------------------------------------------------- google
+
+def test_google_filter_keeps_chat_gemini_only():
+    ids = [
+        "models/gemini-3-pro", "models/gemini-3-flash", "gemini-2.5-flash",
+        "gemini-embedding-001", "imagen-4.0-generate", "veo-3.0-generate",
+        "gemini-2.5-flash-tts", "aqa", "learnlm-2.0-flash", "gemma-3-27b-it",
+    ]
+    kept = plm._filter_google(ids)
+    assert "gemini-3-pro" in kept
+    assert "gemini-3-flash" in kept
+    assert "gemini-2.5-flash" in kept
+    assert "gemini-embedding-001" not in kept
+    assert "imagen-4.0-generate" not in kept
+    assert "veo-3.0-generate" not in kept
+    assert "gemini-2.5-flash-tts" not in kept
+    assert "aqa" not in kept
+    assert "learnlm-2.0-flash" not in kept
+    assert "gemma-3-27b-it" not in kept
+
+
+def test_google_filter_strips_models_prefix():
+    """Google's API returns ids as 'models/gemini-x' -- the prefix must not leak."""
+    kept = plm._filter_google(["models/gemini-2.5-pro"])
+    assert kept == ["gemini-2.5-pro"]
+
+
+@pytest.mark.asyncio
+async def test_google_catalogue_from_env_key(monkeypatch, no_redis):
+    """Google is env-keyed (GOOGLE_API_KEY/GEMINI_API_KEY), like anthropic/openai."""
+    _set_keys(monkeypatch)
+    monkeypatch.setenv("GOOGLE_API_KEY", "goog-test")
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    async def fake_google(key):
+        assert key == "goog-test"
+        return ["gemini-3-pro", "gemini-3-flash"]
+    monkeypatch.setattr(plm, "_fetch_google", fake_google)
+
+    catalog = await plm.fetch_model_catalog()
+    assert catalog["google"] == ["gemini-3-pro", "gemini-3-flash"]
+
+
+@pytest.mark.asyncio
+async def test_google_absent_without_key(monkeypatch, no_redis):
+    """No GOOGLE_API_KEY/GEMINI_API_KEY set -- google must not appear at all.
+
+    Unlike Qwen (panel-entered key, always offered so the admin can pick
+    provider+model before typing the key), Google is env-gated: no key means
+    the deployment deliberately did not turn Google on, so it must not be
+    fetched NOR silently backfilled from the static fallback.
+    """
+    _set_keys(monkeypatch)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    async def explode(key):
+        raise AssertionError("google fetch must not run without a key")
+    monkeypatch.setattr(plm, "_fetch_google", explode)
+
+    catalog = await plm.fetch_model_catalog()
+    assert "google" not in catalog
+
+
+@pytest.mark.asyncio
+async def test_google_fetch_failure_backfills_fallback(monkeypatch, no_redis):
+    """Same degraded-backfill protection as anthropic/openai/qwen."""
+    _set_keys(monkeypatch)
+    monkeypatch.setenv("GOOGLE_API_KEY", "goog-test")
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    async def boom(key):
+        raise TimeoutError()
+    monkeypatch.setattr(plm, "_fetch_google", boom)
+
+    catalog = await plm.fetch_model_catalog()
+    assert catalog["google"] == plm.FALLBACK_CATALOG["google"]

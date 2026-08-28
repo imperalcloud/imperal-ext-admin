@@ -114,6 +114,14 @@ _TOKEN_BUDGETS: list[tuple[str, str, str, str]] = [
      "Cap for the binary post-action yes/no schema-validity check (tiny by design)."),
     ("action_narrator_max_tokens", "Action Narrator", "1024",
      "Cap for post-tool prose narration."),
+    # Coding brain (purpose=code). Declared on SaveLlmConfigParams and read
+    # by the SAME generic _extract_per_purpose_admin flat-key cascade as
+    # every other row above (store[f"{purpose}_max_tokens"]) -- it just had
+    # no row here, so a saved value was silently discarded (nothing rendered
+    # it, so nothing ever posted it to the handler).
+    ("code_max_tokens", "Coding Brain (Webbee Code)", "inherit",
+     "Cap for every Webbee Code terminal/marathon turn. Raise for long "
+     "diffs and multi-file edits."),
 ]
 
 
@@ -175,6 +183,19 @@ def build_llm_form(
     # imperal:config:llm (cfg) -- the store get_admin_llm_config_field reads and
     # the store fn_save_llm_config writes. NOT tenant_defaults.
     kernel_flags_config: dict | None = None,
+    # BUG FIX (2026-08-28): the 11 per-purpose max_tokens caps below are
+    # SAVED into imperal:config:llm by the generic save loop (they are not
+    # in handlers_llm.py's skip_fields) -- the SAME store the kernel's
+    # config_resolver.py cascade actually reads via
+    # _extract_per_purpose_admin(config_store, purpose). But this form was
+    # displaying their "current value" from tenant_defaults (a DIFFERENT
+    # store: Postgres-backed /v1/admin/tenant-defaults) -- an admin who
+    # saved e.g. routing_max_tokens=8000 saw the OLD number reappear on
+    # next load, looking like the save silently failed. Same bug class as
+    # the step_reclassify_enabled/judge_enabled fix above; those two were
+    # caught in the 2026-08-18 orphan-reader audit, these 11 were not.
+    # panels_llm.py passes cfg straight in, like kernel_flags_config.
+    purpose_max_tokens_config: dict | None = None,
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -193,6 +214,7 @@ def build_llm_form(
 
     _td = tenant_defaults or {}
     _kf = kernel_flags_config or {}
+    _pmt = purpose_max_tokens_config or {}
     defaults = {
         "provider": provider,
         "model": model,
@@ -232,17 +254,26 @@ def build_llm_form(
         "tool_picker_model": tool_picker_model if tool_picker_model != model else "",
         "action_narrator_model": action_narrator_model if action_narrator_model != model else "",
         # Federalization 2026-05-19 — per-purpose max_tokens caps (was hardcoded)
-        "routing_max_tokens": int(_td.get("routing_max_tokens", 4096)),
-        "execution_max_tokens": int(_td.get("execution_max_tokens", 4096)),
-        "navigate_max_tokens": int(_td.get("navigate_max_tokens", 4096)),
-        "chain_narrative_max_tokens": int(_td.get("chain_narrative_max_tokens", 8000)),
-        "judge_max_tokens": int(_td.get("judge_max_tokens", 4096)),
-        "conversational_max_tokens": int(_td.get("conversational_max_tokens", 4096)),
-        "step_reclassify_max_tokens": int(_td.get("step_reclassify_max_tokens", 8000)),
-        "tool_picker_max_tokens": int(_td.get("tool_picker_max_tokens", 1024)),
-        "chain_arg_refs_max_tokens": int(_td.get("chain_arg_refs_max_tokens", 2000)),
-        "semantic_verifier_max_tokens": int(_td.get("semantic_verifier_max_tokens", 128)),
-        "action_narrator_max_tokens": int(_td.get("action_narrator_max_tokens", 1024)),
+        # BUG FIX (2026-08-28, see purpose_max_tokens_config note above): read
+        # cfg (_pmt) FIRST -- it is where fn_save_llm_config actually writes
+        # these -- keep _td as the fallback so anything an older build wrote
+        # there still renders instead of silently reverting to the hardcoded
+        # number.
+        "routing_max_tokens": int(_pmt.get("routing_max_tokens", _td.get("routing_max_tokens", 4096))),
+        "execution_max_tokens": int(_pmt.get("execution_max_tokens", _td.get("execution_max_tokens", 4096))),
+        "navigate_max_tokens": int(_pmt.get("navigate_max_tokens", _td.get("navigate_max_tokens", 4096))),
+        "chain_narrative_max_tokens": int(_pmt.get("chain_narrative_max_tokens", _td.get("chain_narrative_max_tokens", 8000))),
+        "judge_max_tokens": int(_pmt.get("judge_max_tokens", _td.get("judge_max_tokens", 4096))),
+        "conversational_max_tokens": int(_pmt.get("conversational_max_tokens", _td.get("conversational_max_tokens", 4096))),
+        "step_reclassify_max_tokens": int(_pmt.get("step_reclassify_max_tokens", _td.get("step_reclassify_max_tokens", 8000))),
+        "tool_picker_max_tokens": int(_pmt.get("tool_picker_max_tokens", _td.get("tool_picker_max_tokens", 1024))),
+        "chain_arg_refs_max_tokens": int(_pmt.get("chain_arg_refs_max_tokens", _td.get("chain_arg_refs_max_tokens", 2000))),
+        "semantic_verifier_max_tokens": int(_pmt.get("semantic_verifier_max_tokens", _td.get("semantic_verifier_max_tokens", 128))),
+        "action_narrator_max_tokens": int(_pmt.get("action_narrator_max_tokens", _td.get("action_narrator_max_tokens", 1024))),
+        # Coding brain (purpose=code) -- NEW row, same cfg-first read as the
+        # others above; no tenant_defaults fallback exists since this key
+        # never had a form row before this fix (nothing legacy to read back).
+        "code_max_tokens": int(_pmt.get("code_max_tokens", 0)) or "",
         # Federalization 2026-05-19 — feature flags (was env-only)
         # FLAG READ PATH (fixed 2026-08-18): these two are SAVED into
         # imperal:config:llm (they are not in the handler's skip_fields), but

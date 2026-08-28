@@ -49,9 +49,15 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             )
         if params.set_extension_override and params.override_model:
             ext_id = params.set_extension_override
+            # Cross-provider like every other model pick in this handler (see the
+            # infer+clear loop below): an override model does not have to share
+            # the global default's provider, so infer it from the model id
+            # instead of silently pairing it with the wrong key.
+            from panels_llm_models import provider_for_model
+            inferred = provider_for_model(params.override_model)
             ext_overrides[ext_id] = {
                 "model": params.override_model,
-                "provider": params.override_provider or current.get("provider", ""),
+                "provider": params.override_provider or inferred or current.get("provider", ""),
             }
             current["extension_overrides"] = ext_overrides
             await r.set("imperal:config:llm", json.dumps(current))

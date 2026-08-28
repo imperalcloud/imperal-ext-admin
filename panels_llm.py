@@ -16,7 +16,7 @@ from panels_sections import (
     _cached, _fetch_llm_usage, _fetch_extensions, _fmt_tokens, _fmt_latency,
 )
 from panels_llm_form import build_llm_form
-from panels_llm_models import fetch_model_catalog
+from panels_llm_models import fetch_model_catalog, catalog_to_options
 
 log = logging.getLogger("admin")
 
@@ -155,6 +155,59 @@ def _build_overrides(overrides: dict, extensions: list[dict]) -> list:
     return nodes
 
 
+def _build_add_override_form(
+    overrides: dict, extensions: list[dict], model_catalog: dict,
+) -> list:
+    """Form to CREATE a new per-extension override (was Reset-only).
+
+    handlers_llm.py::fn_save_llm_config has always accepted
+    set_extension_override + override_model (+ optional override_provider,
+    auto-inferred from the model id when left blank) — this panel just had
+    no control that could ever POST them, so the write path was unreachable
+    from the UI. Only extensions WITHOUT an existing override are offered;
+    to change one, Reset it first.
+    """
+    candidates = [
+        e for e in extensions
+        if e.get("app_id") and e.get("app_id") not in overrides
+    ]
+    if not candidates:
+        return [ui.Text(
+            "Every extension already has an override, or none are installed.",
+            variant="caption",
+        )]
+    ext_options = [
+        {"value": e["app_id"], "label": e.get("display_name", e["app_id"])}
+        for e in sorted(candidates, key=lambda e: e.get("display_name", e["app_id"]))
+    ]
+    _, model_options = catalog_to_options(model_catalog)
+    return [
+        ui.Form(
+            action="save_llm_config",
+            submit_label="Add Override",
+            defaults={"set_extension_override": "", "override_model": ""},
+            children=[
+                ui.Text(
+                    "Pin one extension to a specific model, independent of "
+                    "the platform default and every per-purpose slot above. "
+                    "Provider is inferred from the model id.",
+                    variant="caption",
+                ),
+                ui.Select(
+                    options=ext_options,
+                    param_name="set_extension_override",
+                    placeholder="Choose extension",
+                ),
+                ui.Select(
+                    options=model_options,
+                    param_name="override_model",
+                    placeholder="Choose model",
+                ),
+            ],
+        ),
+    ]
+
+
 # ── Main builder ──────────────────────────────────────────────────────
 
 async def build_llm(ctx, run_test: str = "", **kwargs):
@@ -269,12 +322,27 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             # get_admin_llm_config_field cascade reads and fn_save_llm_config
             # writes -- NOT tenant_defaults.
             kernel_flags_config=cfg,
+            # BUG FIX (2026-08-28): the 11 per-purpose max_tokens caps
+            # (routing/execution/navigate/chain_narrative/judge/conversational/
+            # step_reclassify/tool_picker/chain_arg_refs/semantic_verifier/
+            # action_narrator) + the new code_max_tokens row are ALL saved
+            # into cfg (imperal:config:llm) by the generic save loop -- same
+            # store config_resolver.py's cascade reads via
+            # _extract_per_purpose_admin. The form used to read their
+            # "current value" from tenant_defaults (a different store), so a
+            # save looked like it silently reverted. See build_llm_form's
+            # purpose_max_tokens_config docstring.
+            purpose_max_tokens_config=cfg,
         ),
         ui.Divider(),
         ui.Section(
             title=f"Extension Overrides ({override_count})",
             collapsible=True,
-            children=_build_overrides(ext_overrides, extensions),
+            children=[
+                *_build_overrides(ext_overrides, extensions),
+                ui.Divider(),
+                *_build_add_override_form(ext_overrides, extensions, model_catalog),
+            ],
         ),
         ui.Divider(),
         ui.Section(title="Platform Usage Today", children=[

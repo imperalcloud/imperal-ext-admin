@@ -66,6 +66,11 @@ KERNEL_READ_KEYS: dict[str, str] = {
     "coding_thread_fold_max_tokens": "activities/coding_thread.py:196",
     "coding_thread_fold_retry_max_tokens": "activities/coding_thread.py:197",
     "coding_thread_time_budget_s": "activities/coding_thread.py:200",
+    # --- 2026-08-28 audit: purpose="code" max_tokens read generically by
+    # LLMProvider._extract_per_purpose_admin (provider.py:666) via the flat
+    # f"{purpose}_max_tokens" key -- like every other purpose in this dict --
+    # but had no panel row at all until this fix.
+    "code_max_tokens": "llm/provider.py:_extract_per_purpose_admin (flat key 'code_max_tokens')",
 }
 
 # Keys the SAVE handler deliberately routes to the tenant-defaults endpoint
@@ -236,6 +241,51 @@ def test_stored_value_is_rendered_back():
             assert bool(got) is want, f"{key}: stored {want!r}, form shows {got!r}"
         else:
             assert int(got) == want, f"{key}: stored {want!r}, form shows {got!r}"
+
+
+def test_purpose_max_tokens_stored_in_cfg_is_rendered_back():
+    """The 11 per-purpose max_tokens caps + code_max_tokens must read from cfg.
+
+    2026-08-28 bug: fn_save_llm_config writes these into imperal:config:llm
+    (they are not in skip_fields), but the form used to read their "current
+    value" from tenant_defaults -- a completely different store. An admin who
+    saved routing_max_tokens=9000 saw 4096 reappear on next load, looking
+    like the save silently failed.
+    """
+    stored = {
+        "routing_max_tokens": 9000,
+        "execution_max_tokens": 8001,
+        "navigate_max_tokens": 8002,
+        "chain_narrative_max_tokens": 12000,
+        "judge_max_tokens": 8003,
+        "conversational_max_tokens": 8004,
+        "step_reclassify_max_tokens": 12001,
+        "tool_picker_max_tokens": 8005,
+        "chain_arg_refs_max_tokens": 8006,
+        "semantic_verifier_max_tokens": 500,
+        "action_narrator_max_tokens": 8007,
+        "code_max_tokens": 32000,
+    }
+    tree = _plain(_build_form(purpose_max_tokens_config=stored))
+    for key, want in stored.items():
+        hits = _controls(tree, key)
+        assert hits, f"no control rendered for {key}"
+        got = hits[0].get("value")
+        assert int(got) == want, (
+            f"{key}: cfg has {want!r} but the form rendered {got!r} -- it is "
+            "still reading a stale/wrong store"
+        )
+
+
+def test_purpose_max_tokens_falls_back_to_legacy_tenant_defaults():
+    """A value an OLDER build wrote to tenant_defaults must still render.
+
+    cfg (the correct store) is empty here -- the legacy tenant_defaults copy
+    must not be silently dropped by the fix.
+    """
+    tree = _plain(_build_form(tenant_defaults={"routing_max_tokens": 7777}))
+    hits = _controls(tree, "routing_max_tokens")
+    assert hits and int(hits[0].get("value")) == 7777
 
 
 def test_toggle_off_survives_the_save_filter():
