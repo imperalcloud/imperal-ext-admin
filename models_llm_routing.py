@@ -76,6 +76,13 @@ UNKNOWN_TIER = "unpriced"
 # pure so the routing answers are unit-testable without a network.
 _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("claude", "anthropic"),
+    ("qwen", "qwen"),
+    ("qwq", "qwen"),
+    # DashScope-hosted families (same key, same endpoint) — see
+    # panels_llm_models._QWEN_HOSTED_PREFIXES.
+    ("deepseek", "qwen"),
+    ("glm", "qwen"),
+    ("kimi", "qwen"),
     ("gpt", "openai"),
     ("o1", "openai"),
     ("o3", "openai"),

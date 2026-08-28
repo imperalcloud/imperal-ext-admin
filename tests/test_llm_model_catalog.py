@@ -209,6 +209,10 @@ def test_provider_inference_covers_openai_families():
     assert plm.provider_for_model("gemini-2.0") == "google"
     assert plm.provider_for_model("qwen3-max") == "qwen"
     assert plm.provider_for_model("qwen-plus") == "qwen"
+    # DashScope-hosted families resolve to the qwen provider (same key/endpoint).
+    assert plm.provider_for_model("deepseek-v4-pro") == "qwen"
+    assert plm.provider_for_model("glm-5.2") == "qwen"
+    assert plm.provider_for_model("kimi-k3") == "qwen"
     assert plm.provider_for_model("mystery-model") == ""
 
 
@@ -228,6 +232,36 @@ def test_qwen_filter_keeps_chat_models_only():
     assert "qwen-audio-turbo" not in kept
     assert "text-embedding-v3" not in kept
     assert "wan2.1-t2v-turbo" not in kept
+
+
+def test_qwen_filter_keeps_dashscope_hosted_families():
+    """deepseek/glm/kimi are served by the same key+endpoint — they belong."""
+    ids = [
+        "deepseek-v4-pro", "deepseek-v4-flash", "glm-5.2", "glm-5.1",
+        "kimi-k3", "kimi-k2.7-code", "qwen3-max",
+        "ccai-pro", "ZHIPU/GLM-5.3",  # not plain-family ids -> stay out
+    ]
+    kept = plm._filter_qwen(ids)
+    assert "deepseek-v4-pro" in kept
+    assert "glm-5.2" in kept
+    assert "kimi-k3" in kept
+    assert "kimi-k2.7-code" in kept
+    assert "qwen3-max" in kept
+    assert "ccai-pro" not in kept
+    assert "ZHIPU/GLM-5.3" not in kept
+
+
+def test_qwen_filter_drops_dated_snapshot_only_when_alias_exists():
+    ids = [
+        "qwen-plus", "qwen-plus-2025-09-11",   # alias exists -> snapshot dropped
+        "deepseek-v4-pro-0813",                 # no alias -> snapshot KEPT
+        "qwen3-max-2026-01-23",                 # no alias -> snapshot KEPT
+    ]
+    kept = plm._filter_qwen(ids)
+    assert "qwen-plus" in kept
+    assert "qwen-plus-2025-09-11" not in kept
+    assert "deepseek-v4-pro-0813" in kept
+    assert "qwen3-max-2026-01-23" in kept
 
 
 @pytest.mark.asyncio

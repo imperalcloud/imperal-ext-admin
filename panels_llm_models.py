@@ -35,6 +35,12 @@ _CACHE_TTL_DEGRADED = 120  # seconds (2m)
 _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("claude", "anthropic"),
     ("qwen", "qwen"),
+    ("qwq", "qwen"),
+    # DashScope also hosts these families behind the same OpenAI-compatible
+    # endpoint and the same key — they are qwen-provider models for us.
+    ("deepseek", "qwen"),
+    ("glm", "qwen"),
+    ("kimi", "qwen"),
     ("gpt", "openai"),
     ("o1", "openai"),
     ("o3", "openai"),
@@ -100,21 +106,33 @@ _QWEN_EXCLUDE = (
     "image", "video", "wan", "math", "omni", "livetranslate", "s2s",
     "character", "captioner", "tingwu",
 )
-# Pinned snapshots (qwen-plus-2025-09-11, qwen3-max-2026-01-23, ...): the stable
-# alias already covers them, and 6 dated copies of one model bury the list.
+# Pinned snapshots (qwen-plus-2025-09-11, qwen3-max-2026-01-23, ...): dropped
+# only when the undated alias is ALSO listed — a dated id with no alias is a
+# distinct model and stays.
 _QWEN_DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
+
+# DashScope hosts more than the qwen family behind the same key and the same
+# OpenAI-compatible endpoint: deepseek-*, glm-*, kimi-*. They are chat models
+# the admin explicitly wants selectable, so the catalogue keeps them.
+_QWEN_HOSTED_PREFIXES = ("qwen", "qwq", "deepseek", "glm", "kimi")
 
 
 def _filter_qwen(ids: list[str]) -> list[str]:
-    """Keep chat-capable qwen text models (incl. qwen3-coder, a chat model)."""
+    """Keep chat-capable text models visible to this DashScope key.
+
+    The provider's /models answer is the source of truth; we only drop
+    non-chat families and redundant dated snapshots.
+    """
+    id_set = {i for i in ids if i}
     out: set[str] = set()
-    for i in ids:
+    for i in id_set:
         low = i.lower()
-        if not low.startswith(("qwen", "qwq")):
+        if not low.startswith(_QWEN_HOSTED_PREFIXES):
             continue
         if any(tok in low for tok in _QWEN_EXCLUDE):
             continue
-        if _QWEN_DATE_SUFFIX.search(low):
+        m = _QWEN_DATE_SUFFIX.search(low)
+        if m and low[: m.start()] in {x.lower() for x in id_set}:
             continue
         out.add(i)
     return sorted(out)
