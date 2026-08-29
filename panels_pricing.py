@@ -89,7 +89,20 @@ async def build_pricing(ctx, **kwargs):
         children=[
             ui.Section(
                 title=("Edit Rate" if edit_id else "Add New Rate"),
-                children=[
+                children=([
+                    # "+ Add New Model" (2026-08-29 owner report): this ONE
+                    # form doubles as both Add and Edit -- while editing a
+                    # row its submit button reads "Save Rate", so the only
+                    # way back to "Add" mode used to be a full page reload
+                    # (edit_id resets to "" only via the initial kwargs
+                    # default). This button clears the selection with a
+                    # normal panel round-trip instead, no reload needed.
+                    ui.Button(
+                        label="+ Add New Model", variant="ghost", size="sm",
+                        on_click=ui.Call("__panel__tools", section="pricing",
+                                        edit_id=""),
+                    ),
+                ] if edit_id else []) + [
                     ui.Text("Model ID", variant="caption"),
                     ui.Input(
                         placeholder="e.g. claude-sonnet-4-20250514",

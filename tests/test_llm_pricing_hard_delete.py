@@ -24,6 +24,7 @@ destructive confirm before calling the hard path.
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 
 import handlers_pricing
@@ -68,3 +69,35 @@ def test_panel_offers_hard_delete_with_destructive_confirm_text():
     # requirement, without inventing a second modal mechanism in this app.
     assert "confirm=(f\"Permanently delete the rate row" in src
     assert "cannot be undone" not in src.lower() or "for good" in src
+
+
+# ── "+ Add New Model" vanishes in edit mode (owner, 2026-08-29) ─────────
+#
+# "когда я жму на какую-то модель из таблицы (уже добавленные), то
+# открывается снизу возможность редактировать данные, но нельзя увидеть
+# кнопку добавления модели ... нужно перезагружать страницу чтобы ее
+# увидеть снова" -- the Add/Edit form is ONE ui.Form whose submit button
+# always reads "Save Rate" while editing, so there was no way back to Add
+# mode short of a full reload. Fixed with a "+ Add New Model" button that
+# clears edit_id via a normal panel round-trip.
+async def _build(edit_id: str = ""):
+    from unittest import mock
+
+    fake_rates = [{"id": "claude-x", "tier": "standard",
+                   "input_cost_per_1k": 1.0, "output_cost_per_1k": 2.0,
+                   "is_available": True}]
+    with mock.patch.object(panels_pricing, "_fetch_rates",
+                            return_value=fake_rates):
+        return await panels_pricing.build_pricing(None, edit_id=edit_id)
+
+
+def test_add_new_model_button_appears_only_while_editing():
+    tree = asyncio.run(_build(edit_id="claude-x")).to_dict()
+    dumped = str(tree)
+    assert "+ Add New Model" in dumped
+
+
+def test_add_new_model_button_absent_in_plain_add_mode():
+    tree = asyncio.run(_build(edit_id="")).to_dict()
+    dumped = str(tree)
+    assert "+ Add New Model" not in dumped
