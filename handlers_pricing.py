@@ -58,6 +58,11 @@ class DeleteLlmModelRateParams(BaseModel):
     model_id: str = Field(..., min_length=1)
 
 
+class HardDeleteLlmModelRateParams(BaseModel):
+    """Permanently delete a model rate row — no soft-delete fallback."""
+    model_id: str = Field(..., min_length=1)
+
+
 # SDL: save/delete_llm_model_rate return a receipt whose runtime keys are
 # {model_id, action}. LLMModelRateReceipt mirrors those keys verbatim
 # (I-EXT-RECORD-FIELD-NAMING-SYMMETRIC).
@@ -111,33 +116,75 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
     )
 
 
+async def _call_delete_rate(model_id: str, *, hard: bool) -> tuple[ActionResult | None, str]:
+    """Shared DELETE call — soft and hard delete differ only by one query flag.
+
+    Returns (error_result_or_None, resolved_action_string). Kept as ONE helper
+    so the two @chat.function handlers below cannot drift into two different
+    HTTP-error/status-code handling paths for the same endpoint.
+    """
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN"), ""
+
+    url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/model-rates/{model_id}"
+    params = {"hard": "true"} if hard else None
+    try:
+        async with shared_http(timeout=5.0) as client:
+            resp = await client.delete(
+                url, headers={"X-Service-Token": AUTH_SERVICE_TOKEN}, params=params,
+            )
+    except Exception as e:
+        return ActionResult.error(f"delete HTTP error: {type(e).__name__}: {e}"), ""
+
+    if resp.status_code == 404:
+        return ActionResult.error(f"model {model_id} not found"), ""
+    if resp.status_code != 200:
+        return ActionResult.error(
+            f"delete failed: status={resp.status_code} body={resp.text[:200]}"
+        ), ""
+
+    action = "deleted" if hard else "softdeleted"
+    try:
+        action = resp.json().get("action", action)
+    except Exception:
+        pass
+    return None, action
+
+
 @chat.function("delete_llm_model_rate", action_type="destructive", effects=["delete:llm_model_rate"],
                event="llm_model_rate_deleted",
                data_model=LLMModelRateReceipt,
                description="Soft-delete (mark unavailable) an LLM model rate row.")
 async def fn_delete_llm_model_rate(ctx, params: DeleteLlmModelRateParams) -> ActionResult:
     """Soft-delete (mark unavailable) an LLM model rate row."""
-    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
-        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
-
-    url = f"{AUTH_GW.rstrip('/')}/v1/internal/billing/model-rates/{params.model_id}"
-    try:
-        async with shared_http(timeout=5.0) as client:
-            resp = await client.delete(
-                url, headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
-            )
-    except Exception as e:
-        return ActionResult.error(f"delete HTTP error: {type(e).__name__}: {e}")
-
-    if resp.status_code == 404:
-        return ActionResult.error(f"model {params.model_id} not found")
-    if resp.status_code != 200:
-        return ActionResult.error(
-            f"delete failed: status={resp.status_code} body={resp.text[:200]}"
-        )
-
+    err, action = await _call_delete_rate(params.model_id, hard=False)
+    if err:
+        return err
     return ActionResult.success(
-        data={"model_id": params.model_id, "action": "softdeleted"},
+        data={"model_id": params.model_id, "action": action},
         summary=f"Rate disabled for {params.model_id}",
+        refresh_panels=["tools"],
+    )
+
+
+@chat.function("hard_delete_llm_model_rate", action_type="destructive", effects=["delete:llm_model_rate"],
+               event="llm_model_rate_hard_deleted",
+               data_model=LLMModelRateReceipt,
+               description="Permanently delete an LLM model rate row from llm_model_rates — cannot be undone.")
+async def fn_hard_delete_llm_model_rate(ctx, params: HardDeleteLlmModelRateParams) -> ActionResult:
+    """Permanently delete an LLM model rate row from llm_model_rates.
+
+    There is deliberately no separate Redis cleanup step: the kernel's own
+    billing resolver documents that llm_model_rates has no Redis cache and no
+    sync job (imperal_kernel/billing/resolver.py) — the table row IS the only
+    copy anywhere in the system. Deleting it here is already a complete,
+    guaranteed delete.
+    """
+    err, action = await _call_delete_rate(params.model_id, hard=True)
+    if err:
+        return err
+    return ActionResult.success(
+        data={"model_id": params.model_id, "action": action},
+        summary=f"Rate permanently deleted for {params.model_id}",
         refresh_panels=["tools"],
     )

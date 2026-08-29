@@ -122,13 +122,35 @@ async def build_pricing(ctx, **kwargs):
     edit_actions = None
     if edit_id and edit_row:
         _avail = bool(edit_row.get("is_available", True))
-        edit_actions = ui.Stack(direction="h", gap=2, children=[
-            ui.Button(
-                label=("Disable model" if _avail else "Model is disabled — re-enable via Save"),
-                variant="danger", size="sm",
+        _buttons = []
+        if _avail:
+            _buttons.append(ui.Button(
+                label="Disable model", variant="danger", size="sm",
                 on_click=ui.Call("delete_llm_model_rate", model_id=edit_id),
+            ))
+        else:
+            _buttons.append(ui.Text(
+                "Model is disabled — re-enable via Save", variant="caption",
+            ))
+        # Guaranteed hard-delete (2026-08-29): the soft-delete above only ever
+        # sets is_available=false — the row (and every stale/wrong rate in
+        # it) stays in the table forever, which is exactly what made cleanup
+        # here impossible. This actually removes the row. There is no
+        # separate Redis step: llm_model_rates has no cache and no sync job
+        # (see imperal_kernel/billing/resolver.py), so deleting the one row
+        # here already IS the complete, guaranteed delete everywhere.
+        _buttons.append(ui.Button(
+            label="Delete permanently", variant="danger", size="sm",
+            on_click=ui.Call(
+                "hard_delete_llm_model_rate", model_id=edit_id,
+                confirm=(f"Permanently delete the rate row for '{edit_id}'? "
+                         "This removes it from the database for good — "
+                         "there is nothing to restore afterwards. If you "
+                         "just want to stop a model from being used, use "
+                         "\"Disable model\" instead."),
             ),
-        ]) if _avail else None
+        ))
+        edit_actions = ui.Stack(direction="h", gap=2, children=_buttons)
 
     return ui.Stack(children=[
         ui.Header("LLM Pricing", level=3),
