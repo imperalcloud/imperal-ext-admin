@@ -102,8 +102,9 @@ def _mock_users(monkeypatch, users):
     monkeypatch.setattr(PU, "fetch_user_billing_index", _aret({}))
 
 
-def _mock_extensions(monkeypatch, exts):
+def _mock_extensions(monkeypatch, exts, users=None):
     monkeypatch.setattr(PE, "_fetch_extensions_shared", _aret(exts))
+    monkeypatch.setattr(PE, "_fetch_users_shared", _aret(users or []))
     monkeypatch.setattr(PE, "_fetch_extension_users", _aret([]))
     monkeypatch.setattr(PE, "_fetch_access_policy", _aret({"mode": "public"}))
 
@@ -228,3 +229,49 @@ def test_build_extensions_no_pager_under_one_page(monkeypatch):
 
     assert len(_list_items(tree)) == 20
     assert _buttons(tree) == []
+
+
+# ── Status filter + author on card (owner, 2026-08-29) ──────────────────
+
+
+def test_build_extensions_status_filter_covers_every_real_status(monkeypatch):
+    """Filter options come from whatever statuses actually occur -- not a
+    hardcoded active/inactive guess -- and each one narrows the list."""
+    exts = (_many_extensions(3) + [
+        {**_many_extensions(1)[0], "app_id": "ext-draft", "status": "draft"},
+        {**_many_extensions(1)[0], "app_id": "ext-susp", "status": "suspended"},
+        {**_many_extensions(1)[0], "app_id": "ext-pending", "status": "pending_review"},
+    ])
+    _mock_extensions(monkeypatch, exts)
+
+    tree = asyncio.run(PE.build_extensions(None)).to_dict()
+    selects = [n["props"] for n in _walk(tree) if n.get("type") == "Select"]
+    status_select = next(s for s in selects if s.get("param_name") == "status_filter")
+    values = {o["value"] for o in status_select["options"]}
+    assert {"", "active", "draft", "suspended", "pending_review"} <= values
+
+    draft_tree = asyncio.run(PE.build_extensions(None, status_filter="draft")).to_dict()
+    ids = {i["id"] for i in _list_items(draft_tree)}
+    assert ids == {"ext-draft"}
+
+
+def test_build_extensions_card_shows_author_without_expanding(monkeypatch):
+    """Owner: 'видеть автора приложения сразу' -- resolved from developer_id
+    to the real user's email, visible on the collapsed card subtitle."""
+    exts = [{**_many_extensions(1)[0], "app_id": "ext-a", "developer_id": "imp_u_dev1"}]
+    users = [{"imperal_id": "imp_u_dev1", "email": "dev1@example.com"}]
+    _mock_extensions(monkeypatch, exts, users=users)
+
+    tree = asyncio.run(PE.build_extensions(None)).to_dict()
+    item = _list_items(tree)[0]
+    assert "dev1@example.com" in item["subtitle"]
+
+
+def test_build_extensions_card_omits_author_for_system_apps(monkeypatch):
+    """No developer_id (system apps like admin/billing) -- no bogus author."""
+    exts = _many_extensions(1)
+    _mock_extensions(monkeypatch, exts)
+
+    tree = asyncio.run(PE.build_extensions(None)).to_dict()
+    item = _list_items(tree)[0]
+    assert "by " not in item["subtitle"]

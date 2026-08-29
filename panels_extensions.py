@@ -12,6 +12,7 @@ from imperal_sdk import ui
 
 from app import _gw_request, _registry_get, _tenant_id
 from panels_sections import _cached, _fetch_extensions as _fetch_extensions_shared
+from panels_sections import _fetch_users as _fetch_users_shared
 from render_cap import build_capped_list
 
 
@@ -103,7 +104,8 @@ def _build_policy_summary(app_id: str, policy: dict) -> list:
     return children
 
 
-def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> list:
+def _build_expanded_content(app: dict, user_count: int | None, policy: dict,
+                            author: str | None = None) -> list:
     app_id: str = app.get("app_id") or app.get("id", "")
     status: str = app.get("status", "unknown")
     description: str = app.get("description") or ""
@@ -113,6 +115,7 @@ def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> 
         {"key": "Category", "value": str(app.get("category") or "\u2014").capitalize()},
         {"key": "Status", "value": status.capitalize()},
         {"key": "Users", "value": str(user_count) if user_count is not None else "\u2014"},
+        {"key": "Developer", "value": author or "\u2014 (system)"},
     ]
 
     is_active = status == "active"
@@ -174,30 +177,48 @@ def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> 
 
 async def build_extensions(ctx: Any, category_filter: str = "",
                            status_filter: str = "", **kwargs) -> ui.Stack:
-    extensions = await _fetch_extensions_shared()
+    extensions, all_users = await asyncio.gather(
+        _fetch_extensions_shared(), _fetch_users_shared())
     if not extensions:
         return ui.Stack(children=[
             ui.Header(text="Extensions", level=3),
             ui.Empty(message="No extensions registered", icon="Puzzle"),
         ], direction="v", gap=4)
 
+    # Author lookup: developer_apps.developer_id -> the actual person, shown
+    # right on the collapsed card (owner asked to see it without expanding).
+    # Falls back to the raw id if the user record isn't found (e.g. the
+    # developer account was since deleted) rather than hiding the field.
+    _dev_by_id = {u.get("imperal_id", ""): u for u in all_users if u.get("imperal_id")}
+
+    def _author_label(app: dict) -> str | None:
+        did = app.get("developer_id")
+        if not did:
+            return None
+        u = _dev_by_id.get(did)
+        if not u:
+            return did
+        return u.get("email") or u.get("nickname") or did
+
     categories = sorted({e.get("category", "") for e in extensions if e.get("category")})
     cat_options = [{"value": "", "label": "All Categories"}] + [
         {"value": c, "label": c.capitalize()} for c in categories
     ]
-    status_options = [
-        {"value": "", "label": "All Status"},
-        {"value": "active", "label": "Active"},
-        {"value": "inactive", "label": "Inactive"},
+    # Real status options built from whatever statuses actually occur in the
+    # data (active/suspended/draft/pending_review/... or anything else the
+    # gateway returns) -- not a hardcoded active/inactive guess. This is the
+    # exact same status string _status_badge already renders, so the filter
+    # always matches what the operator sees on each card.
+    statuses = sorted({str(e.get("status", "unknown")) for e in extensions})
+    status_options = [{"value": "", "label": "All Status"}] + [
+        {"value": s, "label": s.replace("_", " ").title()} for s in statuses
     ]
 
     filtered = extensions
     if category_filter:
         filtered = [e for e in filtered if e.get("category") == category_filter]
-    if status_filter == "active":
-        filtered = [e for e in filtered if e.get("status") == "active"]
-    elif status_filter == "inactive":
-        filtered = [e for e in filtered if e.get("status") != "active"]
+    if status_filter:
+        filtered = [e for e in filtered if str(e.get("status", "unknown")) == status_filter]
 
     filter_bar = ui.Stack([
         ui.Select(options=cat_options, value=category_filter, param_name="category_filter",
@@ -264,14 +285,20 @@ async def build_extensions(ctx: Any, category_filter: str = "",
         if cat:
             parts.append(cat.capitalize())
 
+        # Author, right on the collapsed card (owner: "видеть автора приложения
+        # сразу"). System apps (no developer_id, e.g. admin/billing) simply omit it.
+        author = _author_label(app)
+        subtitle = f"{app_id} · by {author}" if author else app_id
+
         return ui.ListItem(
-            id=app_id, title=display_name, subtitle=app_id,
+            id=app_id, title=display_name, subtitle=subtitle,
             badge=_status_badge(app),
             meta=" \u00b7 ".join(parts) if parts else None,
             expandable=True,
             expanded_content=_build_expanded_content(
                 app=app, user_count=uc,
-                policy=policies.get(app_id, {"mode": "public"})),
+                policy=policies.get(app_id, {"mode": "public"}),
+                author=author),
         )
 
     # Byte-aware safety net (2026-08-29): a single 50-row PAGE should never
