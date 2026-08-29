@@ -211,8 +211,12 @@ def _build_role_expanded(
         nodes.append(ui.Button(
             "Delete Role",
             variant="danger",
-            on_click=ui.Call("delete_role", role_id=role_id,
-                             role_name=name),
+            on_click=ui.Call(
+                "delete_role", role_id=role_id, role_name=name,
+                confirm=(f"Permanently delete role '{name}'? Anyone still "
+                         "assigned it needs a new role right away. This "
+                         "cannot be undone."),
+            ),
         ))
 
     return nodes

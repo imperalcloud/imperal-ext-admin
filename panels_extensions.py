@@ -131,12 +131,23 @@ def _build_expanded_content(app: dict, user_count: int | None, policy: dict) -> 
         ui.Button(
             label="Suspend" if is_active else "Restore",
             variant="danger" if is_active else "primary",
-            on_click=ui.Call("suspend_extension" if is_active else "activate_extension",
-                             app_id=app_id),
+            on_click=ui.Call(
+                "suspend_extension" if is_active else "activate_extension",
+                app_id=app_id,
+                **({"confirm": (f"Suspend '{app_id}'? It comes off the "
+                                 "Marketplace and every current user loses "
+                                 "access immediately. You can Restore it "
+                                 "later.")} if is_active else {}),
+            ),
         ),
         ui.Button(
             label="To draft", variant="ghost",
-            on_click=ui.Call("draft_extension", app_id=app_id),
+            on_click=ui.Call(
+                "draft_extension", app_id=app_id,
+                confirm=(f"Send '{app_id}' back to draft? It comes off the "
+                         "Marketplace for rework; existing users keep using "
+                         "it until you re-submit and it's approved again."),
+            ),
         ),
         ui.Button(
             label="Settings", variant="primary",

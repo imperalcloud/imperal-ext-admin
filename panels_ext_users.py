@@ -41,7 +41,10 @@ async def build_ext_users(ctx: Any, app_id: str = "", **kwargs) -> ui.Stack:
             action_btn = ui.Button(
                 label="Deny Access",
                 variant="danger",
-                on_click=ui.Call("deny_extension", app_id=aid, user=uid),
+                on_click=ui.Call(
+                    "deny_extension", app_id=aid, user=uid,
+                    confirm=f"Deny {email or uid} access to this extension?",
+                ),
             )
         else:
             action_btn = ui.Button(

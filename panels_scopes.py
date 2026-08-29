@@ -61,7 +61,12 @@ def _build_expanded(s: dict) -> list[UINode]:
             ui.Button(
                 label="Delete",
                 variant="danger",
-                on_click=ui.Call("delete_scope", scope_name=scope_name),
+                on_click=ui.Call(
+                    "delete_scope", scope_name=scope_name,
+                    confirm=(f"Permanently delete scope '{scope_name}'? "
+                             "Any role or user still holding it loses this "
+                             "permission immediately. This cannot be undone."),
+                ),
             )
         )
 

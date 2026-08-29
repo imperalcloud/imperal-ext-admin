@@ -126,7 +126,12 @@ async def build_pricing(ctx, **kwargs):
         if _avail:
             _buttons.append(ui.Button(
                 label="Disable model", variant="danger", size="sm",
-                on_click=ui.Call("delete_llm_model_rate", model_id=edit_id),
+                on_click=ui.Call(
+                    "delete_llm_model_rate", model_id=edit_id,
+                    confirm=(f"Disable the rate row for '{edit_id}'? It stops "
+                             "being billable immediately. You can re-enable it "
+                             "via Save afterwards."),
+                ),
             ))
         else:
             _buttons.append(ui.Text(

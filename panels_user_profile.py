@@ -512,12 +512,24 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
                     "Deactivate User" if is_active else "User Already Inactive",
                     variant="danger",
                     disabled=not is_active,
-                    on_click=ui.Call("deactivate_user", user_id=user_id) if is_active else None,
+                    on_click=ui.Call(
+                        "deactivate_user", user_id=user_id,
+                        confirm="Deactivate this user? They lose access "
+                                "immediately. You can Activate them again "
+                                "any time.",
+                    ) if is_active else None,
                 ),
                 ui.Button(
                     "Permanent Delete User",
                     variant="danger",
-                    on_click=ui.Call("hard_delete_user", user_id=user_id),
+                    on_click=ui.Call(
+                        "hard_delete_user", user_id=user_id,
+                        confirm=("Permanently delete this user? This erases "
+                                 "the account, its balance, roles and history "
+                                 "for good — there is nothing to restore "
+                                 "afterwards. If you just want to lock them "
+                                 "out, use Deactivate instead."),
+                    ),
                 ),
             ], direction="h", gap=2, wrap=True),
         ],

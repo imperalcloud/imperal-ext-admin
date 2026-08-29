@@ -356,13 +356,24 @@ def _build_user_expanded(user: dict, role_options: list[dict],
                 on_click=ui.Call(
                     "deactivate_user" if is_active else "update_user",
                     user_id=uid,
-                    **({"is_active": True} if not is_active else {}),
+                    **({"is_active": True} if not is_active else {
+                        "confirm": (f"Deactivate {user.get('email', uid)}? "
+                                    "They lose access immediately. You can "
+                                    "Activate them again any time."),
+                    }),
                 ),
             ),
             ui.Button(
                 "Delete",
                 variant="danger",
-                on_click=ui.Call("hard_delete_user", user_id=uid),
+                on_click=ui.Call(
+                    "hard_delete_user", user_id=uid,
+                    confirm=(f"Permanently delete {user.get('email', uid)}? "
+                             "This erases the account, its balance, roles and "
+                             "history for good — there is nothing to restore "
+                             "afterwards. If you just want to lock them out, "
+                             "use Deactivate instead."),
+                ),
             ),
         ], direction="h", gap=2),
     ]
