@@ -207,6 +207,17 @@ async def build_extensions(ctx: Any, category_filter: str = "",
                                    category_filter=category_filter)),
     ], direction="h", gap=2)
 
+    # Hard render + fan-out cap (2026-08-29): with no category/status filter
+    # narrowing the result, a large marketplace listing previously built one
+    # ui.ListItem AND fired one access-policy HTTP call PER extension with no
+    # limit at all -- same class of bug fixed on the Users panel. Cap what
+    # this response builds/fans-out to, same pattern as build_users.
+    _RENDER_CAP = 150
+    total_filtered = len(filtered)
+    truncated = total_filtered > _RENDER_CAP
+    if truncated:
+        filtered = filtered[:_RENDER_CAP]
+
     _app_ids = [app.get("app_id") or app.get("id", "") for app in filtered]
     fetch_users = len(filtered) < 15
 
@@ -253,11 +264,21 @@ async def build_extensions(ctx: Any, category_filter: str = "",
                 policy=policies.get(app_id, {"mode": "public"})),
         ))
 
-    count = (f"{len(filtered)} of {len(extensions)}"
+    count = (f"{len(filtered)} of {total_filtered}"
              if category_filter or status_filter else str(len(extensions)))
+    if truncated:
+        count += f" (showing first {_RENDER_CAP} of {total_filtered} — filter to see the rest)"
 
     return ui.Stack(children=[
         ui.Header(text="Extensions", level=3, subtitle=f"{count} registered"),
         filter_bar,
+        *([ui.Alert(
+            title="Large result — showing a page, not everyone",
+            message=(f"{total_filtered} extensions match right now; only "
+                     f"the first {_RENDER_CAP} are rendered below so the "
+                     "page loads instantly instead of stalling. Use the "
+                     "category/status filters to narrow it down."),
+            type="warning",
+        )] if truncated else []),
         ui.List(items=list_items, searchable=True),
     ], direction="v", gap=4)

@@ -435,6 +435,19 @@ async def build_users(ctx, role_filter: str = "",
     elif status_filter == "inactive":
         filtered = [u for u in filtered if not u.get("is_active", True)]
 
+    # Hard render cap (2026-08-29): with no search/filter narrowing the
+    # result, a large tenant (thousands of accounts) previously built one
+    # ui.ListItem PER USER with no limit at all -- the page would spend
+    # minutes building + serializing a payload that size and often never
+    # finish rendering. The gateway itself already paginates /v1/users
+    # fine; this caps what THIS panel turns into UI nodes in one response,
+    # same shape as the extensions panel's own render cap.
+    _RENDER_CAP = 200
+    total_filtered = len(filtered)
+    truncated = total_filtered > _RENDER_CAP
+    if truncated:
+        filtered = filtered[:_RENDER_CAP]
+
     # Fetch per-user extensions in parallel (max 20)
     _uids = [u.get("imperal_id", u.get("id", "")) for u in filtered[:20]]
     _ext_results = await asyncio.gather(*[_fetch_user_extensions(uid) for uid in _uids])
@@ -521,17 +534,28 @@ async def build_users(ctx, role_filter: str = "",
             ),
         ))
 
-    count = (f"{len(filtered)} of {len(users)} users"
+    count = (f"{len(filtered)} of {total_filtered} users"
              if role_filter or status_filter or q.strip()
              else f"{len(users)} users")
     if q.strip():
         count += f" · matching “{q.strip()}”"
+    if truncated:
+        count += f" (showing first {_RENDER_CAP} — narrow your search or filters to see the rest)"
 
     return ui.Stack(children=[
         ui.Header("User Management", level=3),
         search_bar,
         filter_bar,
         ui.Text(count, variant="caption"),
+        *([ui.Alert(
+            title="Large result — showing a page, not everyone",
+            message=(f"{total_filtered} users match right now; only the "
+                     f"first {_RENDER_CAP} are rendered below so the page "
+                     "loads instantly instead of stalling. Use search or "
+                     "the role/status filters to narrow it down to the "
+                     "person you're after."),
+            type="warning",
+        )] if truncated else []),
         *_build_orphan_rows(orphans, q),
         ui.Accordion(sections=[{
             "id": "create",
