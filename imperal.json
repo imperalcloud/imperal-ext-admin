@@ -12796,6 +12796,30 @@
             "title": "Failover Api Key",
             "type": "string"
           },
+          "stt_provider": {
+            "default": "",
+            "description": "Voice transcription (STT) provider — openai / groq / custom (any OpenAI-Whisper-API-compatible endpoint). Blank = openai (Whisper).",
+            "title": "Stt Provider",
+            "type": "string"
+          },
+          "stt_model": {
+            "default": "",
+            "description": "Voice transcription (STT) model override — blank = platform default (whisper-1)",
+            "title": "Stt Model",
+            "type": "string"
+          },
+          "stt_api_key": {
+            "default": "",
+            "description": "Voice transcription (STT) API key — YOUR OWN key for the STT provider selected above (write-only, leave blank to keep current)",
+            "title": "Stt Api Key",
+            "type": "string"
+          },
+          "stt_base_url": {
+            "default": "",
+            "description": "Custom base URL for the STT provider's OpenAI-compatible endpoint — required for 'custom', optional preset override for others",
+            "title": "Stt Base Url",
+            "type": "string"
+          },
           "set_extension_override": {
             "default": "",
             "description": "Extension ID to set override for",

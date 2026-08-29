@@ -95,6 +95,11 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             "purpose_step_reclassify_temperature", "purpose_step_reclassify_top_p", "purpose_step_reclassify_presence_penalty", "purpose_step_reclassify_frequency_penalty",
             "purpose_tool_picker_temperature", "purpose_tool_picker_top_p", "purpose_tool_picker_presence_penalty", "purpose_tool_picker_frequency_penalty",
             "purpose_action_narrator_temperature", "purpose_action_narrator_top_p", "purpose_action_narrator_presence_penalty", "purpose_action_narrator_frequency_penalty",
+            # Voice / STT BYOK (2026-08-29) — handled by the dedicated nested-dict
+            # merge block below (current["stt"]), never the generic flat loop, so
+            # provider/model/api_key/base_url land together under one key the
+            # gateway's recursive api_key encrypt/mask helpers already protect.
+            "stt_provider", "stt_model", "stt_api_key", "stt_base_url",
         }
         updates = {}
         for field in SaveLlmConfigParams.model_fields:
@@ -188,6 +193,29 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             current["purpose"] = _purpose_map
         else:
             current.pop("purpose", None)
+
+        # ── Voice / STT BYOK merge (2026-08-29) ─────────────────────────
+        # Nested dict (not flat top-level keys) so the auth-gateway's own
+        # recursive api_key encrypt/mask helpers (which key off the literal
+        # name "api_key" at ANY depth) protect stt.api_key with zero new
+        # crypto code here — identical write-only-key convention as the
+        # top-level `api_key` field: a masked value (contains •, i.e. the
+        # admin didn't touch the field) preserves the existing stored key;
+        # blank clears it; a real new value overwrites it.
+        _stt = dict(current.get("stt") or {})
+        if params.stt_provider:
+            _stt["provider"] = params.stt_provider
+        if params.stt_model:
+            _stt["model"] = params.stt_model
+        if params.stt_base_url:
+            _stt["base_url"] = params.stt_base_url
+        if params.stt_api_key:
+            if "\u2022" not in params.stt_api_key:
+                _stt["api_key"] = params.stt_api_key
+            # else: masked echo of the current key — admin left it untouched,
+            # keep whatever is already stored under _stt["api_key"].
+        if _stt:
+            current["stt"] = _stt
 
         current.update(updates)
         await r.set("imperal:config:llm", json.dumps(current))
