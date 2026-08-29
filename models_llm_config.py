@@ -7,13 +7,38 @@ configuration form on the LLM tab.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SaveLlmConfigParams(BaseModel):
     """Save LLM provider/model configuration."""
+
+    # BUG FIX (2026-08-29): every Optional[int]/Optional[bool] field on this
+    # model means "blank = inherit" in the form (ui.Input renders a numeric
+    # control with NO value when the store has nothing -- an empty string,
+    # not a number). Pydantic v2 does not coerce "" -> None for int/bool by
+    # itself, so ANY of these fields left untouched by the admin (not just
+    # the one they actually edited) throws int_parsing/bool_parsing on every
+    # single save. This is the model-level fix: normalise "" -> None for
+    # every Optional[int]/Optional[bool] field BEFORE Pydantic's own type
+    # validation runs, generically (via model_fields introspection) so a
+    # newly added Optional[int]/[bool] field is covered automatically -- no
+    # per-field patch needed, no field can ever be missed again.
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_optional_numerics_to_none(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        for name, field in cls.model_fields.items():
+            if name not in data or data[name] != "":
+                continue
+            ann = field.annotation
+            args = getattr(ann, "__args__", ())
+            if int in args or bool in args:
+                data[name] = None
+        return data
     provider: str = Field(default="", description="LLM provider")
     model: str = Field(default="", description="Default model")
     api_key: str = Field(default="", description="API key (write-only, leave blank to keep)")
