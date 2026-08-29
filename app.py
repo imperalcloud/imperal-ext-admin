@@ -174,6 +174,25 @@ def _tenant_id(ctx) -> str:
     return "default"
 
 
+def _panel_acting(ctx) -> str:
+    """Best-effort acting-user id for the gateway audit trail.
+
+    Was duplicated verbatim in panels_billing_analytics.py and
+    panels_credits.py (9 identical lines each) -- single source of truth
+    now. panels_user_profile.py keeps its own slightly different variant
+    on purpose (try/except around attribute access rather than a dict
+    fallback), so it is left untouched here.
+    """
+    for attr in ("user_id", "imperal_id"):
+        val = getattr(ctx, attr, "") or ""
+        if val:
+            return str(val)
+    user = getattr(ctx, "user", None)
+    if isinstance(user, dict):
+        return str(user.get("imperal_id") or user.get("user_id") or "")
+    return ""
+
+
 async def _resolve_app_id(app_id, include_all=False):
     if not app_id:
         return app_id

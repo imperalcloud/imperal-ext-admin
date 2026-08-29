@@ -32,9 +32,10 @@ is service-token-only, so that helper would 403 and render an empty section
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 
 from imperal_sdk import ui
+from fmt import money as _money, when_with_color as _when
+from app import _panel_acting
 
 log = logging.getLogger("admin")
 
@@ -42,40 +43,6 @@ _DASH = "\u2014"
 
 
 # ── Formatting ────────────────────────────────────────────────────────
-
-
-def _money(cents) -> str:
-    """Cents → $X.XX. Money is never rendered from a float field."""
-    try:
-        return f"${int(cents) / 100:,.2f}"
-    except (TypeError, ValueError):
-        return _DASH
-
-
-def _when(iso: str | None) -> tuple[str, str, str]:
-    """(absolute, relative, colour) for a due date.
-
-    Returns a colour so an overdue row LOOKS overdue: the point of the
-    schedule is to see trouble before it happens, not to read timestamps.
-    """
-    if not iso:
-        return (_DASH, "no date", "gray")
-    try:
-        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-    except ValueError:
-        return (str(iso), "", "gray")
-
-    days = (dt - datetime.now(timezone.utc)).days
-    stamp = dt.strftime("%d %b %Y, %H:%M")
-    if days < 0:
-        return (stamp, f"overdue {abs(days)}d", "red")
-    if days == 0:
-        return (stamp, "today", "red")
-    if days <= 7:
-        return (stamp, f"in {days}d", "yellow")
-    return (stamp, f"in {days}d", "green")
 
 
 def _status_color(status: str) -> str:
@@ -88,18 +55,6 @@ def _status_color(status: str) -> str:
 
 
 # ── Data ──────────────────────────────────────────────────────────────
-
-
-def _panel_acting(ctx) -> str:
-    """Best-effort acting-user id for the gateway audit trail."""
-    for attr in ("user_id", "imperal_id"):
-        val = getattr(ctx, attr, "") or ""
-        if val:
-            return str(val)
-    user = getattr(ctx, "user", None)
-    if isinstance(user, dict):
-        return str(user.get("imperal_id") or user.get("user_id") or "")
-    return ""
 
 
 async def _fetch_analytics(acting: str, window_days: int, limit: int) -> dict:

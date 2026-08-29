@@ -37,6 +37,7 @@ from app import (
 )
 from handlers_billing import _normalize_to_imperal_id
 from models_billing import BillingModeRecord
+from fmt import money as _fmt_money
 
 log = logging.getLogger("admin")
 
@@ -72,9 +73,7 @@ async def _admin_get(path: str, acting: str = "", timeout: float = 5.0):
 
 
 def _money(cents: int | None) -> str:
-    if not cents:
-        return "—"
-    return f"${int(cents) / 100:,.2f}"
+    return _fmt_money(cents, dash_on_zero=True)
 
 
 def _describe(payload: dict) -> str:

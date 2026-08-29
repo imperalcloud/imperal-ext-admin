@@ -33,9 +33,10 @@ reason as _fetch_analytics in panels_billing_analytics.py).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 
 from imperal_sdk import ui
+from fmt import money as _money, when_relative as _when
+from app import _panel_acting
 
 log = logging.getLogger("admin")
 
@@ -53,39 +54,9 @@ def _credits(value) -> str:
         return _DASH
 
 
-def _money(cents) -> str:
-    try:
-        return f"${int(cents) / 100:,.2f}"
-    except (TypeError, ValueError):
-        return _DASH
-
-
-def _when(iso: str | None) -> tuple[str, str]:
-    """(absolute, relative) for a ledger timestamp."""
-    if not iso:
-        return (_DASH, "")
-    try:
-        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-    except ValueError:
-        return (str(iso), "")
-
-    stamp = dt.strftime("%d %b %Y, %H:%M")
-    delta = datetime.now(timezone.utc) - dt
-    days = delta.days
-    if days < 0:
-        return (stamp, "")
-    if days == 0:
-        hours = delta.seconds // 3600
-        if hours < 1:
-            return (stamp, f"{delta.seconds // 60}m ago")
-        return (stamp, f"{hours}h ago")
-    if days == 1:
-        return (stamp, "yesterday")
-    if days < 31:
-        return (stamp, f"{days}d ago")
-    return (stamp, f"{days // 30}mo ago")
+# Shared with panels_billing_analytics.py / handlers_billing_mode.py — see
+# fmt.py docstring for why this used to be 3 copy-pasted definitions.
+from fmt import money as _money, when_relative as _when
 
 
 _KIND_COLOR = {
@@ -105,17 +76,6 @@ def _kind_label(kind: str) -> str:
 
 # ── Data ──────────────────────────────────────────────────────────────
 
-
-def _panel_acting(ctx) -> str:
-    """Best-effort acting-user id for the gateway audit trail."""
-    for attr in ("user_id", "imperal_id"):
-        val = getattr(ctx, attr, "") or ""
-        if val:
-            return str(val)
-    user = getattr(ctx, "user", None)
-    if isinstance(user, dict):
-        return str(user.get("imperal_id") or user.get("user_id") or "")
-    return ""
 
 
 async def _fetch_credits(acting: str, window_days: int, limit: int) -> dict:
