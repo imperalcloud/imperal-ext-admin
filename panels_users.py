@@ -437,25 +437,31 @@ async def build_users(ctx, role_filter: str = "",
     elif status_filter == "inactive":
         filtered = [u for u in filtered if not u.get("is_active", True)]
 
-    # Fan-out cap (2026-08-29): with no search/filter narrowing the result,
-    # a large tenant (thousands of accounts) previously built one
-    # ui.ListItem PER USER with no limit at all -- the page would spend
-    # minutes building + serializing a payload that size and often never
-    # finish rendering. The gateway itself already paginates /v1/users
-    # fine; this bounds how many rows this response even considers fetching
-    # extensions for. The actual render cap (how many end up in the
-    # response) is decided AFTER by build_capped_list below, which measures
-    # real serialized bytes against the kernel's hard 256KB reply cap
-    # instead of guessing a fixed item count (2026-08-29 incident: 41 real
-    # users alone already serialize past 256KB -- a fixed count of 200 was
-    # never actually safe). See render_cap.py.
-    _FAN_OUT_CAP = 200
+    # Real server-side pagination (2026-08-29): the owner wants to be able
+    # to page through EVERY user, 100% of them, not have the rest silently
+    # dropped after a fixed cap. total_filtered is the TRUE count across
+    # the whole filtered set, computed BEFORE slicing, so paging all the
+    # way through always reaches every last one. Each page is its own
+    # server round-trip (Prev/Next below re-call __panel__tools with a new
+    # offset) -- this replaces the earlier fixed 200-row cutoff, which
+    # simply hid anything past row 200 with no way to reach it.
+    _PAGE = 50
     total_filtered = len(filtered)
-    if total_filtered > _FAN_OUT_CAP:
-        filtered = filtered[:_FAN_OUT_CAP]
+    try:
+        offset = max(0, int(kwargs.get("user_offset", 0)))
+    except (TypeError, ValueError):
+        offset = 0
+    # Clamp to the real list bounds only -- NOT rounded down to a multiple
+    # of _PAGE. Rounding to a PAGE-multiple only works if every page always
+    # renders exactly _PAGE rows, which the byte-safety net below explicitly
+    # does not guarantee (a page can render fewer if rows are heavy) -- that
+    # mismatch made the last few users unreachable no matter how far you paged.
+    offset = min(offset, max(0, total_filtered - 1)) if total_filtered else 0
+    page_slice = filtered[offset:offset + _PAGE]
 
-    # Fetch per-user extensions in parallel (max 20)
-    _uids = [u.get("imperal_id", u.get("id", "")) for u in filtered[:20]]
+    # Fetch per-user extensions in parallel — bounded by the page size
+    # itself (50) now, not a separate arbitrary sub-cap.
+    _uids = [u.get("imperal_id", u.get("id", "")) for u in page_slice]
     _ext_results = await asyncio.gather(*[_fetch_user_extensions(uid) for uid in _uids])
     user_ext_map: dict[str, list[dict]] = dict(zip(_uids, _ext_results))
 
@@ -482,7 +488,7 @@ async def build_users(ctx, role_filter: str = "",
             options=[{"value": "", "label": "All Roles"}] + role_options,
             value=role_filter, param_name="role_filter",
             on_change=ui.Call("__panel__tools", section="management",
-                             status_filter=status_filter, q=q),
+                             status_filter=status_filter, q=q, user_offset=0),
         ),
         ui.Select(
             options=[
@@ -492,7 +498,7 @@ async def build_users(ctx, role_filter: str = "",
             ],
             value=status_filter, param_name="status_filter",
             on_change=ui.Call("__panel__tools", section="management",
-                             role_filter=role_filter, q=q),
+                             role_filter=role_filter, q=q, user_offset=0),
         ),
     ], direction="h", gap=2)
 
@@ -539,19 +545,41 @@ async def build_users(ctx, role_filter: str = "",
             ),
         )
 
-    # Byte-aware render cap (2026-08-29 incident): stop adding items once
-    # their REAL serialized weight approaches the kernel's hard 256KB reply
-    # cap, instead of guessing a fixed item count. See render_cap.py.
-    user_items, rendered_count, _ = build_capped_list(filtered, _build_one)
-    truncated = rendered_count < total_filtered
+    # Byte-aware safety net (2026-08-29): a single 50-row PAGE should never
+    # get near the kernel's hard 256KB reply cap, but if some unusually
+    # heavy rows ever did, stop adding them rather than tripping the cap —
+    # same measuring approach as before, just applied to one page instead
+    # of the whole filtered set now that paging (not a cutoff) is how the
+    # operator reaches every one of the total_filtered users. See render_cap.py.
+    user_items, rendered_in_page, _ = build_capped_list(page_slice, _build_one)
+    page_short = rendered_in_page < len(page_slice)
 
-    count = (f"{len(filtered)} of {total_filtered} users"
+    range_start = offset + 1 if total_filtered else 0
+    range_end = offset + rendered_in_page
+    count = (f"{range_start}\u2013{range_end} of {total_filtered} users"
              if role_filter or status_filter or q.strip()
-             else f"{len(users)} users")
+             else f"{range_start}\u2013{range_end} of {len(users)} users")
     if q.strip():
         count += f" · matching “{q.strip()}”"
-    if truncated:
-        count += f" (showing first {rendered_count} — narrow your search or filters to see the rest)"
+
+    def _pager():
+        btns = []
+        if offset > 0:
+            btns.append(ui.Button(label="\u2190 Previous 50", variant="ghost",
+                        on_click=ui.Call("__panel__tools", section="management",
+                                         role_filter=role_filter, status_filter=status_filter, q=q,
+                                         user_offset=max(0, offset - _PAGE))))
+        # Advance by rendered_in_page (what THIS page actually showed), not a
+        # fixed _PAGE -- if the byte-safety net ever trimmed a page short,
+        # advancing by a fixed amount would silently skip the untrimmed
+        # remainder forever. Advancing by the real count guarantees every
+        # row is reachable by paging forward, which is the whole point.
+        if offset + rendered_in_page < total_filtered:
+            btns.append(ui.Button(label="Next 50 \u2192", variant="ghost",
+                        on_click=ui.Call("__panel__tools", section="management",
+                                         role_filter=role_filter, status_filter=status_filter, q=q,
+                                         user_offset=offset + rendered_in_page)))
+        return ui.Stack(children=btns, direction="h", gap=2) if btns else None
 
     return ui.Stack(children=[
         ui.Header("User Management", level=3),
@@ -559,14 +587,12 @@ async def build_users(ctx, role_filter: str = "",
         filter_bar,
         ui.Text(count, variant="caption"),
         *([ui.Alert(
-            title="Large result — showing a page, not everyone",
-            message=(f"{total_filtered} users match right now; only the "
-                     f"first {rendered_count} are rendered below so the page "
-                     "loads instantly instead of stalling. Use search or "
-                     "the role/status filters to narrow it down to the "
-                     "person you're after."),
+            title="This page came in heavier than usual",
+            message=(f"{rendered_in_page} of this page's {len(page_slice)} users "
+                     "are shown below — the rest were unusually large. Page "
+                     "forward/back still reaches everyone else."),
             type="warning",
-        )] if truncated else []),
+        )] if page_short else []),
         *_build_orphan_rows(orphans, q),
         ui.Accordion(sections=[{
             "id": "create",
@@ -581,6 +607,6 @@ async def build_users(ctx, role_filter: str = "",
                 ]),
             ],
         }]),
-        ui.List(items=user_items, searchable=True, page_size=50,
-                total_items=rendered_count),
+        ui.List(items=user_items, searchable=True),
+        *([_pager()] if _pager() else []),
     ])

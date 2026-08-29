@@ -202,26 +202,35 @@ async def build_extensions(ctx: Any, category_filter: str = "",
     filter_bar = ui.Stack([
         ui.Select(options=cat_options, value=category_filter, param_name="category_filter",
                   on_change=ui.Call("__panel__tools", section="extensions",
-                                   status_filter=status_filter)),
+                                   status_filter=status_filter, ext_offset=0)),
         ui.Select(options=status_options, value=status_filter, param_name="status_filter",
                   on_change=ui.Call("__panel__tools", section="extensions",
-                                   category_filter=category_filter)),
+                                   category_filter=category_filter, ext_offset=0)),
     ], direction="h", gap=2)
 
-    # Fan-out cap (2026-08-29): with no category/status filter narrowing the
-    # result, a large marketplace listing previously fired one access-policy
-    # HTTP call PER extension with no limit at all. This bounds how many
-    # concurrent HTTP calls this response fans out to; the actual render cap
-    # (how many end up in the response) is decided AFTER by build_capped_list
-    # below, which measures real serialized bytes instead of guessing an
-    # item count. 150 is just the fan-out ceiling, not the render ceiling.
-    _FAN_OUT_CAP = 150
+    # Real server-side pagination (2026-08-29): the owner wants to page
+    # through EVERY extension, 100% of them, not have the rest silently
+    # dropped after a fixed cap. total_filtered is the TRUE count across
+    # the whole filtered set, computed BEFORE slicing, so paging all the
+    # way through always reaches every last one. Each page is its own
+    # server round-trip (Prev/Next below re-call __panel__tools with a new
+    # offset) -- this replaces the earlier fixed 150-row fan-out cutoff,
+    # which simply hid anything past row 150 with no way to reach it.
+    _PAGE = 50
     total_filtered = len(filtered)
-    if total_filtered > _FAN_OUT_CAP:
-        filtered = filtered[:_FAN_OUT_CAP]
+    try:
+        offset = max(0, int(kwargs.get("ext_offset", 0)))
+    except (TypeError, ValueError):
+        offset = 0
+    # Clamp to the real list bounds only -- NOT rounded down to a multiple
+    # of _PAGE (see panels_users.py for why: a page can render fewer than
+    # _PAGE rows under the byte-safety net, so rounding to a PAGE-multiple
+    # made the last few extensions unreachable no matter how far you paged).
+    offset = min(offset, max(0, total_filtered - 1)) if total_filtered else 0
+    page_slice = filtered[offset:offset + _PAGE]
 
-    _app_ids = [app.get("app_id") or app.get("id", "") for app in filtered]
-    fetch_users = len(filtered) < 15
+    _app_ids = [app.get("app_id") or app.get("id", "") for app in page_slice]
+    fetch_users = len(page_slice) < 15
 
     _tid = _tenant_id(ctx)
     if fetch_users:
@@ -265,28 +274,37 @@ async def build_extensions(ctx: Any, category_filter: str = "",
                 policy=policies.get(app_id, {"mode": "public"})),
         )
 
-    # Byte-aware render cap (2026-08-29 incident): stop adding items once
-    # their REAL serialized weight approaches the kernel's hard 256KB reply
-    # cap, instead of guessing a fixed item count. See render_cap.py.
-    list_items, rendered_count, _ = build_capped_list(filtered, _build_one)
-    truncated = rendered_count < total_filtered
+    # Byte-aware safety net (2026-08-29): a single 50-row PAGE should never
+    # get near the kernel's hard 256KB reply cap, but if some unusually
+    # heavy rows ever did, stop adding them rather than tripping the cap —
+    # same measuring approach as before, just applied to one page instead
+    # of the whole filtered set now that paging (not a cutoff) is how the
+    # operator reaches every one of the total_filtered extensions. See
+    # render_cap.py.
+    list_items, rendered_in_page, _ = build_capped_list(page_slice, _build_one)
 
-    count = (f"{len(filtered)} of {total_filtered}"
-             if category_filter or status_filter else str(len(extensions)))
-    if truncated:
-        count += f" (showing first {rendered_count} of {total_filtered} — filter to see the rest)"
+    range_start = offset + 1 if total_filtered else 0
+    range_end = offset + rendered_in_page
+    count = (f"{range_start}\u2013{range_end} of {total_filtered}"
+             if category_filter or status_filter else f"{range_start}\u2013{range_end} of {len(extensions)}")
+
+    def _pager():
+        btns = []
+        if offset > 0:
+            btns.append(ui.Button(label="\u2190 Previous 50", variant="ghost",
+                        on_click=ui.Call("__panel__tools", section="extensions",
+                                         category_filter=category_filter, status_filter=status_filter,
+                                         ext_offset=max(0, offset - _PAGE))))
+        if offset + rendered_in_page < total_filtered:
+            btns.append(ui.Button(label="Next 50 \u2192", variant="ghost",
+                        on_click=ui.Call("__panel__tools", section="extensions",
+                                         category_filter=category_filter, status_filter=status_filter,
+                                         ext_offset=offset + rendered_in_page)))
+        return ui.Stack(children=btns, direction="h", gap=2) if btns else None
 
     return ui.Stack(children=[
         ui.Header(text="Extensions", level=3, subtitle=f"{count} registered"),
         filter_bar,
-        *([ui.Alert(
-            title="Large result — showing a page, not everyone",
-            message=(f"{total_filtered} extensions match right now; only "
-                     f"the first {rendered_count} are rendered below so the "
-                     "page loads instantly instead of stalling. Use the "
-                     "category/status filters to narrow it down."),
-            type="warning",
-        )] if truncated else []),
-        ui.List(items=list_items, searchable=True, page_size=50,
-                total_items=rendered_count),
+        ui.List(items=list_items, searchable=True),
+        *([_pager()] if _pager() else []),
     ], direction="v", gap=4)
