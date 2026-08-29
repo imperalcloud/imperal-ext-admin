@@ -74,12 +74,27 @@ def test_no_dedicated_qwen_key_param():
     )
 
 
+def test_no_dedicated_kimi_or_zhipu_key_param():
+    """One key = one vendor's models, but ONE field per pair (2026-08-30):
+    kimi/zhipu are first-class providers, yet their keys are entered through
+    the SAME single API Key input (or Failover API Key) as every other
+    provider — never a dedicated per-vendor field."""
+    assert "kimi_api_key" not in SaveLlmConfigParams.model_fields
+    assert "zhipu_api_key" not in SaveLlmConfigParams.model_fields
+
+
 def test_form_renders_no_qwen_key_control():
     controls = _controls(_form())
     assert "qwen_api_key" not in controls, (
         "A qwen_api_key control would write a store slot the kernel only "
         "reads for back-compat -- a dead field by then."
     )
+
+
+def test_form_renders_no_kimi_or_zhipu_key_control():
+    controls = _controls(_form())
+    assert "kimi_api_key" not in controls
+    assert "zhipu_api_key" not in controls
 
 
 def test_form_renders_exactly_one_key_input_per_pair():

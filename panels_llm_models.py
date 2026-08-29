@@ -66,7 +66,7 @@ _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
 FALLBACK_CATALOG: dict[str, list[str]] = {
     "anthropic": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     "openai": ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3"],
-    "qwen": ["qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
+    "qwen": ["qwen3.8-max", "qwen3.8-flash", "qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
     # Provider dropdown has always offered "google" (_env_providers in
     # panels_llm.py, gated on GOOGLE_API_KEY/GEMINI_API_KEY) and the kernel
     # fully resolves it (llm/provider.py _GOOGLE_BASE_URL + param-support
@@ -313,13 +313,14 @@ async def _store_key_for(provider: str) -> str:
     """The panel-entered key for a first-class provider, or "".
 
     kimi/zhipu keys are entered in the PANEL (never env), exactly like qwen's.
-    Precedence mirrors the kernel's config_from_store: the dedicated
-    ``{provider}_api_key`` slot first, then the shared ``api_key`` slot iff
-    the configured provider IS this one (the one API Key input serves
-    whichever provider is selected). Fernet-wrapped values are unwrapped with
-    the same env keys the kernel uses; a missing crypto key degrades to ""
-    (the provider simply has no LIVE models to list — the static backfill in
-    fetch_model_catalog still offers it), never raises.
+    Precedence mirrors the kernel's config_from_store: the shared ``api_key``
+    slot iff the configured provider IS this one (the one API Key input serves
+    whichever provider is selected), then the failover ``failover_api_key``
+    slot iff the configured failover provider IS this one. Fernet-wrapped
+    values are unwrapped with the same env keys the kernel uses; a missing
+    crypto key degrades to "" (the provider simply has no LIVE models to list
+    — the static backfill in fetch_model_catalog still offers it), never
+    raises.
     """
     r = await _redis()
     if r is None:
@@ -334,9 +335,11 @@ async def _store_key_for(provider: str) -> str:
             await r.aclose()
         except Exception:
             pass
-    key = str(cfg.get(f"{provider}_api_key") or "")
-    if not key and cfg.get("provider") == provider:
+    key = ""
+    if cfg.get("provider") == provider:
         key = str(cfg.get("api_key") or "")
+    if not key and cfg.get("failover_provider") == provider:
+        key = str(cfg.get("failover_api_key") or "")
     if not key:
         return ""
     if key.startswith("gAAAAA"):  # Fernet-wrapped — mirror kernel llm/secrets.py

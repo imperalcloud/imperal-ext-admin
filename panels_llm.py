@@ -129,14 +129,11 @@ async def _run_test(cfg: dict, target: str) -> dict:
             # Kimi (Moonshot) / GLM (Zhipu z.ai) keys are PANEL-entered exactly
             # like qwen's (2026-08-30) — same precedence the kernel uses:
             #   1. the pair's own key (Failover API Key when testing failover);
-            #   2. the shared API Key input, when this provider IS the default;
-            #   3. the dedicated {provider}_api_key slot.
+            #   2. the shared API Key input, when this provider IS the default.
             _is_failover = target == "failover"
             pk = str((cfg.get("failover_api_key") if _is_failover else "") or "")
             if not pk and cfg.get("provider") == provider:
                 pk = str(cfg.get("api_key") or "")
-            if not pk:
-                pk = str(cfg.get(f"{provider}_api_key") or "")
             if not pk:
                 return {"ok": False, "message": (
                     f"No API key for {provider} — enter it in the "

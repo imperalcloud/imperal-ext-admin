@@ -545,20 +545,10 @@ def build_llm_form(
                     options=_provider_models,
                     value=model, param_name="model",
                 ),
-                ui.Text("API Key — for the provider selected above (incl. Qwen/DashScope)", variant="caption"),
+                ui.Text("API Key — for the provider selected above", variant="caption"),
                 ui.Input(
                     placeholder="sk-…  (leave blank to keep current)",
                     param_name="api_key", value="",
-                ),
-                ui.Text("Kimi (Moonshot) API Key — kimi-* models only", variant="caption"),
-                ui.Input(
-                    placeholder="sk-…  (leave blank to keep current)",
-                    param_name="kimi_api_key", value="",
-                ),
-                ui.Text("GLM (Zhipu z.ai) API Key — glm-* models only", variant="caption"),
-                ui.Input(
-                    placeholder="…  (leave blank to keep current)",
-                    param_name="zhipu_api_key", value="",
                 ),
                 ui.Text("Base URL (custom providers only)", variant="caption"),
                 ui.Input(

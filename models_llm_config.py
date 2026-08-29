@@ -42,8 +42,6 @@ class SaveLlmConfigParams(BaseModel):
     provider: str = Field(default="", description="LLM provider")
     model: str = Field(default="", description="Default model")
     api_key: str = Field(default="", description="API key (write-only, leave blank to keep)")
-    kimi_api_key: str = Field(default="", description="Kimi (Moonshot) API key (write-only, leave blank to keep)")
-    zhipu_api_key: str = Field(default="", description="GLM (Zhipu z.ai) API key (write-only, leave blank to keep)")
     base_url: str = Field(default="", description="Custom base URL for OpenAI-compatible providers")
     code_model: str = Field(default="", description="Coding brain (Webbee Code) model override — drives every terminal coding/marathon turn (purpose=code). Blank = inherit the reasoning tier (resolve/routing cascade).")
     code_provider: str = Field(default="", description="Coding brain provider override (auto-inferred from the model id when left blank)")
