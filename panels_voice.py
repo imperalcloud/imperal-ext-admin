@@ -7,6 +7,7 @@ save_voice_costs / save_voice_enabled / set_role_voice handlers.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from imperal_sdk import ui
@@ -30,10 +31,14 @@ async def _get(path: str) -> dict:
 
 
 async def build_voice(ctx, **kwargs):
-    costs = await _get("/v1/internal/billing/voice-costs") or {}
-    master = await _get("/v1/internal/billing/voice-enabled") or {}
+    costs, master, roles = await asyncio.gather(
+        _get("/v1/internal/billing/voice-costs"),
+        _get("/v1/internal/billing/voice-enabled"),
+        _gw_request("GET", "/v1/roles"),
+    )
+    costs = costs or {}
+    master = master or {}
     enabled = bool(master.get("enabled", True))
-    roles = await _gw_request("GET", "/v1/roles")
     roles = roles if isinstance(roles, list) else []
 
     # ── Pricing ──────────────────────────────────────────────────────────

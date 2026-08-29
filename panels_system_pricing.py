@@ -7,6 +7,7 @@ save_platform_fees / save_token_rate handlers.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import httpx
@@ -42,10 +43,16 @@ async def _get(path: str) -> dict:
 
 
 async def build_system_pricing(ctx, **kwargs):
-    fees = await _get("/v1/internal/billing/platform-fees") or {}
-    rate = await _get("/v1/internal/billing/token-rate") or {}
-    cats = await _get("/v1/internal/billing/category-defaults") or {}
-    coding = await _get("/v1/internal/billing/coding-pricing") or {}
+    fees, rate, cats, coding = await asyncio.gather(
+        _get("/v1/internal/billing/platform-fees"),
+        _get("/v1/internal/billing/token-rate"),
+        _get("/v1/internal/billing/category-defaults"),
+        _get("/v1/internal/billing/coding-pricing"),
+    )
+    fees = fees or {}
+    rate = rate or {}
+    cats = cats or {}
+    coding = coding or {}
 
     fees_form = ui.Form(
         action="save_platform_fees",
