@@ -74,6 +74,10 @@ def _env_providers() -> list[str]:
     # unavailable would be misleading. The kernel resolver still skips the
     # config until a key actually exists, so an early pick degrades safely.
     avail.append("qwen")
+    # Kimi (Moonshot) + GLM (Zhipu z.ai): first-class system providers whose
+    # keys are PANEL-entered exactly like qwen's (2026-08-30) — always offered.
+    avail.append("kimi")
+    avail.append("zhipu")
     return avail or ["anthropic", "custom"]
 
 
@@ -120,6 +124,24 @@ async def _run_test(cfg: dict, target: str) -> dict:
                     "No API key for qwen — enter it in the "
                     + ("Failover API Key" if _is_failover else "API Key")
                     + (" field" if _is_failover else " field (or set Qwen as the default provider)")
+                )}
+        if provider in ("kimi", "zhipu"):
+            # Kimi (Moonshot) / GLM (Zhipu z.ai) keys are PANEL-entered exactly
+            # like qwen's (2026-08-30) — same precedence the kernel uses:
+            #   1. the pair's own key (Failover API Key when testing failover);
+            #   2. the shared API Key input, when this provider IS the default;
+            #   3. the dedicated {provider}_api_key slot.
+            _is_failover = target == "failover"
+            pk = str((cfg.get("failover_api_key") if _is_failover else "") or "")
+            if not pk and cfg.get("provider") == provider:
+                pk = str(cfg.get("api_key") or "")
+            if not pk:
+                pk = str(cfg.get(f"{provider}_api_key") or "")
+            if not pk:
+                return {"ok": False, "message": (
+                    f"No API key for {provider} — enter it in the "
+                    + ("Failover API Key" if _is_failover else "API Key")
+                    + " field"
                 )}
         return {"ok": True, "message": f"{provider}/{model} \u2014 configured OK"}
     except Exception as e:

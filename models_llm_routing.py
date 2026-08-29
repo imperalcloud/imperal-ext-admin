@@ -78,11 +78,15 @@ _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("claude", "anthropic"),
     ("qwen", "qwen"),
     ("qwq", "qwen"),
-    # DashScope-hosted families (same key, same endpoint) — see
-    # panels_llm_models._QWEN_HOSTED_PREFIXES.
-    ("deepseek", "qwen"),
-    ("glm", "qwen"),
-    ("kimi", "qwen"),
+    # Kimi (Moonshot) + GLM (Zhipu z.ai) are FIRST-CLASS providers with their
+    # own keys (2026-08-30): one key = one vendor's models, so a kimi-* id
+    # bills against the Moonshot key and a glm-* id against the z.ai key —
+    # NEVER the DashScope key that merely re-hosts those families. deepseek
+    # has no first-class slot, so it resolves to "" (unrouted) on purpose.
+    ("kimi", "kimi"),
+    ("moonshot", "kimi"),
+    ("glm", "zhipu"),
+    ("zhipu", "zhipu"),
     ("gpt", "openai"),
     ("o1", "openai"),
     ("o3", "openai"),

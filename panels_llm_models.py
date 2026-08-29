@@ -36,16 +36,14 @@ _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("claude", "anthropic"),
     ("qwen", "qwen"),
     ("qwq", "qwen"),
-    # DashScope also hosts these families behind the same OpenAI-compatible
-    # endpoint and the same key — they are qwen-provider models for us.
-    ("deepseek", "qwen"),
-    ("glm", "qwen"),
-    ("kimi", "qwen"),
-    # Third-party families hosted on DashScope are listed under their vendor's
-    # own namespace: "ZHIPU/GLM-5.3" (and "kimi/kimi-k3"). The bare-prefix rule
-    # above cannot see a slash-prefixed id, so the lowercase vendor token before
-    # the slash is checked too — same key, same endpoint, qwen provider.
-    ("zhipu/", "qwen"),
+    # Kimi (Moonshot) and GLM (Zhipu z.ai) are FIRST-CLASS system providers
+    # with their own keys and endpoints (2026-08-30). A kimi-* id resolves to
+    # the Moonshot key, a glm-* id to the z.ai key — NEVER to the DashScope
+    # key that merely re-hosts those families. One key = one vendor's models.
+    ("kimi", "kimi"),
+    ("moonshot", "kimi"),
+    ("glm", "zhipu"),
+    ("zhipu", "zhipu"),
     ("gpt", "openai"),
     ("o1", "openai"),
     ("o3", "openai"),
@@ -77,9 +75,19 @@ FALLBACK_CATALOG: dict[str, list[str]] = {
     # the provider's own; _fetch_google below replaces this with the live
     # list as soon as a key is configured.
     "google": ["gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    # Kimi (Moonshot) and GLM (Zhipu z.ai) — first-class system providers
+    # (2026-08-30). Static ids are each vendor's own; the live fetchers below
+    # replace them with the key's real /models answer as soon as a key exists.
+    "kimi": ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"],
+    "zhipu": ["glm-5.3", "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5", "glm-4.5-air"],
 }
 
 _QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+# First-class provider endpoints (OpenAI-compatible). The kernel resolver
+# (llm/provider.py) carries the SAME constants — one endpoint per vendor,
+# catalogue and runtime calls hit it identically.
+_KIMI_BASE_URL = "https://api.moonshot.ai/v1"
+_ZHIPU_BASE_URL = "https://api.z.ai/api/paas/v4"
 # Same OpenAI-compatible surface the kernel resolver targets for provider
 # "google" (llm/provider.py:_GOOGLE_BASE_URL) -- one source of truth for the
 # endpoint shape, catalogue and runtime calls both hit it the same way.
@@ -128,12 +136,11 @@ _QWEN_EXCLUDE = (
 # distinct model and stays.
 _QWEN_DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
-# DashScope hosts more than the qwen family behind the same key and the same
-# OpenAI-compatible endpoint: deepseek-*, glm-*, kimi-* — and, since GLM-5.3,
-# vendor-namespaced ids like ZHIPU/GLM-5.3 (the namespace is stripped before
-# matching). They are chat models the admin explicitly wants selectable, so
-# the catalogue keeps them.
-_QWEN_HOSTED_PREFIXES = ("qwen", "qwq", "deepseek", "glm", "kimi")
+# DashScope hosts ONLY the qwen family for us (2026-08-30): the admin's rule
+# is one key = one vendor's models, so the deepseek/glm/kimi re-hosts that
+# DashScope also lists behind the same key are deliberately NOT offered here —
+# kimi-* and glm-* are first-class providers with their own keys now.
+_QWEN_HOSTED_PREFIXES = ("qwen", "qwq")
 
 
 def _filter_qwen(ids: list[str]) -> list[str]:
@@ -146,11 +153,13 @@ def _filter_qwen(ids: list[str]) -> list[str]:
     out: set[str] = set()
     for i in id_set:
         low = i.lower()
-        # Vendor-namespaced ids ("ZHIPU/GLM-5.3", "kimi/kimi-k3"): DashScope is
-        # explicitly hosting that family through this key+endpoint, so match on
-        # the bare model name after the namespace.
-        if "/" in low and any(low.split("/", 1)[0].startswith(p) for p in _QWEN_HOSTED_PREFIXES + ("zhipu",)):
-            low = low.split("/", 1)[1]
+        # Vendor-namespaced ids ("ZHIPU/GLM-5.3", "kimi/kimi-k3") are NOT
+        # qwen-family models: the namespace is another vendor re-hosted on
+        # DashScope, and the admin's rule (2026-08-30) is one key = one
+        # vendor's models. Those families are first-class providers with
+        # their own keys now, so a slash id never enters the qwen list.
+        if "/" in low:
+            continue
         if not low.startswith(_QWEN_HOSTED_PREFIXES):
             continue
         if any(tok in low for tok in _QWEN_EXCLUDE):
@@ -223,6 +232,40 @@ async def _fetch_google(key: str) -> list[str]:
         return _filter_google([m.get("id", "") for m in r.json().get("data", [])])
 
 
+async def _fetch_kimi(key: str) -> list[str]:
+    """Moonshot (Kimi) OpenAI-compatible /models — the vendor's OWN endpoint,
+    so every id it returns is by definition a kimi-family model this key can
+    actually run. One key = one vendor's models (2026-08-30)."""
+    url = _KIMI_BASE_URL.rstrip("/") + "/models"
+    async with shared_http(timeout=12.0) as c:
+        r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
+        r.raise_for_status()
+        return _filter_kimi([m.get("id", "") for m in r.json().get("data", [])])
+
+
+async def _fetch_zhipu(key: str) -> list[str]:
+    """Zhipu (z.ai) OpenAI-compatible /models — the vendor's OWN endpoint, so
+    every id it returns is by definition a glm-family model this key can
+    actually run. One key = one vendor's models (2026-08-30)."""
+    url = _ZHIPU_BASE_URL.rstrip("/") + "/models"
+    async with shared_http(timeout=12.0) as c:
+        r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
+        r.raise_for_status()
+        return _filter_zhipu([m.get("id", "") for m in r.json().get("data", [])])
+
+
+def _filter_kimi(ids: list[str]) -> list[str]:
+    """Keep kimi-* chat models; the vendor's endpoint only lists its own
+    family, so this is a prefix guard, not a curation."""
+    return sorted({i for i in ids if i.lower().startswith(("kimi", "moonshot"))})
+
+
+def _filter_zhipu(ids: list[str]) -> list[str]:
+    """Keep glm-* chat models; the vendor's endpoint only lists its own
+    family, so this is a prefix guard, not a curation."""
+    return sorted({i for i in ids if i.lower().startswith("glm")})
+
+
 async def _qwen_key_from_store() -> tuple[str, str]:
     """(key, base_url) for Qwen from the LLM Config Store, or ("", "").
 
@@ -264,6 +307,47 @@ async def _qwen_key_from_store() -> tuple[str, str]:
             return "", ""
     base = str(cfg.get("base_url") or "") if cfg.get("provider") == "qwen" else ""
     return key, base
+
+
+async def _store_key_for(provider: str) -> str:
+    """The panel-entered key for a first-class provider, or "".
+
+    kimi/zhipu keys are entered in the PANEL (never env), exactly like qwen's.
+    Precedence mirrors the kernel's config_from_store: the dedicated
+    ``{provider}_api_key`` slot first, then the shared ``api_key`` slot iff
+    the configured provider IS this one (the one API Key input serves
+    whichever provider is selected). Fernet-wrapped values are unwrapped with
+    the same env keys the kernel uses; a missing crypto key degrades to ""
+    (the provider simply has no LIVE models to list — the static backfill in
+    fetch_model_catalog still offers it), never raises.
+    """
+    r = await _redis()
+    if r is None:
+        return ""
+    try:
+        raw = await r.get("imperal:config:llm") or "{}"
+        cfg = json.loads(raw)
+    except Exception:
+        return ""
+    finally:
+        try:
+            await r.aclose()
+        except Exception:
+            pass
+    key = str(cfg.get(f"{provider}_api_key") or "")
+    if not key and cfg.get("provider") == provider:
+        key = str(cfg.get("api_key") or "")
+    if not key:
+        return ""
+    if key.startswith("gAAAAA"):  # Fernet-wrapped — mirror kernel llm/secrets.py
+        try:
+            from cryptography.fernet import Fernet
+            fkey = os.getenv("IMPERAL_ENCRYPTION_KEY", "") or os.getenv("IMAP_ENCRYPTION_KEY", "")
+            if fkey:
+                key = Fernet(fkey.encode()).decrypt(key.encode()).decode()
+        except Exception:
+            return ""
+    return key
 
 
 async def _redis():
@@ -322,6 +406,27 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: qwen fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
+    # Kimi (Moonshot) + GLM (Zhipu z.ai): first-class system providers, keys
+    # PANEL-entered like qwen's (2026-08-30). Each fetcher hits the vendor's
+    # OWN endpoint, so the catalogue can only ever list that vendor's models.
+    kk = await _store_key_for("kimi")
+    if kk:
+        try:
+            catalog["kimi"] = await _fetch_kimi(kk)
+        except Exception as e:
+            log.warning(
+                "model_catalog: kimi fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
+    zk = await _store_key_for("zhipu")
+    if zk:
+        try:
+            catalog["zhipu"] = await _fetch_zhipu(zk)
+        except Exception as e:
+            log.warning(
+                "model_catalog: zhipu fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
     gk = os.getenv("GOOGLE_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
     if gk:
         try:
@@ -348,7 +453,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
     # Anthropic and cannot pick a GPT model at all. Backfill from the static
     # fallback so every configured provider stays selectable, and mark the
     # result degraded so it is cached briefly instead of for an hour.
-    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk), ("google", gk)) if key}
+    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk), ("google", gk), ("kimi", kk), ("zhipu", zk)) if key}
     missing = sorted(expected - set(catalog))
     for prov in missing:
         fb = FALLBACK_CATALOG.get(prov)
@@ -375,6 +480,12 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
     # test_unconfigured_provider_is_not_backfilled).
     if "qwen" not in catalog:
         catalog["qwen"] = list(FALLBACK_CATALOG.get("qwen", []))
+    # Kimi + Zhipu are panel-keyed exactly like qwen (2026-08-30): same
+    # unconditional backfill so the admin can pick their models in the SAME
+    # save that enters the key. The kernel still refuses a keyless config.
+    for _p in ("kimi", "zhipu"):
+        if _p not in catalog:
+            catalog[_p] = list(FALLBACK_CATALOG.get(_p, []))
 
     # 3. Cache the live result (short TTL when degraded, so we retry soon)
     if r is not None:

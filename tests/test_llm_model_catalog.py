@@ -209,10 +209,16 @@ def test_provider_inference_covers_openai_families():
     assert plm.provider_for_model("gemini-2.0") == "google"
     assert plm.provider_for_model("qwen3-max") == "qwen"
     assert plm.provider_for_model("qwen-plus") == "qwen"
-    # DashScope-hosted families resolve to the qwen provider (same key/endpoint).
-    assert plm.provider_for_model("deepseek-v4-pro") == "qwen"
-    assert plm.provider_for_model("glm-5.2") == "qwen"
-    assert plm.provider_for_model("kimi-k3") == "qwen"
+    # Kimi (Moonshot) and GLM (Zhipu z.ai) are FIRST-CLASS providers with
+    # their own keys (2026-08-30) — one key = one vendor's models, so a
+    # kimi-* id resolves to the Moonshot key and a glm-* id to the z.ai key,
+    # NEVER to the DashScope key that merely re-hosts those families.
+    assert plm.provider_for_model("kimi-k3") == "kimi"
+    assert plm.provider_for_model("kimi-k2.7-code") == "kimi"
+    assert plm.provider_for_model("glm-5.3") == "zhipu"
+    assert plm.provider_for_model("glm-4.5-air") == "zhipu"
+    # deepseek has no first-class provider slot — it is not offered anywhere.
+    assert plm.provider_for_model("deepseek-v4-pro") == ""
     assert plm.provider_for_model("mystery-model") == ""
 
 
@@ -234,24 +240,19 @@ def test_qwen_filter_keeps_chat_models_only():
     assert "wan2.1-t2v-turbo" not in kept
 
 
-def test_qwen_filter_keeps_dashscope_hosted_families():
-    """deepseek/glm/kimi are served by the same key+endpoint — they belong,
-    including vendor-NAMESPACED ids: DashScope lists GLM-5.3 as ZHIPU/GLM-5.3
-    (and kimi-k3 as kimi/kimi-k3), so the namespace must not hide them."""
+def test_qwen_filter_keeps_only_qwen_family():
+    """One key = one vendor's models (2026-08-30): the DashScope key offers
+    ONLY the qwen/qwq family. deepseek/glm/kimi are first-class providers
+    with their own keys now, and vendor-NAMESPACED ids (ZHIPU/GLM-5.3,
+    kimi/kimi-k3) are another vendor re-hosted on DashScope — never offered
+    under the qwen key."""
     ids = [
         "deepseek-v4-pro", "deepseek-v4-flash", "glm-5.2", "glm-5.1",
-        "kimi-k3", "kimi-k2.7-code", "qwen3-max",
+        "kimi-k3", "kimi-k2.7-code", "qwen3-max", "qwq-plus",
         "ccai-pro", "ZHIPU/GLM-5.3", "kimi/kimi-k3",
     ]
     kept = plm._filter_qwen(ids)
-    assert "deepseek-v4-pro" in kept
-    assert "glm-5.2" in kept
-    assert "kimi-k3" in kept
-    assert "kimi-k2.7-code" in kept
-    assert "qwen3-max" in kept
-    assert "ccai-pro" not in kept
-    assert "ZHIPU/GLM-5.3" in kept      # admin asked for it; live API lists it
-    assert "kimi/kimi-k3" in kept
+    assert kept == ["qwen3-max", "qwq-plus"]
 
 
 def test_qwen_filter_still_drops_unknown_namespaces_and_nonchat():
@@ -265,14 +266,21 @@ def test_qwen_filter_still_drops_unknown_namespaces_and_nonchat():
 def test_qwen_filter_drops_dated_snapshot_only_when_alias_exists():
     ids = [
         "qwen-plus", "qwen-plus-2025-09-11",   # alias exists -> snapshot dropped
-        "deepseek-v4-pro-0813",                 # no alias -> snapshot KEPT
         "qwen3-max-2026-01-23",                 # no alias -> snapshot KEPT
     ]
     kept = plm._filter_qwen(ids)
     assert "qwen-plus" in kept
     assert "qwen-plus-2025-09-11" not in kept
-    assert "deepseek-v4-pro-0813" in kept
     assert "qwen3-max-2026-01-23" in kept
+
+
+def test_kimi_and_zhipu_filters_keep_only_their_own_family():
+    """Each first-class provider's filter is a prefix guard on the vendor's
+    OWN /models answer — one key = one vendor's models (2026-08-30)."""
+    kimi_ids = ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6", "glm-5.3", "qwen3-max"]
+    assert plm._filter_kimi(kimi_ids) == ["kimi-k2.6", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k3"]
+    zhipu_ids = ["glm-5.3", "glm-5.3-flash", "glm-4.5", "glm-4.5-air", "kimi-k3", "qwen3-max"]
+    assert plm._filter_zhipu(zhipu_ids) == ["glm-4.5", "glm-4.5-air", "glm-5.3", "glm-5.3-flash"]
 
 
 @pytest.mark.asyncio

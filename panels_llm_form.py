@@ -31,6 +31,8 @@ _PROVIDERS = [
     {"value": "anthropic", "label": "Anthropic"},
     {"value": "openai", "label": "OpenAI"},
     {"value": "qwen", "label": "Qwen (DashScope)"},
+    {"value": "kimi", "label": "Kimi (Moonshot)"},
+    {"value": "zhipu", "label": "GLM (Zhipu z.ai)"},
     {"value": "google", "label": "Google"},
     {"value": "custom", "label": "Custom (OpenAI-compatible)"},
 ]
@@ -547,6 +549,16 @@ def build_llm_form(
                 ui.Input(
                     placeholder="sk-…  (leave blank to keep current)",
                     param_name="api_key", value="",
+                ),
+                ui.Text("Kimi (Moonshot) API Key — kimi-* models only", variant="caption"),
+                ui.Input(
+                    placeholder="sk-…  (leave blank to keep current)",
+                    param_name="kimi_api_key", value="",
+                ),
+                ui.Text("GLM (Zhipu z.ai) API Key — glm-* models only", variant="caption"),
+                ui.Input(
+                    placeholder="…  (leave blank to keep current)",
+                    param_name="zhipu_api_key", value="",
                 ),
                 ui.Text("Base URL (custom providers only)", variant="caption"),
                 ui.Input(

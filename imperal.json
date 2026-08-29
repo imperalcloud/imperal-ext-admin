@@ -12466,6 +12466,18 @@
             "title": "Api Key",
             "type": "string"
           },
+          "kimi_api_key": {
+            "default": "",
+            "description": "Kimi (Moonshot) API key (write-only, leave blank to keep)",
+            "title": "Kimi Api Key",
+            "type": "string"
+          },
+          "zhipu_api_key": {
+            "default": "",
+            "description": "GLM (Zhipu z.ai) API key (write-only, leave blank to keep)",
+            "title": "Zhipu Api Key",
+            "type": "string"
+          },
           "base_url": {
             "default": "",
             "description": "Custom base URL for OpenAI-compatible providers",
