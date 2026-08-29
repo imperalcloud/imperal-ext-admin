@@ -287,5 +287,6 @@ async def build_extensions(ctx: Any, category_filter: str = "",
                      "category/status filters to narrow it down."),
             type="warning",
         )] if truncated else []),
-        ui.List(items=list_items, searchable=True),
+        ui.List(items=list_items, searchable=True, page_size=50,
+                total_items=rendered_count),
     ], direction="v", gap=4)

@@ -581,5 +581,6 @@ async def build_users(ctx, role_filter: str = "",
                 ]),
             ],
         }]),
-        ui.List(items=user_items, searchable=True),
+        ui.List(items=user_items, searchable=True, page_size=50,
+                total_items=rendered_count),
     ])
