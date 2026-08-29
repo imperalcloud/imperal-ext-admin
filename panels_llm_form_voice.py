@@ -87,7 +87,6 @@ def build_voice_section(defaults: dict, model_catalog: list[str] | None = None) 
             placeholder="sk-\u2026  (leave blank to keep current)",
             param_name="stt_api_key",
             value=defaults.get("stt_api_key", ""),
-            type="password",
         ),
         ui.Text(
             "Base URL — the provider's OpenAI-compatible endpoint. "
