@@ -235,11 +235,13 @@ def test_qwen_filter_keeps_chat_models_only():
 
 
 def test_qwen_filter_keeps_dashscope_hosted_families():
-    """deepseek/glm/kimi are served by the same key+endpoint — they belong."""
+    """deepseek/glm/kimi are served by the same key+endpoint — they belong,
+    including vendor-NAMESPACED ids: DashScope lists GLM-5.3 as ZHIPU/GLM-5.3
+    (and kimi-k3 as kimi/kimi-k3), so the namespace must not hide them."""
     ids = [
         "deepseek-v4-pro", "deepseek-v4-flash", "glm-5.2", "glm-5.1",
         "kimi-k3", "kimi-k2.7-code", "qwen3-max",
-        "ccai-pro", "ZHIPU/GLM-5.3",  # not plain-family ids -> stay out
+        "ccai-pro", "ZHIPU/GLM-5.3", "kimi/kimi-k3",
     ]
     kept = plm._filter_qwen(ids)
     assert "deepseek-v4-pro" in kept
@@ -248,7 +250,16 @@ def test_qwen_filter_keeps_dashscope_hosted_families():
     assert "kimi-k2.7-code" in kept
     assert "qwen3-max" in kept
     assert "ccai-pro" not in kept
-    assert "ZHIPU/GLM-5.3" not in kept
+    assert "ZHIPU/GLM-5.3" in kept      # admin asked for it; live API lists it
+    assert "kimi/kimi-k3" in kept
+
+
+def test_qwen_filter_still_drops_unknown_namespaces_and_nonchat():
+    """A namespace we don't host through this key stays out, and a namespaced
+    non-chat family is still excluded after the namespace is stripped."""
+    ids = ["META/llama-3-70b", "ZHIPU/GLM-audio-tts", "qwen3-max"]
+    kept = plm._filter_qwen(ids)
+    assert kept == ["qwen3-max"]
 
 
 def test_qwen_filter_drops_dated_snapshot_only_when_alias_exists():

@@ -41,6 +41,11 @@ _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("deepseek", "qwen"),
     ("glm", "qwen"),
     ("kimi", "qwen"),
+    # Third-party families hosted on DashScope are listed under their vendor's
+    # own namespace: "ZHIPU/GLM-5.3" (and "kimi/kimi-k3"). The bare-prefix rule
+    # above cannot see a slash-prefixed id, so the lowercase vendor token before
+    # the slash is checked too — same key, same endpoint, qwen provider.
+    ("zhipu/", "qwen"),
     ("gpt", "openai"),
     ("o1", "openai"),
     ("o3", "openai"),
@@ -124,8 +129,10 @@ _QWEN_EXCLUDE = (
 _QWEN_DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
 # DashScope hosts more than the qwen family behind the same key and the same
-# OpenAI-compatible endpoint: deepseek-*, glm-*, kimi-*. They are chat models
-# the admin explicitly wants selectable, so the catalogue keeps them.
+# OpenAI-compatible endpoint: deepseek-*, glm-*, kimi-* — and, since GLM-5.3,
+# vendor-namespaced ids like ZHIPU/GLM-5.3 (the namespace is stripped before
+# matching). They are chat models the admin explicitly wants selectable, so
+# the catalogue keeps them.
 _QWEN_HOSTED_PREFIXES = ("qwen", "qwq", "deepseek", "glm", "kimi")
 
 
@@ -139,6 +146,11 @@ def _filter_qwen(ids: list[str]) -> list[str]:
     out: set[str] = set()
     for i in id_set:
         low = i.lower()
+        # Vendor-namespaced ids ("ZHIPU/GLM-5.3", "kimi/kimi-k3"): DashScope is
+        # explicitly hosting that family through this key+endpoint, so match on
+        # the bare model name after the namespace.
+        if "/" in low and any(low.split("/", 1)[0].startswith(p) for p in _QWEN_HOSTED_PREFIXES + ("zhipu",)):
+            low = low.split("/", 1)[1]
         if not low.startswith(_QWEN_HOSTED_PREFIXES):
             continue
         if any(tok in low for tok in _QWEN_EXCLUDE):
