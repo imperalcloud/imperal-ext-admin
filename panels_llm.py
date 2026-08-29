@@ -260,6 +260,8 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     failover_on = cfg.get("failover_enabled", False)
     fo_provider = cfg.get("failover_provider", "")
     fo_model = cfg.get("failover_model", "")
+    stt_provider = cfg.get("stt_provider", "")
+    stt_model = cfg.get("stt_model", "")
     base_url = cfg.get("base_url", "")
     ext_overrides = cfg.get("extension_overrides", {})
     available = _env_providers()
@@ -290,6 +292,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             judge_model=judge,
             failover_enabled=bool(failover_on),
             failover_provider=fo_provider, failover_model=fo_model,
+            stt_provider=stt_provider, stt_model=stt_model,
             available_providers=available,
             tenant_defaults=tenant_defaults,
             # LCU-4 (2026-04-30): cfg["purpose"] is the kernel cascade

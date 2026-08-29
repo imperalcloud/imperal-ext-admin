@@ -167,6 +167,12 @@ class SaveLlmConfigParams(BaseModel):
     failover_provider: str = Field(default="", description="Failover provider")
     failover_model: str = Field(default="", description="Failover model")
     failover_api_key: str = Field(default="", description="Failover API key (write-only)")
+    # Voice STT (Whisper) provider/model (2026-08-29 owner report): "у нас
+    # покдлючен whisper ai, но в llm configs вообще нету настройки провайдера
+    # под это ... а это важно". Read by the auth-gateway's app.voice.service.
+    # transcribe() (blank stt_model = keep the gateway's own env default).
+    stt_provider: str = Field(default="", description="Voice transcription (STT) provider — blank = openai (Whisper)")
+    stt_model: str = Field(default="", description="Voice transcription (STT) model override — blank = platform default (whisper-1)")
     set_extension_override: str = Field(default="", description="Extension ID to set override for")
     override_model: str = Field(default="", description="Model for extension override")
     override_provider: str = Field(default="", description="Provider for extension override")

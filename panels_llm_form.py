@@ -24,6 +24,7 @@ from panels_llm_form_tbc import build_tbc_section
 from panels_llm_form_coding_thread import build_coding_thread_section
 from panels_llm_form_tiers import build_tiers_section
 from panels_llm_form_automation import build_automation_section
+from panels_llm_form_voice import build_voice_section
 from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 
 _PROVIDERS = [
@@ -196,6 +197,11 @@ def build_llm_form(
     # caught in the 2026-08-18 orphan-reader audit, these 11 were not.
     # panels_llm.py passes cfg straight in, like kernel_flags_config.
     purpose_max_tokens_config: dict | None = None,
+    # Voice / STT (Whisper) (2026-08-29): blank stt_model = use the
+    # gateway's own platform default (whisper-1). Read by
+    # app.voice.service.transcribe() through get_llm_config().
+    stt_provider: str = "",
+    stt_model: str = "",
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -294,6 +300,9 @@ def build_llm_form(
         "failover_provider": failover_provider or "openai",
         "failover_model": failover_model,
         "failover_api_key": "",
+        # Voice / STT (Whisper) (2026-08-29 owner report)
+        "stt_provider": stt_provider or "openai",
+        "stt_model": stt_model,
         # Token Budget Controls (admin-only kernel-internal knobs)
         "narration_history_limit": int(_td.get("narration_history_limit", 12)),
         "confirmation_card_tokens": int(_td.get("confirmation_card_tokens", 300)),
@@ -582,6 +591,9 @@ def build_llm_form(
 
             # ── 3b · Webbee Code Model Tiers (2026-07-30) ─────────
             build_tiers_section(defaults, _all_models),
+
+            # ── 3c · Voice / STT (Whisper) (2026-08-29) ───────────
+            build_voice_section(defaults),
 
             # ── 4 · Per-Purpose AI Parameters ─────────────────────
             ui.Section(title="\U0001f39b Per-Purpose AI Parameters",
