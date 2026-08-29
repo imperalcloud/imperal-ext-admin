@@ -12,6 +12,8 @@ import logging
 
 from imperal_sdk import ui
 
+from render_cap import build_capped_list
+
 from panels_billing_analytics import (
     fetch_user_billing_index, _panel_acting, _money, _when,
 )
@@ -435,18 +437,22 @@ async def build_users(ctx, role_filter: str = "",
     elif status_filter == "inactive":
         filtered = [u for u in filtered if not u.get("is_active", True)]
 
-    # Hard render cap (2026-08-29): with no search/filter narrowing the
-    # result, a large tenant (thousands of accounts) previously built one
+    # Fan-out cap (2026-08-29): with no search/filter narrowing the result,
+    # a large tenant (thousands of accounts) previously built one
     # ui.ListItem PER USER with no limit at all -- the page would spend
     # minutes building + serializing a payload that size and often never
     # finish rendering. The gateway itself already paginates /v1/users
-    # fine; this caps what THIS panel turns into UI nodes in one response,
-    # same shape as the extensions panel's own render cap.
-    _RENDER_CAP = 200
+    # fine; this bounds how many rows this response even considers fetching
+    # extensions for. The actual render cap (how many end up in the
+    # response) is decided AFTER by build_capped_list below, which measures
+    # real serialized bytes against the kernel's hard 256KB reply cap
+    # instead of guessing a fixed item count (2026-08-29 incident: 41 real
+    # users alone already serialize past 256KB -- a fixed count of 200 was
+    # never actually safe). See render_cap.py.
+    _FAN_OUT_CAP = 200
     total_filtered = len(filtered)
-    truncated = total_filtered > _RENDER_CAP
-    if truncated:
-        filtered = filtered[:_RENDER_CAP]
+    if total_filtered > _FAN_OUT_CAP:
+        filtered = filtered[:_FAN_OUT_CAP]
 
     # Fetch per-user extensions in parallel (max 20)
     _uids = [u.get("imperal_id", u.get("id", "")) for u in filtered[:20]]
@@ -496,8 +502,7 @@ async def build_users(ctx, role_filter: str = "",
     # opening anything: email (title), imperal_id + plan + role (subtitle),
     # and the next due date (meta). Previously the row showed email and role
     # only, so finding someone by id meant expanding cards one at a time.
-    user_items = []
-    for u in filtered:
+    def _build_one(u: dict) -> ui.ListItem:
         uid = u.get("imperal_id", u.get("id", ""))
         is_active = u.get("is_active", True)
         ub = billing_map.get(uid) or {}
@@ -518,7 +523,7 @@ async def build_users(ctx, role_filter: str = "",
         else:
             meta = ""
 
-        user_items.append(ui.ListItem(
+        return ui.ListItem(
             id=uid,
             title=u.get("email", "?"),
             subtitle=subtitle,
@@ -532,7 +537,13 @@ async def build_users(ctx, role_filter: str = "",
                 u, role_options, all_scopes, extensions,
                 user_ext_map.get(uid, []), plan_options, ub,
             ),
-        ))
+        )
+
+    # Byte-aware render cap (2026-08-29 incident): stop adding items once
+    # their REAL serialized weight approaches the kernel's hard 256KB reply
+    # cap, instead of guessing a fixed item count. See render_cap.py.
+    user_items, rendered_count, _ = build_capped_list(filtered, _build_one)
+    truncated = rendered_count < total_filtered
 
     count = (f"{len(filtered)} of {total_filtered} users"
              if role_filter or status_filter or q.strip()
@@ -540,7 +551,7 @@ async def build_users(ctx, role_filter: str = "",
     if q.strip():
         count += f" · matching “{q.strip()}”"
     if truncated:
-        count += f" (showing first {_RENDER_CAP} — narrow your search or filters to see the rest)"
+        count += f" (showing first {rendered_count} — narrow your search or filters to see the rest)"
 
     return ui.Stack(children=[
         ui.Header("User Management", level=3),
@@ -550,7 +561,7 @@ async def build_users(ctx, role_filter: str = "",
         *([ui.Alert(
             title="Large result — showing a page, not everyone",
             message=(f"{total_filtered} users match right now; only the "
-                     f"first {_RENDER_CAP} are rendered below so the page "
+                     f"first {rendered_count} are rendered below so the page "
                      "loads instantly instead of stalling. Use search or "
                      "the role/status filters to narrow it down to the "
                      "person you're after."),

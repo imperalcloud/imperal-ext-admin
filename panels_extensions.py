@@ -12,6 +12,7 @@ from imperal_sdk import ui
 
 from app import _gw_request, _registry_get, _tenant_id
 from panels_sections import _cached, _fetch_extensions as _fetch_extensions_shared
+from render_cap import build_capped_list
 
 
 # ---------------------------------------------------------------------------
@@ -207,16 +208,17 @@ async def build_extensions(ctx: Any, category_filter: str = "",
                                    category_filter=category_filter)),
     ], direction="h", gap=2)
 
-    # Hard render + fan-out cap (2026-08-29): with no category/status filter
-    # narrowing the result, a large marketplace listing previously built one
-    # ui.ListItem AND fired one access-policy HTTP call PER extension with no
-    # limit at all -- same class of bug fixed on the Users panel. Cap what
-    # this response builds/fans-out to, same pattern as build_users.
-    _RENDER_CAP = 150
+    # Fan-out cap (2026-08-29): with no category/status filter narrowing the
+    # result, a large marketplace listing previously fired one access-policy
+    # HTTP call PER extension with no limit at all. This bounds how many
+    # concurrent HTTP calls this response fans out to; the actual render cap
+    # (how many end up in the response) is decided AFTER by build_capped_list
+    # below, which measures real serialized bytes instead of guessing an
+    # item count. 150 is just the fan-out ceiling, not the render ceiling.
+    _FAN_OUT_CAP = 150
     total_filtered = len(filtered)
-    truncated = total_filtered > _RENDER_CAP
-    if truncated:
-        filtered = filtered[:_RENDER_CAP]
+    if total_filtered > _FAN_OUT_CAP:
+        filtered = filtered[:_FAN_OUT_CAP]
 
     _app_ids = [app.get("app_id") or app.get("id", "") for app in filtered]
     fetch_users = len(filtered) < 15
@@ -235,8 +237,7 @@ async def build_extensions(ctx: Any, category_filter: str = "",
 
     policies = dict(zip(_app_ids, _policy_results))
 
-    list_items: list[ui.ListItem] = []
-    for app in filtered:
+    def _build_one(app: dict) -> ui.ListItem:
         app_id = app.get("app_id") or app.get("id", "")
         display_name = app.get("display_name") or app.get("name") or app_id
         uc = user_counts.get(app_id)
@@ -254,7 +255,7 @@ async def build_extensions(ctx: Any, category_filter: str = "",
         if cat:
             parts.append(cat.capitalize())
 
-        list_items.append(ui.ListItem(
+        return ui.ListItem(
             id=app_id, title=display_name, subtitle=app_id,
             badge=_status_badge(app),
             meta=" \u00b7 ".join(parts) if parts else None,
@@ -262,12 +263,18 @@ async def build_extensions(ctx: Any, category_filter: str = "",
             expanded_content=_build_expanded_content(
                 app=app, user_count=uc,
                 policy=policies.get(app_id, {"mode": "public"})),
-        ))
+        )
+
+    # Byte-aware render cap (2026-08-29 incident): stop adding items once
+    # their REAL serialized weight approaches the kernel's hard 256KB reply
+    # cap, instead of guessing a fixed item count. See render_cap.py.
+    list_items, rendered_count, _ = build_capped_list(filtered, _build_one)
+    truncated = rendered_count < total_filtered
 
     count = (f"{len(filtered)} of {total_filtered}"
              if category_filter or status_filter else str(len(extensions)))
     if truncated:
-        count += f" (showing first {_RENDER_CAP} of {total_filtered} — filter to see the rest)"
+        count += f" (showing first {rendered_count} of {total_filtered} — filter to see the rest)"
 
     return ui.Stack(children=[
         ui.Header(text="Extensions", level=3, subtitle=f"{count} registered"),
@@ -275,7 +282,7 @@ async def build_extensions(ctx: Any, category_filter: str = "",
         *([ui.Alert(
             title="Large result — showing a page, not everyone",
             message=(f"{total_filtered} extensions match right now; only "
-                     f"the first {_RENDER_CAP} are rendered below so the "
+                     f"the first {rendered_count} are rendered below so the "
                      "page loads instantly instead of stalling. Use the "
                      "category/status filters to narrow it down."),
             type="warning",
