@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.14",
+  "sdk_version": "5.9.16",
   "app_id": "admin",
   "version": "5.11.0",
   "name": "Admin",
@@ -12726,6 +12726,45 @@
             "description": "BOOLEAN. Federal prose-judge anti-fabrication Gate 6 ON/OFF (was env IMPERAL_JUDGE_ENABLED). When True, every narrator output is reviewed by a judge LLM that flags fabricated entities/IDs. Default False (opt-in). Reads at responses/judge.py:is_judge_enabled.",
             "title": "Judge Enabled"
           },
+          "hub_brain_first_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "BOOLEAN. hub-brain-first-v1 routing kill-switch: when True an interactive turn with no open confirmation card may skip the classify_intent LLM gate and go straight to the brain (lower latency, one less LLM call). BYOLLM tenants always keep the classifier regardless. Kernel default True; env fallback IMPERAL_HUB_BRAIN_FIRST_ENABLED. Flipping this rolls routing back within 60s with NO redeploy -- it is the runtime kill-switch. Reads at activities/brain_first.py:_read_brain_first_flag.",
+            "title": "Hub Brain First Enabled"
+          },
+          "panel_diet_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "BOOLEAN. Panel-diet tool-catalogue trimming: when True the agentic catalogue sent to the brain is slimmed for panel turns (fewer prompt tokens per turn). Kernel default True; env fallback. Fail-soft -- any resolver error also lands on True. Reads at activities/agentic_catalog.py:107.",
+            "title": "Panel Diet Enabled"
+          },
+          "frame_v2_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "BOOLEAN. Facts-only frame-v2 DUAL emission (I-FRAMES-FACTS-ONLY): when True, surfaces whose profile declares frame_version='v2' also receive the new v2 frame alongside the existing v1 one. Kernel default False (opt-in); env fallback IMPERAL_FRAME_V2_ENABLED. A config hiccup can only ever suppress the NEW twin, never the v1 emit clients rely on. Reads at activities/agentic_catalog.py:_read_frame_v2_flag.",
+            "title": "Frame V2 Enabled"
+          },
           "failover_enabled": {
             "anyOf": [
               {
@@ -13477,7 +13516,7 @@
               }
             ],
             "default": null,
-            "description": "UNIT: rounds. Max fold rounds ONE compact_coding_thread activity call may run (catch-up folding: keeps compacting until under budget or this cap). Default 6. Higher = a badly-behind thread converges fully in one call; lower = spreads catch-up over more activity invocations. Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS.",
+            "description": "UNIT: rounds. Max fold rounds ONE compact_coding_thread activity call may run (catch-up folding: keeps compacting until under budget or this cap). Kernel default 12. Higher = a badly-behind thread converges fully in one call; lower = spreads catch-up over more activity invocations. Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS.",
             "title": "Coding Thread Max Rounds"
           },
           "coding_thread_time_budget_s": {
@@ -13498,7 +13537,7 @@
           "coding_thread_fold_max_tokens": {
             "anyOf": [
               {
-                "maximum": 16000,
+                "maximum": 65536,
                 "minimum": 1024,
                 "type": "integer"
               },
@@ -13507,8 +13546,38 @@
               }
             ],
             "default": null,
-            "description": "UNIT: tokens. Response cap for the digest-fold LLM call. I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy spans (~1-2 tokens/char) truncating the digest JSON mid-string at the old fixed 4096, so the fold silently skipped and the thread never shrank. On any truncation/parse failure the call now automatically retries ONCE at 2x this value before falling back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Default 4096. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS.",
+            "description": "UNIT: tokens. Response cap for the digest-fold LLM call. I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy spans (~1-2 tokens/char) truncating the digest JSON mid-string at the old fixed 4096, so the fold silently skipped and the thread never shrank. On any truncation/parse failure the call now automatically retries ONCE at coding_thread_fold_retry_max_tokens before falling back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Kernel default 24576. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS.",
             "title": "Coding Thread Fold Max Tokens"
+          },
+          "coding_thread_fold_retry_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 131072,
+                "minimum": 1024,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. Response cap for the ONE automatic RETRY of a fold digest call whose first attempt came back truncated/unparseable (dense-token spans truncate sooner). Must exceed coding_thread_fold_max_tokens or the retry cannot fit what the first attempt could not. Kernel default 49152 (2x the 24576 base). Reads at activities/coding_thread.py:_COMPACT_FOLD_RETRY_MAX_TOKENS.",
+            "title": "Coding Thread Fold Retry Max Tokens"
+          },
+          "knowledge_pick_max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 8000,
+                "minimum": 200,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: tokens. max_tokens for the Stage-1 docs ROUTER LLM that picks which documentation sections answer a question (search_docs). Kernel fallback when unset: 200 -- too small for a reasoning model, whose thinking tokens then eat the whole budget and the reply arrives with an EMPTY text block (measured ~25% of calls -> 'no documentation found' on docs that exist). Recommended 1500. Reads at activities/knowledge.py:_pick_llm.",
+            "title": "Knowledge Pick Max Tokens"
           },
           "purpose_code_temperature": {
             "default": "",
@@ -14411,6 +14480,140 @@
         "x-sdl": "entity"
       },
       "event": "llm_model_rate_deleted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "hard_delete_llm_model_rate",
+      "description": "Permanently delete an LLM model rate row from llm_model_rates — cannot be undone.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:llm_model_rate"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Permanently delete a model rate row — no soft-delete fallback.",
+        "properties": {
+          "model_id": {
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "HardDeleteLlmModelRateParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt entity for save_llm_model_rate / delete_llm_model_rate\n(kind='llmmodelrate').\n\nMirrors the ACTUAL handler return keys verbatim (verified vs\nhandlers_pricing.fn_save_llm_model_rate / fn_delete_llm_model_rate):\n{model_id, action}. id = title = model_id.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Id"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "LLMModelRateReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "llm_model_rate_hard_deleted",
       "background": false,
       "long_running": false,
       "scopes": [],
