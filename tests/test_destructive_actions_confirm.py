@@ -79,3 +79,64 @@ def test_every_destructive_action_has_a_confirm_gate():
         "button must pass confirm=\"...\" (or the conditional dict-spread form) "
         "so the panel shows a confirmation modal first."
     )
+
+
+def _danger_buttons_missing_confirm() -> dict[str, list[str]]:
+    """Return {file: [line snippets]} for every ui.Button(variant="danger")
+
+    whose on_click has no confirm= gate.
+
+    WHY THIS EXISTS SEPARATELY from the destructive-handler sweep above:
+    2026-08-29 found THREE red "danger" buttons (Reject app, Reject payout,
+    Reset LLM override) with no confirm modal at all -- invisible to the
+    other test because their handlers are declared action_type="write", not
+    "destructive". A button's own visual promise ("this is dangerous, look
+    red") must be backed by a confirm gate regardless of how its handler
+    happens to be classified -- the operator reads the button, not the
+    source code.
+    """
+    problems: dict[str, list[str]] = {}
+    for fn in sorted(glob.glob("panels_*.py")):
+        src = open(fn, encoding="utf-8").read()
+        idx = 0
+        n = len(src)
+        while True:
+            m = re.search(r"ui\.Button\(", src[idx:])
+            if not m:
+                break
+            start = idx + m.start()
+            popen = idx + m.end() - 1
+            depth = 0
+            i = popen
+            while i < n:
+                if src[i] == "(":
+                    depth += 1
+                elif src[i] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            block = src[start:i + 1]
+            idx = i + 1
+            has_danger = 'variant="danger"' in block or "variant='danger'" in block
+            if not has_danger:
+                continue
+            # A ternary variant (danger only on one branch, e.g. toggle
+            # buttons) is fine as long as SOME confirm gate is present for
+            # that branch -- the conditional dict-spread form used by
+            # Suspend/Restore and Deactivate/Activate toggles.
+            has_confirm = "confirm=" in block or '"confirm"' in block or "'confirm'" in block
+            if not has_confirm:
+                line_no = src[:start].count("\n") + 1
+                problems.setdefault(fn, []).append(f"line {line_no}")
+    return problems
+
+
+def test_every_danger_variant_button_has_a_confirm_gate():
+    problems = _danger_buttons_missing_confirm()
+    assert not problems, (
+        "These ui.Button(variant=\"danger\") sites have no confirm= gate on "
+        f"their on_click (no modal shown before firing): {problems}. A red "
+        "danger button makes a visual promise of consequence; back it with "
+        "confirm=\"...\" regardless of the handler's own action_type."
+    )

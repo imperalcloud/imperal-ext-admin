@@ -94,7 +94,12 @@ async def build_payouts(ctx, **kwargs) -> ui.Stack:
                 ui.Button(
                     label="Reject Payout",
                     variant="danger",
-                    on_click=ui.Call("review_payout", payout_id=selected_id, action="reject"),
+                    on_click=ui.Call(
+                        "review_payout", payout_id=selected_id, action="reject",
+                        confirm=("Reject this payout request? The developer "
+                                  "keeps their earnings balance and can "
+                                  "request a payout again later."),
+                    ),
                 ),
             ]),
         ]))

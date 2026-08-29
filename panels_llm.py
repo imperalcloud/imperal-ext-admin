@@ -148,8 +148,13 @@ def _build_overrides(overrides: dict, extensions: list[dict]) -> list:
             ]),
             ui.Button(
                 label="Reset", variant="danger", size="sm",
-                on_click=ui.Call("save_llm_config",
-                                 reset_extension_override=ext_id),
+                on_click=ui.Call(
+                    "save_llm_config", reset_extension_override=ext_id,
+                    confirm=(f"Reset '{display}' back to the system default "
+                             "model? Its per-extension override is cleared "
+                             "immediately — you can set a new one via Save "
+                             "any time."),
+                ),
             ),
         ], direction="h", gap=3, justify="between", align="center"))
     return nodes

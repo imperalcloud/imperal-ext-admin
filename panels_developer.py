@@ -91,8 +91,13 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
                 ui.Button(
                     label="Reject",
                     variant="danger",
-                    on_click=ui.Call("review_app", app_id=selected_id, action="reject",
-                                      reason="Does not meet quality standards"),
+                    on_click=ui.Call(
+                        "review_app", app_id=selected_id, action="reject",
+                        reason="Does not meet quality standards",
+                        confirm=(f"Reject '{selected_id}'? The developer will "
+                                 "need to fix it and resubmit before it can "
+                                 "go live."),
+                    ),
                 ),
             ]),
         ]))
