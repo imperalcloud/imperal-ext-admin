@@ -10,19 +10,11 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, EmptyParams, _gw_request, _user_id, _verify_write_reflected
+from app import chat, ActionResult, EmptyParams, _gw_request, _user_id, _verify_write_reflected, _aslist
 from models_email import (
     EmailLogResponse, EmailTemplatesResponse, EmailTemplateFull,
     EmailTemplateSaved, EmailTestResult,
 )
-
-
-def _aslist(r) -> list:
-    if isinstance(r, list):
-        return r
-    if isinstance(r, dict) and "error" not in r:
-        return r.get("items") or []
-    return []
 
 
 # ── Param models ──────────────────────────────────────────────────

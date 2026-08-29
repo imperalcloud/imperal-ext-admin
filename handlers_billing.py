@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, EmptyParams,
     _resolve_user_by_email, _resolve_user_flexible, _gw_request, _admin_put,
+    _acting,
 )
 from models_records import (
     BillingHealthResponse, BillingOverviewResponse, UserBalanceRecord, UserBalancesResponse,
@@ -310,13 +311,6 @@ async def fn_billing_health(ctx, params: EmptyParams) -> ActionResult:
 
 
 # ─── Plan assignment (active subscription) ──────────────────────────────── #
-
-def _acting(ctx) -> str:
-    try:
-        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
-    except Exception:
-        return ""
-
 
 class _PlanSetReceipt(BaseModel):
     action: str = "saved"

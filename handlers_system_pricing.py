@@ -13,17 +13,10 @@ import logging
 import httpx
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put_checked
+from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put_checked, _acting
 from models_records import PlatformFeeReceipt, TokenRateReceipt, CategoryDefaultsReceipt, CodingPricingReceipt
 
 log = logging.getLogger("admin")
-
-
-def _acting(ctx) -> str:
-    try:
-        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
-    except Exception:
-        return ""
 
 
 class SavePlatformFeesParams(BaseModel):

@@ -4,16 +4,10 @@ import logging
 import httpx
 from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
-from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN
+from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _acting
 from models_records import PaymentConfigRecord, PaymentTestResultRecord
 
 log = logging.getLogger("admin")
-
-def _acting(ctx) -> str:
-    try:
-        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
-    except Exception:
-        return ""
 
 class EmptyParams(BaseModel):
     pass

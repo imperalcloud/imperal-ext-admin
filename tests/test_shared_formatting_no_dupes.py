@@ -41,6 +41,28 @@ def test_money_is_defined_exactly_once_outside_its_home_module():
     )
 
 
+def test_acting_is_defined_exactly_once():
+    # app.py owns the canonical _acting (the X-Acting-User helper used by
+    # write handlers). Was duplicated identically in FIVE handler files
+    # before this sweep -- none of them may define their own copy again.
+    hits = _files_defining("_acting")
+    assert hits == ["app.py"], (
+        f"_acting should only be defined in app.py -- found in: {hits}. "
+        "Other handler files must `from app import _acting`."
+    )
+
+
+def test_aslist_is_defined_exactly_once():
+    # app.py owns the canonical _aslist (gateway list-response normalizer).
+    # Was duplicated identically in handlers_admin_reads.py and
+    # handlers_email.py before this sweep.
+    hits = _files_defining("_aslist")
+    assert hits == ["app.py"], (
+        f"_aslist should only be defined in app.py -- found in: {hits}. "
+        "Other handler files must `from app import _aslist`."
+    )
+
+
 def test_panel_acting_is_defined_exactly_once_outside_its_deliberate_variant():
     # app.py owns the canonical _panel_acting. panels_user_profile.py keeps
     # its own slightly different variant on purpose (documented in both

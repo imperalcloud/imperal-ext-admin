@@ -16,18 +16,12 @@ from pydantic import BaseModel, Field
 from app import (
     chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN,
     _verify_write_reflected, _gw_request, _admin_put, _admin_put_checked,
+    _acting,
 )
 
 log = logging.getLogger("admin")
 
 VOICE_SCOPE = "voice:use"
-
-
-def _acting(ctx) -> str:
-    try:
-        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
-    except Exception:
-        return ""
 
 
 class _Receipt(BaseModel):

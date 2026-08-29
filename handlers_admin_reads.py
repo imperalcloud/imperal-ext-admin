@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, EmptyParams, _gw_request
+from app import chat, ActionResult, EmptyParams, _gw_request, _aslist
 # Single source for imperal_id coercion (imp_u_* or email -> imp_u_*).
 from handlers_billing import _normalize_to_imperal_id
 from models_admin_reads import (
@@ -19,14 +19,6 @@ from models_admin_reads import (
 
 class _UserIdParam(BaseModel):
     user_id: str = Field(description="Canonical imperal_id (imp_u_XXXXXXXX) or the user's email.")
-
-
-def _aslist(r) -> list:
-    if isinstance(r, list):
-        return r
-    if isinstance(r, dict) and "error" not in r:
-        return r.get("items") or []
-    return []
 
 
 @chat.function("get_user_payments", action_type="read", data_model=PaymentsResponse,

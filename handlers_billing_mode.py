@@ -33,7 +33,7 @@ from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field, model_validator
 
 from app import (
-    chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put,
+    chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, _admin_put, _acting,
 )
 from handlers_billing import _normalize_to_imperal_id
 from models_billing import BillingModeRecord
@@ -48,14 +48,6 @@ _MODE_HUMAN = {
     "manual": "pays manually / by invoice — no card needed, never auto-charged",
     "free": "free access — never charged",
 }
-
-
-def _acting(ctx) -> str:
-    """The admin performing the change (mirrors handlers_billing._acting)."""
-    try:
-        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
-    except Exception:
-        return ""
 
 
 async def _admin_get(path: str, acting: str = "", timeout: float = 5.0):

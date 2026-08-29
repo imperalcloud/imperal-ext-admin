@@ -174,6 +174,33 @@ def _tenant_id(ctx) -> str:
     return "default"
 
 
+def _acting(ctx) -> str:
+    """The user performing a write, for the gateway's X-Acting-User audit trail.
+
+    Was duplicated identically (6-line try/except body) in FIVE handler
+    files (handlers_billing.py, handlers_billing_mode.py, handlers_payment.py,
+    handlers_system_pricing.py, handlers_voice.py) plus panels_user_profile.py's
+    own _panel_acting -- single source of truth now.
+    """
+    try:
+        return str(getattr(getattr(ctx, "user", None), "imperal_id", "") or "")
+    except Exception:
+        return ""
+
+
+def _aslist(r) -> list:
+    """Normalize a gateway response that should be a list.
+
+    Was duplicated identically in handlers_admin_reads.py and
+    handlers_email.py -- single source of truth now.
+    """
+    if isinstance(r, list):
+        return r
+    if isinstance(r, dict) and "error" not in r:
+        return r.get("items") or []
+    return []
+
+
 def _panel_acting(ctx) -> str:
     """Best-effort acting-user id for the gateway audit trail.
 
