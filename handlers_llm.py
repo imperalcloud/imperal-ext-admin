@@ -65,6 +65,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             return ActionResult.success(
                 data={"override": ext_id, "model": params.override_model},
                 summary=f"Set LLM override for {ext_id}: {params.override_model}",
+                refresh_panels=["tools"],
             )
 
         # Generic config update
