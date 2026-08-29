@@ -104,7 +104,13 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
     return ActionResult.success(
         data={"app_id": app_id, "action": "approve", "status": result,
               "reason": params.reason, "registered": registered},
-        summary=f"App {app_id} approved and registered")
+        summary=f"App {app_id} approved and registered",
+        # Without this, ActionResult refreshes ALL panels by default (see
+        # imperal_sdk ActionResult.success docstring) — that's what made the
+        # sidebar spin AND the whole center reload on Approve, while Reject
+        # (which already scoped this) only ever refreshed the App Review
+        # table itself. Scoping approve identically fixes both symptoms.
+        refresh_panels=["tools"])
 
 
 # ── Developer tier management ────────────────────────────────────────────────

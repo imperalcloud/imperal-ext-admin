@@ -272,6 +272,7 @@ async def fn_reset_conversation(ctx, params: ResetConvParams) -> ActionResult:
     return ActionResult.success(
         data={"imperal_id": target},
         summary=summary,
+        refresh_panels=["tools"],
     )
 
 

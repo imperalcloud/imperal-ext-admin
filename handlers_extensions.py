@@ -235,7 +235,11 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
     if "exceptions" in policy:
         merged["exceptions"] = {**cur_policy.get("exceptions", {}), **policy["exceptions"]}
     await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": merged}})
-    return ActionResult.success(data={"app_id": aid, "policy": merged}, summary=f"Policy for {aid}: mode={merged.get('mode', '?')}")
+    return ActionResult.success(
+        data={"app_id": aid, "policy": merged},
+        summary=f"Policy for {aid}: mode={merged.get('mode', '?')}",
+        refresh_panels=["tools"],
+    )
 
 
 @chat.function("get_access_policy", action_type="read", data_model=AccessPolicyRecord, description="Show access policy with per-role resolution.")

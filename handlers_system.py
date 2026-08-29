@@ -246,7 +246,8 @@ async def fn_set_task_limit(ctx, params: TaskLimitParams) -> ActionResult:
     if isinstance(result, dict) and result.get("error"):
         return ActionResult.error(result["error"])
     return ActionResult.success(data={"role": params.role_name, "max_tasks": params.max_tasks},
-                                summary=f"'{params.role_name}' task limit: {params.max_tasks}")
+                                summary=f"'{params.role_name}' task limit: {params.max_tasks}",
+                                refresh_panels=["tools"])
 
 @chat.function("get_task_limit", action_type="read", data_model=TaskLimitResponse, description="Get max concurrent tasks for a role.")
 async def fn_get_task_limit(ctx, params: RoleNameParams) -> ActionResult:
