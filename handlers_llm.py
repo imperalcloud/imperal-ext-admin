@@ -223,6 +223,17 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # Qwen key is panel-entered, not env), so a saved key must not wait out
         # the cache TTL before its provider's models appear in the dropdowns.
         await r.delete("imperal:config:llm:model_catalog")
+        # Flush every worker process's in-memory config cache NOW (2026-08-30).
+        # Each worker holds `_config_cache` for _CONFIG_CACHE_TTL=60s and only
+        # clears it on `imperal:config:invalidate:__system__` — without this
+        # publish a save can take up to a minute to reach live turns, which
+        # reads as "the panel saved but nothing changed" (GLM-ultrasmart
+        # incident: admin switched BYOLLM→system, workers kept serving the
+        # pre-save pair until their TTL expired).
+        try:
+            await r.publish("imperal:config:invalidate:__system__", "llm_config_saved")
+        except Exception as _pub_e:  # never fail a good save over a notify
+            log.warning("save_llm_config: invalidate publish failed: %s", _pub_e)
         await r.aclose()
         # Drop stale `llm_config` / `tenant_defaults` entries so the next
         # panel render re-fetches Redis instead of serving the pre-save copy.
