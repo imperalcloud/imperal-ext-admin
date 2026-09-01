@@ -60,6 +60,24 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
         ],
         rows=rows,
         on_row_click=ui.Call("__panel__tools", section="app_review"),
+        selectable=True,
+        selection_key="app_id",
+        bulk_actions=[
+            {
+                "label": "Approve Selected",
+                "icon": "CheckCheck",
+                "variant": "primary",
+                "action": ui.Call("bulk_review_apps", action="approve"),
+                "confirm": "Are you sure you want to approve all selected applications?",
+            },
+            {
+                "label": "Reject Selected",
+                "icon": "XCircle",
+                "variant": "danger",
+                "action": ui.Call("bulk_review_apps", action="reject", reason="Rejected by administrator in bulk review"),
+                "confirm": "Are you sure you want to reject all selected applications?",
+            },
+        ],
     )
     stack_items.append(table)
 
