@@ -18258,6 +18258,81 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "bulk_review_apps",
+      "description": "Bulk approve or reject multiple developer app submissions at once",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:app_review"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "app_ids": {
+            "description": "List of app IDs to review",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "App Ids",
+            "type": "array"
+          },
+          "action": {
+            "description": "approve or reject",
+            "title": "Action",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "description": "Rejection reason (required for reject)",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_ids",
+          "action"
+        ],
+        "title": "BulkAppReviewParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "admin.bulk_apps_reviewed",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_app_review_details",
+      "description": "Get full details (manifest, tools, description, pricing, git_url) of any pending or reviewed app",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "app_id": {
+            "description": "App ID to fetch full details for",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "GetAppDetailsParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "developer_profile",
       "description": "Show a user's developer profile: tier, nickname, apps count, earnings, registration date. tier=None means not a registered developer.",
       "action_type": "read",
@@ -19679,6 +19754,18 @@
                 "default": null,
                 "title": "Display Name"
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Name"
+              },
               "short_description": {
                 "anyOf": [
                   {
@@ -19690,6 +19777,18 @@
                 ],
                 "default": null,
                 "title": "Short Description"
+              },
+              "long_description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Long Description"
               },
               "category": {
                 "anyOf": [
@@ -19715,6 +19814,30 @@
                 "default": null,
                 "title": "Developer Id"
               },
+              "developer_email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Developer Email"
+              },
+              "developer_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Developer Name"
+              },
               "pricing_model": {
                 "anyOf": [
                   {
@@ -19726,6 +19849,90 @@
                 ],
                 "default": null,
                 "title": "Pricing Model"
+              },
+              "pricing_config": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Pricing Config"
+              },
+              "git_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Git Url"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Version"
+              },
+              "tools_json": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tools Json"
+              },
+              "manifest_json": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Manifest Json"
+              },
+              "screenshots": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Screenshots"
+              },
+              "submitted_at": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Submitted At"
+              },
+              "created_at": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Created At"
               }
             },
             "required": [

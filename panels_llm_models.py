@@ -64,9 +64,10 @@ _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
 
 # Resilience-only fallback (used iff BOTH live fetch and cache fail).
 FALLBACK_CATALOG: dict[str, list[str]] = {
-    "anthropic": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
-    "openai": ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3"],
-    "qwen": ["qwen3.8-max", "qwen3.8-flash", "qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
+    "anthropic": ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+    "openai": ["gpt-5.6", "gpt-5.6-sol", "gpt-5", "gpt-5-mini", "gpt-4o", "o4", "o3", "o3-mini"],
+    "qwen": ["qwen3.8-max", "qwen3.8-flash", "qwen3.7-max", "qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
+    "deepseek": ["deepseek-v4", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-v3", "deepseek-r1"],
     # Provider dropdown has always offered "google" (_env_providers in
     # panels_llm.py, gated on GOOGLE_API_KEY/GEMINI_API_KEY) and the kernel
     # fully resolves it (llm/provider.py _GOOGLE_BASE_URL + param-support
@@ -74,7 +75,7 @@ FALLBACK_CATALOG: dict[str, list[str]] = {
     # picking Google always left the Model Select empty. Static ids here are
     # the provider's own; _fetch_google below replaces this with the live
     # list as soon as a key is configured.
-    "google": ["gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    "google": ["gemini-3.7-flash", "gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
     # Kimi (Moonshot) and GLM (Zhipu z.ai) — first-class system providers
     # (2026-08-30). Static ids are each vendor's own; the live fetchers below
     # replace them with the key's real /models answer as soon as a key exists.

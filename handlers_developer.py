@@ -27,6 +27,16 @@ class AppReviewParams(BaseModel):
     reason: str = Field(default="", description="Rejection reason (required for reject)")
 
 
+class BulkAppReviewParams(BaseModel):
+    app_ids: list[str] = Field(..., min_length=1, max_length=100, description="List of app IDs to review")
+    action: str = Field(..., description="approve or reject")
+    reason: str = Field(default="", description="Rejection reason (required for reject)")
+
+
+class GetAppDetailsParams(BaseModel):
+    app_id: str = Field(..., description="App ID to fetch full details for")
+
+
 class PayoutReviewParams(BaseModel):
     payout_id: int = Field(..., description="Payout request ID")
     action: str = Field(..., description="approve or reject")
@@ -111,6 +121,81 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
         # (which already scoped this) only ever refreshed the App Review
         # table itself. Scoping approve identically fixes both symptoms.
         refresh_panels=["tools"])
+
+
+@chat.function("bulk_review_apps", action_type="write", event="admin.bulk_apps_reviewed", effects=["update:app_review"], description="Bulk approve or reject multiple developer app submissions at once")
+async def bulk_review_apps(ctx, params: BulkAppReviewParams) -> ActionResult:
+    """Bulk approve or reject multiple developer app submissions at once."""
+    action = params.action.lower()
+    if action not in ("approve", "reject"):
+        return ActionResult.error("action must be 'approve' or 'reject'", retryable=False)
+    if action == "reject" and not params.reason:
+        return ActionResult.error("reason is required when rejecting apps", retryable=False)
+
+    results = []
+    success_count = 0
+    fail_count = 0
+
+    for app_id in params.app_ids:
+        app_id = app_id.strip()
+        if not app_id:
+            continue
+        try:
+            if action == "reject":
+                res = await _gw_request("POST", f"/v1/admin/apps/{app_id}/reject", {"reason": params.reason})
+                results.append({"app_id": app_id, "status": "rejected", "ok": True})
+                success_count += 1
+            else:
+                res = await _gw_request("POST", f"/v1/admin/apps/{app_id}/approve")
+                # Non-critical registry sync
+                try:
+                    async with shared_http(timeout=5) as c:
+                        await c.post(
+                            f"{REGISTRY_URL}/v1/apps",
+                            json={"app_id": app_id, "display_name": app_id},
+                            headers={"x-api-key": REGISTRY_KEY, "Content-Type": "application/json"},
+                        )
+                except Exception:
+                    pass
+                results.append({"app_id": app_id, "status": "approved", "ok": True})
+                success_count += 1
+        except Exception as exc:
+            results.append({"app_id": app_id, "status": "error", "error": str(exc), "ok": False})
+            fail_count += 1
+
+    return ActionResult.success(
+        data={"action": action, "results": results, "total": len(params.app_ids),
+              "succeeded": success_count, "failed": fail_count},
+        summary=f"Bulk {action} completed: {success_count} succeeded, {fail_count} failed",
+        refresh_panels=["tools"],
+    )
+
+
+@chat.function("get_app_review_details", action_type="read", description="Get full details (manifest, tools, description, pricing, git_url) of any pending or reviewed app")
+async def get_app_review_details(ctx, params: GetAppDetailsParams) -> ActionResult:
+    """Get full details of a specific pending or reviewed app."""
+    app_id = params.app_id.strip()
+    if not app_id:
+        return ActionResult.error("app_id is required")
+
+    pending = await _gw_request("GET", "/v1/admin/apps/pending")
+    items = pending if isinstance(pending, list) else pending.get("items", [])
+    for entry in items:
+        if entry.get("app_id") == app_id:
+            return ActionResult.success(
+                data=entry,
+                summary=f"Details for pending app '{entry.get('display_name') or app_id}'",
+            )
+
+    # Fallback to general app details from gateway if available
+    try:
+        app_data = await _gw_request("GET", f"/v1/apps/{app_id}")
+        if isinstance(app_data, dict) and "error" not in app_data:
+            return ActionResult.success(data=app_data, summary=f"Details for app '{app_id}'")
+    except Exception:
+        pass
+
+    return ActionResult.error(f"App '{app_id}' not found in pending review queue")
 
 
 # ── Developer tier management ────────────────────────────────────────────────

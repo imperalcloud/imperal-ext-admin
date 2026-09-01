@@ -104,18 +104,31 @@ class PendingAppRecord(sdl.Entity):
     """A developer_apps row awaiting review — /v1/admin/apps/pending."""
     app_id: Optional[str] = None
     display_name: Optional[str] = None
+    name: Optional[str] = None
     short_description: Optional[str] = None
+    description: Optional[str] = None
+    long_description: Optional[str] = None
     category: Optional[str] = None
     status: Optional[str] = None
     developer_id: Optional[str] = None
+    developer_email: Optional[str] = None
+    developer_name: Optional[str] = None
     pricing_model: Optional[str] = None
+    pricing_config: Optional[Any] = None
+    git_url: Optional[str] = None
+    version: Optional[str] = None
+    tools_json: Optional[Any] = None
+    manifest_json: Optional[Any] = None
+    screenshots: Optional[Any] = None
+    submitted_at: Optional[Any] = None
+    created_at: Optional[Any] = None
 
     @model_validator(mode="before")
     @classmethod
     def _c(cls, d):
         if isinstance(d, dict):
             d["id"] = d.get("app_id") or d.get("id") or ""
-            d.setdefault("title", d.get("display_name") or d.get("app_id") or "")
+            d.setdefault("title", d.get("display_name") or d.get("name") or d.get("app_id") or "")
             d.setdefault("kind", "app")
         return d
 

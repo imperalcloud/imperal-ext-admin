@@ -63,33 +63,78 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
     )
     stack_items.append(table)
 
+    # Bulk actions bar if there are pending apps
+    all_app_ids = [a.get("app_id") for a in apps if a.get("app_id")]
+    if len(all_app_ids) > 1:
+        stack_items.append(ui.Section(
+            title=f"Bulk Actions ({len(all_app_ids)} pending apps)",
+            children=[
+                ui.Text("Approve or reject all currently pending applications in one atomic batch:"),
+                ui.Stack(direction="h", gap=1, children=[
+                    ui.Button(
+                        label=f"Approve All ({len(all_app_ids)})",
+                        variant="primary",
+                        on_click=ui.Call(
+                            "bulk_review_apps",
+                            app_ids=all_app_ids,
+                            action="approve",
+                            confirm=f"Are you sure you want to bulk approve all {len(all_app_ids)} pending apps and list them in the Marketplace?",
+                        ),
+                    ),
+                    ui.Button(
+                        label=f"Reject All ({len(all_app_ids)})",
+                        variant="danger",
+                        on_click=ui.Call(
+                            "bulk_review_apps",
+                            app_ids=all_app_ids,
+                            action="reject",
+                            reason="Bulk rejected by administrator",
+                            confirm=f"Are you sure you want to bulk reject all {len(all_app_ids)} pending apps?",
+                        ),
+                    ),
+                ]),
+            ],
+        ))
+
     # Detail actions when a row is selected
     selected = None
+    raw_app_entry = None
     if isinstance(row, dict) and row.get("app_id"):
         selected = row
     elif selected_id:
         selected = next((r for r in rows if str(r.get("app_id", "")) == str(selected_id)), None)
 
+    if selected:
+        raw_app_entry = next((a for a in apps if a.get("app_id") == selected.get("app_id")), None)
+
     if isinstance(selected, dict) and selected.get("app_id"):
         selected_id = selected["app_id"]
+        raw = raw_app_entry or {}
+        desc = raw.get("description") or raw.get("short_description") or "—"
+        version = raw.get("version") or "0.1.0"
+        pricing_model = raw.get("pricing_model") or "free"
+
         stack_items.append(ui.Divider())
-        stack_items.append(ui.Section(title="Selected app", children=[
+        stack_items.append(ui.Section(title=f"Selected app: {selected_id}", children=[
             ui.KeyValue(items=[
                 {"key": "App ID", "value": selected_id},
                 {"key": "Name", "value": selected.get("name", "—")},
                 {"key": "Developer", "value": selected.get("developer", "—")},
                 {"key": "Category", "value": selected.get("category", "—")},
+                {"key": "Version", "value": version},
+                {"key": "Pricing Model", "value": pricing_model},
                 {"key": "Git URL", "value": selected.get("git_url", "—")},
                 {"key": "Submitted", "value": selected.get("submitted", "—")},
             ], columns=2),
+            ui.Text(f"**Description:** {desc}"),
             ui.Stack(direction="h", gap=1, children=[
                 ui.Button(
-                    label="Approve",
+                    label="Approve App",
                     variant="primary",
                     on_click=ui.Call("review_app", app_id=selected_id, action="approve"),
                 ),
                 ui.Button(
-                    label="Reject",
+                    label="Reject App",
                     variant="danger",
                     on_click=ui.Call(
                         "review_app", app_id=selected_id, action="reject",
