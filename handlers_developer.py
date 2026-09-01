@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+from typing import Optional
+
 import httpx
 from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
@@ -13,7 +15,7 @@ from app import (
 )
 from models_records import (
     AppReviewReceipt, DeveloperProfileRecord, DeveloperTierReceipt,
-    PayoutReviewReceipt,
+    PayoutReviewReceipt, PendingAppRecord,
 )
 
 log = logging.getLogger("admin")
@@ -28,7 +30,8 @@ class AppReviewParams(BaseModel):
 
 
 class BulkAppReviewParams(BaseModel):
-    app_ids: list[str] = Field(..., min_length=1, max_length=100, description="List of app IDs to review")
+    app_ids: list[str] = Field(default_factory=list, description="List of app IDs to review")
+    message_ids: Optional[list[str]] = Field(default=None, description="Injected list of IDs from UI bulk actions")
     action: str = Field(..., description="approve or reject")
     reason: str = Field(default="", description="Rejection reason (required for reject)")
 
@@ -136,7 +139,11 @@ async def bulk_review_apps(ctx, params: BulkAppReviewParams) -> ActionResult:
     success_count = 0
     fail_count = 0
 
-    for app_id in params.app_ids:
+    target_ids = params.app_ids or params.message_ids or []
+    if not target_ids:
+        return ActionResult.error("No apps selected for bulk review", retryable=False)
+
+    for app_id in target_ids:
         app_id = app_id.strip()
         if not app_id:
             continue
@@ -164,15 +171,15 @@ async def bulk_review_apps(ctx, params: BulkAppReviewParams) -> ActionResult:
             fail_count += 1
 
     return ActionResult.success(
-        data={"action": action, "results": results, "total": len(params.app_ids),
+        data={"action": action, "results": results, "total": len(target_ids),
               "succeeded": success_count, "failed": fail_count},
         summary=f"Bulk {action} completed: {success_count} succeeded, {fail_count} failed",
         refresh_panels=["tools"],
     )
 
 
-@chat.function("get_app_review_details", action_type="read", description="Get full details (manifest, tools, description, pricing, git_url) of any pending or reviewed app")
-async def get_app_review_details(ctx, params: GetAppDetailsParams) -> ActionResult:
+@chat.function("get_app_review_details", action_type="read", data_model=PendingAppRecord, description="Get full details (manifest, tools, description, pricing, git_url) of any pending or reviewed app")
+async def get_app_review_details(ctx, params: GetAppDetailsParams) -> ActionResult[PendingAppRecord]:
     """Get full details of a specific pending or reviewed app."""
     app_id = params.app_id.strip()
     if not app_id:

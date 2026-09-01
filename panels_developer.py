@@ -36,50 +36,87 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
             ui.Empty(message="No apps pending review.", icon="ClipboardCheck"),
         ])
 
-    # Build table rows
-    rows = []
+    # Build list items for pending apps with full multi-selection
+    list_items = []
     for a in apps:
+        app_id = a.get("app_id", "")
+        name = a.get("display_name") or a.get("name") or app_id
+        dev = a.get("developer_id") or a.get("developer_email") or a.get("developer", "")
+        cat = a.get("category", "")
         git_url = a.get("git_url", "")
-        rows.append({
-            "app_id":    a.get("app_id", ""),
-            "name":      a.get("display_name", a.get("name", "")),
-            "developer": a.get("developer_id", a.get("developer", "")),
-            "category":  a.get("category", ""),
-            "git_url":   git_url[:40] + ("…" if len(git_url) > 40 else ""),
-            "submitted": a.get("submitted_at", a.get("created_at", "")),
-        })
+        ver = a.get("version", "")
+        pricing = a.get("pricing_model", "")
+        submitted = a.get("submitted_at") or a.get("created_at", "")
 
-    table = ui.DataTable(
-        columns=[
-            ui.DataColumn(key="app_id",    label="App ID"),
-            ui.DataColumn(key="name",      label="Name"),
-            ui.DataColumn(key="developer", label="Developer"),
-            ui.DataColumn(key="category",  label="Category"),
-            ui.DataColumn(key="git_url",   label="Git URL"),
-            ui.DataColumn(key="submitted", label="Submitted"),
-        ],
-        rows=rows,
-        on_row_click=ui.Call("__panel__tools", section="app_review"),
+        meta_parts = []
+        if cat:
+            meta_parts.append(cat.capitalize())
+        if ver:
+            meta_parts.append(f"v{ver}")
+        if pricing:
+            meta_parts.append(pricing)
+        if submitted:
+            meta_parts.append(str(submitted)[:10])
+
+        list_items.append(ui.ListItem(
+            id=app_id,
+            title=name,
+            subtitle=f"{app_id} · by {dev}" if dev else app_id,
+            meta=" · ".join(meta_parts) if meta_parts else None,
+            badge=ui.Badge("Pending", variant="warning"),
+            expandable=True,
+            expanded_content=ui.Stack(gap=1, children=[
+                ui.Text(f"**Git URL:** `{git_url}`" if git_url else "**Git URL:** None"),
+                ui.Text(f"**Description:** {a.get('description') or a.get('short_description') or 'No description provided.'}"),
+                ui.Stack(direction="h", gap=1, children=[
+                    ui.Button(
+                        label="Approve",
+                        variant="primary",
+                        on_click=ui.Call(
+                            "review_app",
+                            app_id=app_id,
+                            action="approve",
+                            confirm=f"Approve '{name}' and list it in the Marketplace?",
+                        ),
+                    ),
+                    ui.Button(
+                        label="Reject",
+                        variant="danger",
+                        on_click=ui.Call(
+                            "review_app",
+                            app_id=app_id,
+                            action="reject",
+                            reason="Rejected by administrator",
+                            confirm=f"Reject '{name}' submission?",
+                        ),
+                    ),
+                ]),
+            ]),
+        ))
+
+    # Bulk actions definition for ui.List (native SDK DUI schema: selectable, bulk_actions)
+    bulk_actions = [
+        {
+            "label": "Approve Selected",
+            "icon": "CheckCheck",
+            "variant": "primary",
+            "action": ui.Call("bulk_review_apps", action="approve"),
+        },
+        {
+            "label": "Reject Selected",
+            "icon": "XCircle",
+            "variant": "danger",
+            "action": ui.Call("bulk_review_apps", action="reject", reason="Rejected by administrator in bulk review"),
+        },
+    ]
+
+    list_view = ui.List(
+        items=list_items,
+        searchable=True,
         selectable=True,
-        selection_key="app_id",
-        bulk_actions=[
-            {
-                "label": "Approve Selected",
-                "icon": "CheckCheck",
-                "variant": "primary",
-                "action": ui.Call("bulk_review_apps", action="approve"),
-                "confirm": "Are you sure you want to approve all selected applications?",
-            },
-            {
-                "label": "Reject Selected",
-                "icon": "XCircle",
-                "variant": "danger",
-                "action": ui.Call("bulk_review_apps", action="reject", reason="Rejected by administrator in bulk review"),
-                "confirm": "Are you sure you want to reject all selected applications?",
-            },
-        ],
+        bulk_actions=bulk_actions,
     )
-    stack_items.append(table)
+    stack_items.append(list_view)
 
     # Bulk actions bar if there are pending apps
     all_app_ids = [a.get("app_id") for a in apps if a.get("app_id")]

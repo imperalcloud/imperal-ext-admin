@@ -68,6 +68,12 @@ from models_developer import (  # noqa: F401
     DeveloperTierReceipt,
     PayoutReviewReceipt,
 )
+from models_admin_reads import (  # noqa: F401
+    PendingAppRecord,
+    PendingAppsResponse,
+    PendingPayoutRecord,
+    PendingPayoutsResponse,
+)
 from models_extensions import (  # noqa: F401
     ExtensionRecord,
     ExtensionsListResponse,
