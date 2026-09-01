@@ -63,7 +63,7 @@ async def build_app_review(ctx, **kwargs) -> ui.Stack:
             title=name,
             subtitle=f"{app_id} · by {dev}" if dev else app_id,
             meta=" · ".join(meta_parts) if meta_parts else None,
-            badge=ui.Badge("Pending", variant="warning"),
+            badge=ui.Badge(label="Pending", color="yellow"),
             expandable=True,
             expanded_content=ui.Stack(gap=1, children=[
                 ui.Text(f"**Git URL:** `{git_url}`" if git_url else "**Git URL:** None"),
