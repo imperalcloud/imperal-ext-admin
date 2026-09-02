@@ -34,7 +34,7 @@ async def _fetch_rates() -> list[dict]:
     try:
         async with shared_http(timeout=5.0) as client:
             resp = await client.get(
-                url, headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
+                url, headers={"X-Service-Token": str(AUTH_SERVICE_TOKEN)},
             )
         if resp.status_code != 200:
             log.warning("_fetch_rates: status=%s", resp.status_code)

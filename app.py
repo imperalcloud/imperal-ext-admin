@@ -48,11 +48,17 @@ def _get_service_token() -> str:
 
 
 class _AuthServiceTokenProxy(str):
+    def __new__(cls):
+        return super().__new__(cls, _get_service_token())
+
     def __str__(self):
         return _get_service_token()
 
     def __bool__(self):
         return bool(_get_service_token())
+
+    def encode(self, encoding="utf-8", errors="strict"):
+        return _get_service_token().encode(encoding, errors)
 
 
 AUTH_SERVICE_TOKEN = _AuthServiceTokenProxy()
