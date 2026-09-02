@@ -50,6 +50,16 @@ _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("o4", "openai"),
     ("chatgpt", "openai"),
     ("gemini", "google"),
+    # OpenRouter multi-vendor router (model format vendor/model-id, e.g. z-ai/glm-5.3)
+    ("openrouter", "openrouter"),
+    ("z-ai/", "openrouter"),
+    ("anthropic/", "openrouter"),
+    ("openai/", "openrouter"),
+    ("google/", "openrouter"),
+    ("meta-llama/", "openrouter"),
+    ("mistralai/", "openrouter"),
+    ("deepseek/", "openrouter"),
+    ("qwen/", "openrouter"),
 )
 
 # OpenAI exposes 120+ models incl. non-chat families. Exclude by substring.
@@ -81,6 +91,21 @@ FALLBACK_CATALOG: dict[str, list[str]] = {
     # replace them with the key's real /models answer as soon as a key exists.
     "kimi": ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"],
     "zhipu": ["glm-5.3", "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5", "glm-4.5-air"],
+    # OpenRouter multi-vendor router (2026-09-02).
+    "openrouter": [
+        "z-ai/glm-5.3",
+        "anthropic/claude-3.7-sonnet",
+        "anthropic/claude-3.5-sonnet",
+        "openai/gpt-4o",
+        "openai/gpt-4o-mini",
+        "openai/o3-mini",
+        "google/gemini-2.5-pro",
+        "google/gemini-2.5-flash",
+        "deepseek/deepseek-chat",
+        "deepseek/deepseek-r1",
+        "qwen/qwen-2.5-coder-32b-instruct",
+        "meta-llama/llama-3.3-70b-instruct",
+    ],
 }
 
 _QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -89,6 +114,7 @@ _QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1
 # catalogue and runtime calls hit it identically.
 _KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 _ZHIPU_BASE_URL = "https://api.z.ai/api/paas/v4"
+_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Same OpenAI-compatible surface the kernel resolver targets for provider
 # "google" (llm/provider.py:_GOOGLE_BASE_URL) -- one source of truth for the
 # endpoint shape, catalogue and runtime calls both hit it the same way.
@@ -253,6 +279,26 @@ async def _fetch_zhipu(key: str) -> list[str]:
         r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
         r.raise_for_status()
         return _filter_zhipu([m.get("id", "") for m in r.json().get("data", [])])
+
+
+async def _fetch_openrouter(key: str, base_url: str = "") -> list[str]:
+    """OpenRouter OpenAI-compatible /models (key admin-entered via the panel)."""
+    url = (base_url or _OPENROUTER_BASE_URL).rstrip("/") + "/models"
+    async with shared_http(timeout=12.0) as c:
+        r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
+        r.raise_for_status()
+        data = r.json().get("data", [])
+        return _filter_openrouter([m.get("id", "") for m in data])
+
+
+def _filter_openrouter(ids: list[str]) -> list[str]:
+    """Keep all chat models from openrouter, clean up format."""
+    out: list[str] = []
+    for i in ids:
+        if not i or not isinstance(i, str):
+            continue
+        out.append(i.strip())
+    return sorted(set(out))
 
 
 def _filter_kimi(ids: list[str]) -> list[str]:
@@ -440,6 +486,16 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: google fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
+    # OpenRouter: key is PANEL-entered (lives in the LLM Config Store, not env).
+    ork = await _store_key_for("openrouter")
+    if ork:
+        try:
+            catalog["openrouter"] = await _fetch_openrouter(ork)
+        except Exception as e:
+            log.warning(
+                "model_catalog: openrouter fetch failed: %s: %s",
+                type(e).__name__, e or "(no detail)",
+            )
 
     catalog = {p: m for p, m in catalog.items() if m}
     if not catalog:
@@ -457,7 +513,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
     # Anthropic and cannot pick a GPT model at all. Backfill from the static
     # fallback so every configured provider stays selectable, and mark the
     # result degraded so it is cached briefly instead of for an hour.
-    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk), ("google", gk), ("kimi", kk), ("zhipu", zk)) if key}
+    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk), ("google", gk), ("kimi", kk), ("zhipu", zk), ("openrouter", ork)) if key}
     missing = sorted(expected - set(catalog))
     for prov in missing:
         fb = FALLBACK_CATALOG.get(prov)
@@ -468,26 +524,10 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 prov, len(fb),
             )
 
-    # 2c. QWEN IS THE ONLY provider offered without a key. Its key is
-    # PANEL-entered (the LLM Config Store, never env), so on a fresh install
-    # the admin must be able to pick "Qwen (DashScope)" AND one of its models
-    # in the SAME save that enters the key; refusing to list them made Qwen
-    # unselectable until a second save -- the exact asymmetry the provider
-    # select already avoids with its unconditional "qwen" entry here. The
-    # static ids are the provider's own, and the kernel still refuses to build
-    # a config with no key, so an early pick degrades safely instead of
-    # mis-routing. fn_save_llm_config drops this cache on every save, so the
-    # LIVE list replaces the static one as soon as the key exists.
-    #
-    # Env-keyed providers are deliberately NOT backfilled: no env key means
-    # the deployment switched that provider off on purpose (federal
-    # test_unconfigured_provider_is_not_backfilled).
-    if "qwen" not in catalog:
-        catalog["qwen"] = list(FALLBACK_CATALOG.get("qwen", []))
-    # Kimi + Zhipu are panel-keyed exactly like qwen (2026-08-30): same
-    # unconditional backfill so the admin can pick their models in the SAME
-    # save that enters the key. The kernel still refuses a keyless config.
-    for _p in ("kimi", "zhipu"):
+    # 2c. Panel-entered providers (qwen, kimi, zhipu, openrouter) are offered
+    # with unconditional fallback lists so the admin can pick them and their models
+    # in the SAME save that enters the key.
+    for _p in ("qwen", "kimi", "zhipu", "openrouter"):
         if _p not in catalog:
             catalog[_p] = list(FALLBACK_CATALOG.get(_p, []))
 

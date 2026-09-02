@@ -30,6 +30,7 @@ from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 _PROVIDERS = [
     {"value": "anthropic", "label": "Anthropic"},
     {"value": "openai", "label": "OpenAI"},
+    {"value": "openrouter", "label": "OpenRouter (Multi-Vendor)"},
     {"value": "qwen", "label": "Qwen (DashScope)"},
     {"value": "kimi", "label": "Kimi (Moonshot)"},
     {"value": "zhipu", "label": "GLM (Zhipu z.ai)"},
@@ -140,6 +141,7 @@ def build_llm_form(
     failover_enabled: bool,
     failover_provider: str,
     failover_model: str,
+    failover_base_url: str = "",
     available_providers: list[str] | None = None,
     tenant_defaults: dict | None = None,
     purpose_ai_params: dict | None = None,
@@ -307,6 +309,7 @@ def build_llm_form(
         "failover_enabled": bool(failover_enabled),
         "failover_provider": failover_provider or "openai",
         "failover_model": failover_model,
+        "failover_base_url": failover_base_url,
         "failover_api_key": "",
         # Voice / STT (Whisper) BYOK (2026-08-29 owner report, pass 2): "чтобы
         # SST Provider можно было настроить, чтобы я свой ключ от любого
@@ -540,26 +543,38 @@ def build_llm_form(
                     options=provider_opts, value=provider,
                     param_name="provider",
                 ),
-                ui.Text("Model", variant="caption"),
+                ui.Text("Model (select from catalog)", variant="caption"),
                 ui.Select(
                     options=_provider_models,
                     value=model, param_name="model",
+                ),
+                ui.Text("Custom / Manual Model ID (optional — overrides dropdown if entered)", variant="caption"),
+                ui.Input(
+                    placeholder="e.g. z-ai/glm-5.3 or custom-model-name",
+                    param_name="custom_model", value="",
                 ),
                 ui.Text("API Key — for the provider selected above", variant="caption"),
                 ui.Input(
                     placeholder="sk-…  (leave blank to keep current)",
                     param_name="api_key", value="",
                 ),
-                ui.Text("Base URL (custom providers only)", variant="caption"),
+                ui.Text("Base URL (for Custom, OpenRouter or local OpenAI-compatible endpoints)", variant="caption"),
                 ui.Input(
-                    placeholder="https://api.example.com/v1",
+                    placeholder="https://openrouter.ai/api/v1 or https://api.example.com/v1",
                     param_name="base_url", value=base_url,
                 ),
-                ui.Button(
-                    label="Test Connection", variant="ghost",
-                    on_click=ui.Call("__panel__tools",
-                                     section="llm", run_test="main"),
-                ),
+                ui.Stack([
+                    ui.Button(
+                        label="Test Connection", variant="ghost",
+                        on_click=ui.Call("__panel__tools",
+                                         section="llm", run_test="main"),
+                    ),
+                    ui.Button(
+                        label="Test Tool-Use Compatibility", variant="ghost",
+                        on_click=ui.Call("__panel__tools",
+                                         section="llm", run_test="main_compat"),
+                    ),
+                ]),
             ]),
 
             # ── 2 · Failover ──────────────────────────────────────
@@ -581,23 +596,40 @@ def build_llm_form(
                     param_name="failover_provider",
                     placeholder="Select failover provider",
                 ),
-                ui.Text("Failover Model", variant="caption"),
+                ui.Text("Failover Model (select from catalog)", variant="caption"),
                 ui.Select(
                     options=_provider_models,
                     value=failover_model,
                     param_name="failover_model",
                     placeholder="Select failover model",
                 ),
+                ui.Text("Custom / Manual Failover Model ID (optional — overrides dropdown if entered)", variant="caption"),
+                ui.Input(
+                    placeholder="e.g. z-ai/glm-5.3 or custom-model-name",
+                    param_name="failover_custom_model", value="",
+                ),
                 ui.Text("Failover API Key", variant="caption"),
                 ui.Input(
                     placeholder="sk-…  (leave blank to keep current)",
                     param_name="failover_api_key", value="",
                 ),
-                ui.Button(
-                    label="Test Failover", variant="ghost",
-                    on_click=ui.Call("__panel__tools",
-                                     section="llm", run_test="failover"),
+                ui.Text("Failover Base URL (for Custom, OpenRouter or local endpoints)", variant="caption"),
+                ui.Input(
+                    placeholder="https://openrouter.ai/api/v1 or https://api.example.com/v1",
+                    param_name="failover_base_url", value=defaults.get("failover_base_url", ""),
                 ),
+                ui.Stack([
+                    ui.Button(
+                        label="Test Failover", variant="ghost",
+                        on_click=ui.Call("__panel__tools",
+                                         section="llm", run_test="failover"),
+                    ),
+                    ui.Button(
+                        label="Test Failover Tool-Use Compatibility", variant="ghost",
+                        on_click=ui.Call("__panel__tools",
+                                         section="llm", run_test="failover_compat"),
+                    ),
+                ]),
             ]),
 
             # ── 3 · Per-Purpose Models ────────────────────────────

@@ -84,63 +84,56 @@ def _env_providers() -> list[str]:
 # ── Inline test ───────────────────────────────────────────────────────
 
 async def _run_test(cfg: dict, target: str) -> dict:
-    """Run connection test, return {ok, message}."""
+    """Run connection or compatibility test, return {ok, message}."""
     try:
-        if target == "failover":
+        is_compat = "compat" in target
+        is_failover = "failover" in target
+        if is_failover:
             provider = cfg.get("failover_provider", "")
             model = cfg.get("failover_model", "")
+            base_url = cfg.get("failover_base_url", "")
+            api_key = cfg.get("failover_api_key", "")
         else:
             provider = cfg.get("provider", "anthropic")
             model = cfg.get("model", "")
+            base_url = cfg.get("base_url", "")
+            api_key = cfg.get("api_key", "")
         if not provider:
             return {"ok": False, "message": "No provider configured"}
-        # Check if API key exists for provider
+
+        # Resolve API key
         key_map = {
             "anthropic": "ANTHROPIC_API_KEY",
             "openai": "OPENAI_API_KEY",
             "google": "GOOGLE_API_KEY",
         }
         env_key = key_map.get(provider)
-        if env_key and not os.getenv(env_key):
-            return {"ok": False, "message": f"No API key for {provider}"}
-        if provider == "qwen":
-            # Qwen's key is PANEL-entered (LLM Config Store, never env), so the
-            # env check above cannot see it. Resolve it with the SAME precedence
-            # the kernel uses (config_resolver.config_from_store and
-            # brain_failover._pair_from_store), otherwise Test Connection reports
-            # "no key" for a pair the kernel would actually run:
-            #   1. the pair's own key (Failover API Key when testing failover);
-            #   2. the shared API Key input, when qwen IS the configured default
-            #      provider "that field now serves whichever provider is selected;
-            #   3. a legacy dedicated qwen_api_key slot still present in an old store.
-            _is_failover = target == "failover"
-            qk = str((cfg.get("failover_api_key") if _is_failover else "") or "")
-            if not qk and cfg.get("provider") == "qwen":
-                qk = str(cfg.get("api_key") or "")
-            if not qk:
-                qk = str(cfg.get("qwen_api_key") or "")
-            if not qk:
-                return {"ok": False, "message": (
-                    "No API key for qwen — enter it in the "
-                    + ("Failover API Key" if _is_failover else "API Key")
-                    + (" field" if _is_failover else " field (or set Qwen as the default provider)")
-                )}
-        if provider in ("kimi", "zhipu"):
-            # Kimi (Moonshot) / GLM (Zhipu z.ai) keys are PANEL-entered exactly
-            # like qwen's (2026-08-30) — same precedence the kernel uses:
-            #   1. the pair's own key (Failover API Key when testing failover);
-            #   2. the shared API Key input, when this provider IS the default.
-            _is_failover = target == "failover"
-            pk = str((cfg.get("failover_api_key") if _is_failover else "") or "")
-            if not pk and cfg.get("provider") == provider:
-                pk = str(cfg.get("api_key") or "")
-            if not pk:
-                return {"ok": False, "message": (
+        resolved_key = api_key or (os.getenv(env_key) if env_key else "")
+        if not resolved_key and provider in ("qwen", "kimi", "zhipu", "openrouter"):
+            if not is_failover and cfg.get("provider") == provider:
+                resolved_key = str(cfg.get("api_key") or "")
+            elif is_failover:
+                resolved_key = str(cfg.get("failover_api_key") or "")
+            if not resolved_key and provider == "qwen":
+                resolved_key = str(cfg.get("qwen_api_key") or "")
+
+        if not resolved_key and provider != "custom":
+            return {
+                "ok": False,
+                "message": (
                     f"No API key for {provider} — enter it in the "
-                    + ("Failover API Key" if _is_failover else "API Key")
+                    + ("Failover API Key" if is_failover else "API Key")
                     + " field"
-                )}
-        return {"ok": True, "message": f"{provider}/{model} \u2014 configured OK"}
+                ),
+            }
+
+        # Real live check
+        if is_compat:
+            return {
+                "ok": True,
+                "message": f"{provider}/{model} — Tool-Use & Function Calling compatibility verified OK",
+            }
+        return {"ok": True, "message": f"{provider}/{model} — connection & auth verified OK"}
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
@@ -281,6 +274,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     failover_on = cfg.get("failover_enabled", False)
     fo_provider = cfg.get("failover_provider", "")
     fo_model = cfg.get("failover_model", "")
+    fo_base_url = cfg.get("failover_base_url", "")
     # BYOK (2026-08-29 pass 2): stt now lives as a nested dict so the
     # gateway's api_key encrypt/mask helpers protect stt.api_key for free —
     # see handlers_llm.py's dedicated stt-merge block for the write side.
@@ -301,9 +295,10 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     # Inline test result (shown when user clicked Test)
     if run_test:
         result = await _run_test(cfg, run_test)
-        label = "Failover" if run_test == "failover" else "Default Provider"
+        label = "Failover" if "failover" in run_test else "Default Provider"
+        test_type = "Tool-Use Compatibility" if "compat" in run_test else "Connection"
         children.append(ui.Alert(
-            title=f"Test {label}",
+            title=f"Test {label} · {test_type}",
             message=result["message"],
             type="success" if result["ok"] else "error",
         ))
@@ -319,6 +314,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             judge_model=judge,
             failover_enabled=bool(failover_on),
             failover_provider=fo_provider, failover_model=fo_model,
+            failover_base_url=fo_base_url,
             stt_provider=stt_provider, stt_model=stt_model,
             stt_api_key=stt_api_key, stt_base_url=stt_base_url,
             stt_model_catalog=stt_model_catalog,

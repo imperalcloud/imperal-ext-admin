@@ -102,6 +102,12 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             "stt_provider", "stt_model", "stt_api_key", "stt_base_url",
         }
         updates = {}
+        # Apply custom model inputs if provided (overrides dropdown if admin typed one)
+        if getattr(params, "custom_model", "") and str(params.custom_model).strip():
+            params.model = str(params.custom_model).strip()
+        if getattr(params, "failover_custom_model", "") and str(params.failover_custom_model).strip():
+            params.failover_model = str(params.failover_custom_model).strip()
+
         for field in SaveLlmConfigParams.model_fields:
             if field in skip_fields:
                 continue

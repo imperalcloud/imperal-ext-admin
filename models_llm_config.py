@@ -166,7 +166,10 @@ class SaveLlmConfigParams(BaseModel):
     failover_enabled: Optional[bool] = Field(default=None, description="Enable failover")
     failover_provider: str = Field(default="", description="Failover provider")
     failover_model: str = Field(default="", description="Failover model")
+    failover_custom_model: str = Field(default="", description="Manual custom model id for failover when not in dropdown")
     failover_api_key: str = Field(default="", description="Failover API key (write-only)")
+    failover_base_url: str = Field(default="", description="Failover base URL (endpoint for custom or OpenAI-compatible failover provider)")
+    custom_model: str = Field(default="", description="Manual custom model id for primary provider when not in dropdown")
     # Voice STT (Whisper) provider/model (2026-08-29 owner report): "у нас
     # покдлючен whisper ai, но в llm configs вообще нету настройки провайдера
     # под это ... а это важно". Read by the auth-gateway's app.voice.service.

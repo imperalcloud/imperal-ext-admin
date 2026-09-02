@@ -12790,10 +12790,28 @@
             "title": "Failover Model",
             "type": "string"
           },
+          "failover_custom_model": {
+            "default": "",
+            "description": "Manual custom model id for failover when not in dropdown",
+            "title": "Failover Custom Model",
+            "type": "string"
+          },
           "failover_api_key": {
             "default": "",
             "description": "Failover API key (write-only)",
             "title": "Failover Api Key",
+            "type": "string"
+          },
+          "failover_base_url": {
+            "default": "",
+            "description": "Failover base URL (endpoint for custom or OpenAI-compatible failover provider)",
+            "title": "Failover Base Url",
+            "type": "string"
+          },
+          "custom_model": {
+            "default": "",
+            "description": "Manual custom model id for primary provider when not in dropdown",
+            "title": "Custom Model",
             "type": "string"
           },
           "stt_provider": {
