@@ -92,19 +92,24 @@ FALLBACK_CATALOG: dict[str, list[str]] = {
     "kimi": ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"],
     "zhipu": ["glm-5.3", "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5", "glm-4.5-air"],
     # OpenRouter multi-vendor router (2026-09-02).
+    # Prioritizes Gemini, GLM, Qwen, DeepSeek first
     "openrouter": [
+        "google/gemini-3.7-flash",
+        "google/gemini-3-pro",
+        "google/gemini-2.5-pro",
+        "google/gemini-2.5-flash",
         "z-ai/glm-5.3",
+        "z-ai/glm-5.3-flash",
+        "qwen/qwen3.8-max",
+        "qwen/qwen3.8-flash",
+        "qwen/qwen-2.5-coder-32b-instruct",
+        "deepseek/deepseek-chat",
+        "deepseek/deepseek-r1",
+        "deepseek/deepseek-v3.2",
         "anthropic/claude-3.7-sonnet",
         "anthropic/claude-3.5-sonnet",
         "openai/gpt-4o",
         "openai/gpt-4o-mini",
-        "openai/o3-mini",
-        "google/gemini-2.5-pro",
-        "google/gemini-2.5-flash",
-        "deepseek/deepseek-chat",
-        "deepseek/deepseek-r1",
-        "qwen/qwen-2.5-coder-32b-instruct",
-        "meta-llama/llama-3.3-70b-instruct",
     ],
 }
 
@@ -292,8 +297,8 @@ async def _fetch_openrouter(key: str, base_url: str = "") -> list[str]:
 
 
 _OPENROUTER_TOP_VENDORS = (
-    "z-ai/", "anthropic/", "openai/", "google/", "deepseek/",
-    "qwen/", "meta-llama/", "mistralai/", "x-ai/", "moonshotai/",
+    "google/", "z-ai/", "qwen/", "deepseek/",
+    "anthropic/", "openai/", "meta-llama/", "mistralai/", "x-ai/", "moonshotai/",
     "minimax/", "bytedance-seed/", "cohere/",
 )
 
@@ -308,13 +313,9 @@ _OPENROUTER_DATE_PAT = re.compile(r"-\d{8}$|-\d{4}-\d{2}-\d{2}$")
 
 
 def _filter_openrouter(ids: list[str]) -> list[str]:
-    """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~20-25).
+    """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~25).
 
-    OpenRouter exposes hundreds of non-chat, dated, batch and niche models.
-    Sending 400+ options across 16 dropdowns creates 6,000+ AST nodes and
-    hangs the panel / exceeds the 256KB RPC payload limit.
-    We keep top flagship chat/code models from premier vendors.
-    Any custom/niche model can always be entered via the custom model input!
+    Prioritizes Google Gemini, Z-AI GLM, Qwen, and DeepSeek at the top of the dropdown!
     """
     out: list[str] = []
     for i in ids:
@@ -330,9 +331,17 @@ def _filter_openrouter(ids: list[str]) -> list[str]:
         if _OPENROUTER_DATE_PAT.search(i_clean):
             continue
         out.append(i_clean)
-    # Deduplicate and sort
-    sorted_unique = sorted(set(out))
-    # Cap to top 25 premier models to keep total AST payload safely well under the 256KB RPC limit
+
+    # Sort with custom priority: google/, z-ai/, qwen/, deepseek/ first
+    priority_prefixes = ["google/", "z-ai/", "qwen/", "deepseek/", "anthropic/", "openai/"]
+    def sort_key(model_id: str):
+        low = model_id.lower()
+        for idx, pref in enumerate(priority_prefixes):
+            if low.startswith(pref):
+                return (idx, low)
+        return (len(priority_prefixes), low)
+
+    sorted_unique = sorted(set(out), key=sort_key)
     return sorted_unique[:25]
 
 
