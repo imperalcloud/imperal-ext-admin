@@ -291,14 +291,48 @@ async def _fetch_openrouter(key: str, base_url: str = "") -> list[str]:
         return _filter_openrouter([m.get("id", "") for m in data])
 
 
+_OPENROUTER_TOP_VENDORS = (
+    "z-ai/", "anthropic/", "openai/", "google/", "deepseek/",
+    "qwen/", "meta-llama/", "mistralai/", "x-ai/", "moonshotai/",
+    "minimax/", "bytedance-seed/", "cohere/",
+)
+
+_OPENROUTER_EXCLUDE = (
+    ":free", ":batch", ":extended", "embedding", "embed", "rerank",
+    "tts", "audio", "whisper", "vision-exp", "image", "wan", "flux",
+    "diffusion", "guard", "safety", "moderation", "live", "translat",
+    "base", "quantized",
+)
+
+_OPENROUTER_DATE_PAT = re.compile(r"-\d{8}$|-\d{4}-\d{2}-\d{2}$")
+
+
 def _filter_openrouter(ids: list[str]) -> list[str]:
-    """Keep all chat models from openrouter, clean up format."""
+    """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~40-50).
+
+    OpenRouter exposes hundreds of non-chat, dated, batch and niche models.
+    Sending 400+ options across 16 dropdowns creates 6,000+ AST nodes and
+    hangs the panel. We keep only stable flagship chat/code models from top
+    vendors. Any other model can still be entered via the custom model input!
+    """
     out: list[str] = []
     for i in ids:
         if not i or not isinstance(i, str):
             continue
-        out.append(i.strip())
-    return sorted(set(out))
+        i_clean = i.strip()
+        if i_clean.startswith("~"):
+            continue
+        if not i_clean.startswith(_OPENROUTER_TOP_VENDORS):
+            continue
+        if any(tok in i_clean.lower() for tok in _OPENROUTER_EXCLUDE):
+            continue
+        if _OPENROUTER_DATE_PAT.search(i_clean):
+            continue
+        out.append(i_clean)
+    # Deduplicate and sort
+    sorted_unique = sorted(set(out))
+    # Cap to top 60 flagship models so dropdowns remain snappy
+    return sorted_unique[:60]
 
 
 def _filter_kimi(ids: list[str]) -> list[str]:
