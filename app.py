@@ -31,7 +31,12 @@ log = logging.getLogger("admin")
 AUTH_GW = os.getenv("IMPERAL_GATEWAY_URL", "http://104.224.88.155:8085")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://66.78.41.10:8098")
 REGISTRY_KEY = os.getenv("REGISTRY_API_KEY", "")
-AUTH_SERVICE_TOKEN = os.getenv("AUTH_SERVICE_TOKEN", "")
+AUTH_SERVICE_TOKEN = (
+    os.getenv("AUTH_SERVICE_TOKEN", "")
+    or os.getenv("IMPERAL_SERVICE_TOKEN", "")
+    or os.getenv("SERVICE_TOKEN", "")
+    or "imp_iYwLFcq5yMTQyTXS7rg71RRUII1IhhgPjpEfCB3iJ7QGI9Pm"
+)
 REDIS_URL = os.getenv("REDIS_URL", "")
 TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "104.224.88.156")
 TEMPORAL_PORT = int(os.getenv("TEMPORAL_PORT", "7233"))
