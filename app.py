@@ -31,12 +31,6 @@ log = logging.getLogger("admin")
 AUTH_GW = os.getenv("IMPERAL_GATEWAY_URL", "http://104.224.88.155:8085")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://66.78.41.10:8098")
 REGISTRY_KEY = os.getenv("REGISTRY_API_KEY", "")
-AUTH_SERVICE_TOKEN = (
-    os.getenv("AUTH_SERVICE_TOKEN", "")
-    or os.getenv("IMPERAL_SERVICE_TOKEN", "")
-    or os.getenv("SERVICE_TOKEN", "")
-    or "imp_iYwLFcq5yMTQyTXS7rg71RRUII1IhhgPjpEfCB3iJ7QGI9Pm"
-)
 REDIS_URL = os.getenv("REDIS_URL", "")
 TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "104.224.88.156")
 TEMPORAL_PORT = int(os.getenv("TEMPORAL_PORT", "7233"))
@@ -44,36 +38,45 @@ TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 
-_http = None
+
+def _get_service_token() -> str:
+    return (
+        os.getenv("AUTH_SERVICE_TOKEN", "")
+        or os.getenv("IMPERAL_SERVICE_TOKEN", "")
+        or os.getenv("SERVICE_TOKEN", "")
+    )
 
 
-def _get_http():
-    global _http
-    if _http is None:
-        _http = httpx.AsyncClient(
-            base_url=AUTH_GW,
-            headers={"X-Service-Token": AUTH_SERVICE_TOKEN},
-            timeout=10.0,
+class _AuthServiceTokenProxy(str):
+    def __str__(self):
+        return _get_service_token()
+
+    def __bool__(self):
+        return bool(_get_service_token())
+
+
+AUTH_SERVICE_TOKEN = _AuthServiceTokenProxy()
+
+
+async def _gw_request(method, path, data=None, acting=None, ctx=None):
+    token = _get_service_token()
+    if not token and ctx:
+        token = getattr(ctx, "_service_token", "") or (
+            ctx._derive_service_token() if hasattr(ctx, "_derive_service_token") else ""
         )
-    return _http
+    headers = {"X-Service-Token": token}
+    if acting:
+        headers["X-Acting-User"] = acting
 
+    async with shared_http(timeout=10.0) as c:
+        url = f"{AUTH_GW.rstrip('/')}/{path.lstrip('/')}"
+        if method.upper() in ("POST", "PUT", "PATCH"):
+            r = await getattr(c, method.lower())(url, json=data, headers=headers)
+        elif method.upper() == "DELETE" and data is not None:
+            r = await c.request("DELETE", url, json=data, headers=headers)
+        else:
+            r = await getattr(c, method.lower())(url, headers=headers)
 
-async def _gw_request(method, path, data=None, acting=None):
-    c = _get_http()
-    # acting -> X-Acting-User (BFF pattern): lets gateway endpoints that
-    # defense-in-depth gate on admin role (e.g. email template-write / test-send)
-    # attribute + authorize the call. Omitted for pure backend reads.
-    extra = {"X-Acting-User": acting} if acting else None
-    if method.upper() in ("POST", "PUT", "PATCH"):
-        r = await getattr(c, method.lower())(path, json=data, headers=extra)
-    elif method.upper() == "DELETE" and data is not None:
-        # DELETE-with-body (e.g. admin app purge confirm payload)
-        r = await c.request("DELETE", path, json=data, headers=extra)
-    else:
-        r = await getattr(c, method.lower())(path, headers=extra)
-    # Federal: never call r.json() blindly. Auth-gw may return 4xx/5xx
-    # with HTML body, empty body, or {"detail": "..."} — surface readable
-    # error to ActionResult.error path instead of JSONDecodeError.
     if r.status_code >= 400:
         body = (r.text or "").strip()
         try:
