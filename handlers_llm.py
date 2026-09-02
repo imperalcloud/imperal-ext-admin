@@ -224,6 +224,22 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             current["stt"] = _stt
 
         current.update(updates)
+
+        # ── Atomically prune stale empty keys / ghost overrides ─────
+        # If a purpose model is set to the same as default or empty, ensure both
+        # model and provider keys are pruned so nothing gets stuck in Redis.
+        _global_prov = current.get("provider") or ""
+        _global_mod = current.get("model") or ""
+        for _purp in ("resolve", "resolve_fallback", "failover", "routing", "execution",
+                      "navigate", "chain_narrative", "judge", "conversational",
+                      "step_reclassify", "tool_picker", "action_narrator"):
+            _mk = f"{_purp}_model"
+            _pk = f"{_purp}_provider"
+            # If model is empty or equals global default without an explicit different provider, drop override
+            if not current.get(_mk):
+                current.pop(_mk, None)
+                current.pop(_pk, None)
+
         await r.set("imperal:config:llm", json.dumps(current))
         # The live model catalogue is derived from the keys in THIS store (a
         # Qwen key is panel-entered, not env), so a saved key must not wait out
