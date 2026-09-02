@@ -195,7 +195,7 @@ def _filter_qwen(ids: list[str]) -> list[str]:
         if m and low[: m.start()] in {x.lower() for x in id_set}:
             continue
         out.add(i)
-    return sorted(out)
+    return sorted(out)[:20]
 
 
 # Google's OpenAI-compatible /models answer also lists embedding/imagen/veo/
@@ -308,12 +308,13 @@ _OPENROUTER_DATE_PAT = re.compile(r"-\d{8}$|-\d{4}-\d{2}-\d{2}$")
 
 
 def _filter_openrouter(ids: list[str]) -> list[str]:
-    """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~40-50).
+    """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~20-25).
 
     OpenRouter exposes hundreds of non-chat, dated, batch and niche models.
     Sending 400+ options across 16 dropdowns creates 6,000+ AST nodes and
-    hangs the panel. We keep only stable flagship chat/code models from top
-    vendors. Any other model can still be entered via the custom model input!
+    hangs the panel / exceeds the 256KB RPC payload limit.
+    We keep top flagship chat/code models from premier vendors.
+    Any custom/niche model can always be entered via the custom model input!
     """
     out: list[str] = []
     for i in ids:
@@ -331,8 +332,8 @@ def _filter_openrouter(ids: list[str]) -> list[str]:
         out.append(i_clean)
     # Deduplicate and sort
     sorted_unique = sorted(set(out))
-    # Cap to top 60 flagship models so dropdowns remain snappy
-    return sorted_unique[:60]
+    # Cap to top 25 premier models to keep total AST payload safely well under the 256KB RPC limit
+    return sorted_unique[:25]
 
 
 def _filter_kimi(ids: list[str]) -> list[str]:
