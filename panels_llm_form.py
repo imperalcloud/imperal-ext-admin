@@ -228,12 +228,28 @@ def build_llm_form(
     # Model dropdown options from the live catalogue (fallback iff none supplied).
     _all_models, _provider_models = catalog_to_options(model_catalog or FALLBACK_CATALOG)
 
+    # Ensure custom/saved models that are not in catalog are included in dropdown options
+    # so ui.Select doesn't render empty or drop the selection on client reload.
+    if model and not any(opt.get("value") == model for opt in _provider_models):
+        custom_opt = {"value": model, "label": f"{model} (current / custom)"}
+        _provider_models.insert(0, dict(custom_opt))
+        _all_models.insert(1, dict(custom_opt))
+
+    if failover_model and not any(opt.get("value") == failover_model for opt in _provider_models):
+        custom_fo_opt = {"value": failover_model, "label": f"{failover_model} (current / custom)"}
+        _provider_models.insert(0, dict(custom_fo_opt))
+        _all_models.insert(1, dict(custom_fo_opt))
+
+    is_custom_primary = bool(model and (model not in (model_catalog or {}).get(provider, [])))
+    is_custom_fo = bool(failover_model and (failover_model not in (model_catalog or {}).get(failover_provider or "openai", [])))
+
     _td = tenant_defaults or {}
     _kf = kernel_flags_config or {}
     _pmt = purpose_max_tokens_config or {}
     defaults = {
         "provider": provider,
         "model": model,
+        "custom_model": model if is_custom_primary else "",
         "base_url": base_url,
         "api_key": "",
         "code_model": code_model if code_model != model else "",
@@ -309,6 +325,7 @@ def build_llm_form(
         "failover_enabled": bool(failover_enabled),
         "failover_provider": failover_provider or "openai",
         "failover_model": failover_model,
+        "failover_custom_model": failover_model if is_custom_fo else "",
         "failover_base_url": failover_base_url,
         "failover_api_key": "",
         # Voice / STT (Whisper) BYOK (2026-08-29 owner report, pass 2): "чтобы
@@ -551,7 +568,7 @@ def build_llm_form(
                 ui.Text("Custom / Manual Model ID (optional — overrides dropdown if entered)", variant="caption"),
                 ui.Input(
                     placeholder="e.g. z-ai/glm-5.3 or custom-model-name",
-                    param_name="custom_model", value="",
+                    param_name="custom_model", value=defaults.get("custom_model", ""),
                 ),
                 ui.Text("API Key — for the provider selected above", variant="caption"),
                 ui.Input(
@@ -606,7 +623,7 @@ def build_llm_form(
                 ui.Text("Custom / Manual Failover Model ID (optional — overrides dropdown if entered)", variant="caption"),
                 ui.Input(
                     placeholder="e.g. z-ai/glm-5.3 or custom-model-name",
-                    param_name="failover_custom_model", value="",
+                    param_name="failover_custom_model", value=defaults.get("failover_custom_model", ""),
                 ),
                 ui.Text("Failover API Key", variant="caption"),
                 ui.Input(
