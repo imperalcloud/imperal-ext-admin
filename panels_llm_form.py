@@ -597,8 +597,8 @@ def build_llm_form(
             # ── 2 · Failover ──────────────────────────────────────
             ui.Section(title="\U0001f501 Failover", collapsible=True, children=[
                 ui.Text(
-                    "Fallback provider used automatically when the primary is "
-                    "unavailable or returns an error.",
+                    "Optional retry target used only after the primary fails. "
+                    "Leave its model blank to keep no global failover configured.",
                     variant="caption",
                 ),
                 ui.Toggle(
@@ -609,7 +609,7 @@ def build_llm_form(
                 ),
                 ui.Text("Failover Provider", variant="caption"),
                 ui.Select(
-                    options=provider_opts, value=failover_provider or "openai",
+                    options=provider_opts, value=failover_provider,
                     param_name="failover_provider",
                     placeholder="Select failover provider",
                 ),

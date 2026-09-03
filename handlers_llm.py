@@ -223,6 +223,16 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if _stt:
             current["stt"] = _stt
 
+        # URLs are configuration, not write-only secrets: an explicit blank
+        # removes a stale custom endpoint instead of silently retaining it.
+        # API-key blanks deliberately retain their existing value; URL blanks
+        # must not behave that way because they change where requests go.
+        for _url_key in ("base_url", "failover_base_url"):
+            if _url_key in params.model_fields_set and not str(
+                getattr(params, _url_key) or ""
+            ).strip():
+                current.pop(_url_key, None)
+
         current.update(updates)
 
         # ── Atomically prune stale empty keys / ghost overrides ─────

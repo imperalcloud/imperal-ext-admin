@@ -194,3 +194,26 @@ def test_failover_pair_keys_survive_a_blank_model():
     for name in ("failover_model", "failover_provider", "failover_api_key",
                  "failover_enabled"):
         assert name in fields, f"{name} must stay writable from the panel"
+
+
+def test_blank_failover_provider_stays_unselected():
+    """An absent fallback must not render as an implicit OpenAI fallback."""
+    controls = _controls(_form())
+    failover = controls["failover_provider"]
+    assert len(failover) == 1
+    assert failover[0].get("value") == ""
+
+
+def test_failover_base_url_remains_a_panel_writable_field():
+    """The endpoint belongs to the fallback pair and must remain configurable."""
+    assert "failover_base_url" in SaveLlmConfigParams.model_fields
+    controls = _controls(_form())
+    assert len(controls.get("failover_base_url", [])) == 1
+
+
+def test_explicitly_blank_urls_remove_stale_endpoints():
+    """URLs are routing configuration, unlike masked write-only API keys."""
+    src = inspect.getsource(handlers_llm.fn_save_llm_config)
+    assert 'for _url_key in ("base_url", "failover_base_url"):' in src
+    assert "_url_key in params.model_fields_set" in src
+    assert "current.pop(_url_key, None)" in src
