@@ -48,6 +48,8 @@ _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
     ("o1", "openai"),
     ("o3", "openai"),
     ("o4", "openai"),
+    ("sol", "openai"),
+    ("fable", "openai"),
     ("chatgpt", "openai"),
     ("gemini", "google"),
     # OpenRouter multi-vendor router (model format vendor/model-id, e.g. z-ai/glm-5.3)
@@ -74,8 +76,8 @@ _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
 
 # Resilience-only fallback (used iff BOTH live fetch and cache fail).
 FALLBACK_CATALOG: dict[str, list[str]] = {
-    "anthropic": ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
-    "openai": ["gpt-5.6", "gpt-5.6-sol", "gpt-5", "gpt-5-mini", "gpt-4o", "o4", "o3", "o3-mini"],
+    "anthropic": ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-3-7-sonnet", "claude-haiku-4-5-20251001"],
+    "openai": ["gpt-5.6", "gpt-5.6-sol", "sol-1", "fable-5.1", "gpt-5", "gpt-5-mini", "gpt-4o", "o4", "o3", "o3-mini"],
     "qwen": ["qwen3.8-max", "qwen3.8-flash", "qwen3.7-max", "qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
     "deepseek": ["deepseek-v4", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-v3", "deepseek-r1"],
     # Provider dropdown has always offered "google" (_env_providers in
