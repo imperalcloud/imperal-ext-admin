@@ -559,7 +559,7 @@ def build_llm_form(
         ),
         ui.Stack([
             ui.Text("Global Thinking Budget (tokens)", variant="body"),
-            ui.Text("Max reasoning tokens for Claude 3.7 thinking / Gemini. Blank = provider default.", variant="caption"),
+            ui.Text("Max reasoning tokens for Claude 3.7 / Gemini 2.5+ / Qwen / DeepSeek (1,024 – 64,000). Anthropic requires temperature=1.0 and max_tokens > budget; the kernel guards this automatically. Blank = provider default.", variant="caption"),
         ], gap=0),
         ui.Input(
             placeholder="inherit (default)",
@@ -568,7 +568,7 @@ def build_llm_form(
         ),
         ui.Stack([
             ui.Text("Webbee Code Thinking Budget (tokens)", variant="body"),
-            ui.Text("Reasoning token budget for purpose=code (terminal & marathon agent). Recommended 8000-16000 for complex refactoring.", variant="caption"),
+            ui.Text("Reasoning token budget for purpose=code (terminal & marathon agent). Recommended 8000–16000 for complex architectural refactoring and zero-shot benchmark logic.", variant="caption"),
         ], gap=0),
         ui.Input(
             placeholder="inherit (default)",
