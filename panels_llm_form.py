@@ -306,6 +306,13 @@ def build_llm_form(
         # others above; no tenant_defaults fallback exists since this key
         # never had a form row before this fix (nothing legacy to read back).
         "code_max_tokens": int(_pmt.get("code_max_tokens", 0)) or "",
+        # ICNLI Thinking & Reasoning Governance is persisted directly in
+        # imperal:config:llm. A blank budget means provider-native default;
+        # mode defaults to adaptive behavior rather than silently forcing a
+        # provider-specific reasoning implementation.
+        "thinking_mode": str(_kf.get("thinking_mode", "auto") or "auto"),
+        "thinking_budget": int(_kf.get("thinking_budget", 0)) or "",
+        "code_thinking_budget": int(_kf.get("code_thinking_budget", 0)) or "",
         # Federalization 2026-05-19 — feature flags (was env-only)
         # FLAG READ PATH (fixed 2026-08-18): these two are SAVED into
         # imperal:config:llm (they are not in the handler's skip_fields), but
@@ -532,6 +539,43 @@ def build_llm_form(
                 value=str(defaults[pname]),
             ),
         ])
+
+    # ── Category 5b: Extended Thinking & Reasoning Governance (ICNLI) ───────
+    thinking_children: list = [
+        ui.Text(
+            "Extended Thinking (Chain-of-Thought) and Reasoning token budgets across "
+            "Claude 3.7 / Gemini 2.5+ / OpenAI o-series / DeepSeek / Qwen. "
+            "Controls how deep the model thinks before returning actions or final answers.",
+            variant="caption",
+        ),
+        ui.Stack([
+            ui.Text("Thinking Mode (auto / on / off)", variant="body"),
+            ui.Text("Global thinking switch. 'auto' = model decides, 'on' = force deep CoT, 'off' = max speed / low latency.", variant="caption"),
+        ], gap=0),
+        ui.Input(
+            placeholder="auto (default)",
+            param_name="thinking_mode",
+            value=str(defaults.get("thinking_mode", "auto")),
+        ),
+        ui.Stack([
+            ui.Text("Global Thinking Budget (tokens)", variant="body"),
+            ui.Text("Max reasoning tokens for Claude 3.7 thinking / Gemini. Blank = provider default.", variant="caption"),
+        ], gap=0),
+        ui.Input(
+            placeholder="inherit (default)",
+            param_name="thinking_budget",
+            value=str(defaults.get("thinking_budget", "")),
+        ),
+        ui.Stack([
+            ui.Text("Webbee Code Thinking Budget (tokens)", variant="body"),
+            ui.Text("Reasoning token budget for purpose=code (terminal & marathon agent). Recommended 8000-16000 for complex refactoring.", variant="caption"),
+        ], gap=0),
+        ui.Input(
+            placeholder="inherit (default)",
+            param_name="code_thinking_budget",
+            value=str(defaults.get("code_thinking_budget", "")),
+        ),
+    ]
 
     return ui.Form(
         action="save_llm_config",

@@ -328,6 +328,23 @@ class SaveLlmConfigParams(BaseModel):
             "every Webbee Code terminal and marathon turn. NULL = inherit."
         ),
     )
+    # ── Thinking & Reasoning Governance (ICNLI Multi-Model) ─────────
+    thinking_mode: Optional[str] = Field(
+        default=None,
+        description="Extended thinking mode: 'auto' (default) | 'on' (force deep reasoning) | 'off' (disable reasoning for maximum speed)",
+    )
+    thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Global thinking budget tokens cap for models supporting extended thinking (Anthropic Claude 3.7 / Gemini / OpenAI o-series). NULL = inherit model default.",
+    )
+    code_thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Coding brain thinking budget tokens cap (purpose=code). Higher = deep reasoning and plan verification before executing file/terminal actions.",
+    )
     resolve_max_tokens: Optional[int] = Field(
         default=None,
         description=(
