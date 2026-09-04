@@ -711,6 +711,10 @@ def build_llm_form(
             ui.Section(title="\U0001f4cf Per-Purpose Token Budgets (max_tokens)",
                        collapsible=True, children=budget_children),
 
+            # ── 5b · Extended Thinking & Reasoning Governance (ICNLI) ──
+            ui.Section(title="\U0001f9e0 Thinking & Reasoning Governance (ICNLI Multi-Model)",
+                       collapsible=True, children=thinking_children),
+
             # ── 6 · Token Budget Controls (TBC) ───────────────────
             build_tbc_section(defaults),
 
