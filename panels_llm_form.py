@@ -172,6 +172,7 @@ def build_llm_form(
     supersmart_fallback_model: str = "",
     ultrasmart_model: str = "",
     ultrasmart_fallback_model: str = "",
+    routing_fallback_model: str = "",
     # Live model catalogue fetched from the provider APIs (panels_llm_models.
     # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
     model_catalog: dict | None = None,
@@ -276,6 +277,7 @@ def build_llm_form(
         "ultrasmart_model": ultrasmart_model if ultrasmart_model != model else "",
         "ultrasmart_fallback_model": ultrasmart_fallback_model,
         "routing_model": routing_model if routing_model != model else "",
+        "routing_fallback_model": routing_fallback_model,
         "execution_model": execution_model if execution_model != model else "",
         "navigate_model": navigate_model if navigate_model != model else "",
         "chain_narrative_model": chain_narrative_model if chain_narrative_model != model else "",
@@ -465,6 +467,21 @@ def build_llm_form(
                     options=_all_models,
                     value=defaults.get("code_fallback_model", ""),
                     param_name="code_fallback_model",
+                    placeholder="No fallback",
+                ),
+            ])
+        if key == "routing":
+            # Routing fallback model — one retry on this model when routing errors.
+            model_children.extend([
+                ui.Text(
+                    "Fallback model — used only when routing primary errors "
+                    "(one retry). Blank = no fallback.",
+                    variant="caption",
+                ),
+                ui.Select(
+                    options=_all_models,
+                    value=defaults.get("routing_fallback_model", ""),
+                    param_name="routing_fallback_model",
                     placeholder="No fallback",
                 ),
             ])
