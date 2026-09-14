@@ -68,11 +68,14 @@ _PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
 _OPENAI_EXCLUDE = (
     "transcribe", "tts", "audio", "image", "realtime", "search", "codex",
     "deep-research", "moderation", "embedding", "whisper", "diarize", "instruct",
+    "chat-latest",
 )
 # Dated snapshots (gpt-4.1-2025-04-14 / gpt-4-0613 / ...-20251001) — keep the
 # stable alias, drop the pinned snapshot. Applied to OpenAI only (Anthropic ids
 # are themselves canonical, e.g. claude-haiku-4-5-20251001).
 _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
+
+_OPENAI_EXPERIMENTAL_SUFFIXES = ("-luna", "-sol", "-terra", "-astra", "-live")
 
 # Resilience-only fallback (used iff BOTH live fetch and cache fail).
 FALLBACK_CATALOG: dict[str, list[str]] = {
@@ -145,15 +148,38 @@ def _filter_openai(ids: list[str]) -> list[str]:
             continue
         if any(tok in i for tok in _OPENAI_EXCLUDE):
             continue
+        if any(i.endswith(suf) for suf in _OPENAI_EXPERIMENTAL_SUFFIXES):
+            continue
         if _OPENAI_DATE_SUFFIX.search(i):
             continue
         out.add(i)
-    return sorted(out)
+    # Sort prioritizing modern flagships (gpt-5, o3, o1, gpt-4o, gpt-4.1)
+    priority = ["gpt-5", "o3", "o1", "gpt-4o", "gpt-4.1", "gpt-4"]
+
+    def sort_key(m: str):
+        for idx, pref in enumerate(priority):
+            if m.startswith(pref):
+                return (idx, m)
+        return (len(priority), m)
+
+    sorted_models = sorted(out, key=sort_key)
+    # Keep up to 16 flagship models to preserve UI payload safety under the 256KB wire cap
+    return sorted_models[:16]
 
 
 def _filter_anthropic(ids: list[str]) -> list[str]:
-    """All claude-* models are chat-capable."""
-    return sorted({i for i in ids if i.startswith("claude-")})
+    """All claude-* models are chat-capable. Keep top active flagship models."""
+    out = {i for i in ids if i.startswith("claude-")}
+    priority = ["claude-opus-5", "claude-sonnet-5", "claude-opus-4", "claude-sonnet-4", "claude-3-7-sonnet", "claude-haiku-4"]
+
+    def sort_key(m: str):
+        for idx, pref in enumerate(priority):
+            if m.startswith(pref):
+                return (idx, m)
+        return (len(priority), m)
+
+    sorted_models = sorted(out, key=sort_key)
+    return sorted_models[:10]
 
 
 # DashScope lists 160+ ids incl. vision/audio/embedding/rerank families.
