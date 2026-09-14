@@ -148,7 +148,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                          # stored provider must follow the model, or the kernel
                          # pairs an openai provider with a qwen model -> 404.
                          "failover",
-                         "routing", "execution", "navigate", "chain_narrative", "judge",
+                         "routing", "routing_fallback", "execution", "navigate", "chain_narrative", "judge",
                          # Federalization 3.1 -- new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _model_key = f"{_purpose}_model"

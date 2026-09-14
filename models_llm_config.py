@@ -77,6 +77,8 @@ class SaveLlmConfigParams(BaseModel):
     ultrasmart_fallback_provider: str = Field(default="", description="Webbee UltraSmart tier — fallback provider (auto-inferred from the fallback model id when left blank)")
     routing_model: str = Field(default="", description="Routing model override")
     routing_provider: str = Field(default="", description="Routing provider override")
+    routing_fallback_model: str = Field(default="", description="Routing fallback model — used for ONE retry only when routing primary errors (e.g. z-ai/glm-5.3)")
+    routing_fallback_provider: str = Field(default="", description="Routing fallback provider (auto-inferred from model id when left blank)")
     execution_model: str = Field(default="", description="Execution model override")
     execution_provider: str = Field(default="", description="Execution provider override")
     navigate_model: str = Field(default="", description="Navigate model override")
