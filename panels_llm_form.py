@@ -313,8 +313,18 @@ def build_llm_form(
         # mode defaults to adaptive behavior rather than silently forcing a
         # provider-specific reasoning implementation.
         "thinking_mode": str(_kf.get("thinking_mode", "auto") or "auto"),
+        "thinking_effort": str(_kf.get("thinking_effort", "") or ""),
         "thinking_budget": int(_kf.get("thinking_budget", 0)) or "",
+        "code_thinking_effort": str(_kf.get("code_thinking_effort", "") or ""),
         "code_thinking_budget": int(_kf.get("code_thinking_budget", 0)) or "",
+        "panel_thinking_effort": str(_kf.get("panel_thinking_effort", "max") or "max"),
+        "panel_thinking_budget": int(_kf.get("panel_thinking_budget", 0)) or "",
+        "webbeesmart_thinking_effort": str(_kf.get("webbeesmart_thinking_effort", "") or ""),
+        "webbeesmart_thinking_budget": int(_kf.get("webbeesmart_thinking_budget", 0)) or "",
+        "supersmart_thinking_effort": str(_kf.get("supersmart_thinking_effort", "") or ""),
+        "supersmart_thinking_budget": int(_kf.get("supersmart_thinking_budget", 0)) or "",
+        "ultrasmart_thinking_effort": str(_kf.get("ultrasmart_thinking_effort", "max") or "max"),
+        "ultrasmart_thinking_budget": int(_kf.get("ultrasmart_thinking_budget", 0)) or "",
         # Federalization 2026-05-19 — feature flags (was env-only)
         # FLAG READ PATH (fixed 2026-08-18): these two are SAVED into
         # imperal:config:llm (they are not in the handler's skip_fields), but
@@ -558,10 +568,19 @@ def build_llm_form(
         ])
 
     # ── Category 5b: Extended Thinking & Reasoning Governance (ICNLI) ───────
+    _effort_opts = [
+        {"label": "Inherit / Provider Default", "value": ""},
+        {"label": "None (Disable reasoning / fast)", "value": "none"},
+        {"label": "Low", "value": "low"},
+        {"label": "Medium", "value": "medium"},
+        {"label": "High", "value": "high"},
+        {"label": "Max (Deepest reasoning / verification)", "value": "max"},
+    ]
+
     thinking_children: list = [
         ui.Text(
-            "Extended Thinking (Chain-of-Thought) and Reasoning token budgets across "
-            "Claude 3.7 / Gemini 2.5+ / OpenAI o-series / DeepSeek / Qwen. "
+            "Extended Thinking (Chain-of-Thought), Reasoning Effort (hardness) and token budgets across "
+            "Claude 3.7 / Gemini 2.5+ / OpenAI o-series / GPT-5 / DeepSeek / Qwen. "
             "Controls how deep the model thinks before returning actions or final answers.",
             variant="caption",
         ),
@@ -575,6 +594,16 @@ def build_llm_form(
             value=str(defaults.get("thinking_mode", "auto")),
         ),
         ui.Stack([
+            ui.Text("Global Reasoning Effort (hardness)", variant="body"),
+            ui.Text("Controls reasoning effort level for OpenAI o-series/GPT-5, Gemini 2.5+, Claude 3.7.", variant="caption"),
+        ], gap=0),
+        ui.Select(
+            options=_effort_opts,
+            param_name="thinking_effort",
+            value=str(defaults.get("thinking_effort", "")),
+            placeholder="Inherit / Provider Default",
+        ),
+        ui.Stack([
             ui.Text("Global Thinking Budget (tokens)", variant="body"),
             ui.Text("Max reasoning tokens for Claude 3.7 / Gemini 2.5+ / Qwen / DeepSeek (1,024 – 64,000). Anthropic requires temperature=1.0 and max_tokens > budget; the kernel guards this automatically. Blank = provider default.", variant="caption"),
         ], gap=0),
@@ -583,9 +612,40 @@ def build_llm_form(
             param_name="thinking_budget",
             value=str(defaults.get("thinking_budget", "")),
         ),
+        ui.Divider(),
+        ui.Stack([
+            ui.Text("Webbee Panel UI Reasoning Effort (Default MAX)", variant="body"),
+            ui.Text("Web Panel conversation model reasoning effort. Default is MAX for deepest reasoning and full context comprehension.", variant="caption"),
+        ], gap=0),
+        ui.Select(
+            options=_effort_opts,
+            param_name="panel_thinking_effort",
+            value=str(defaults.get("panel_thinking_effort", "max")),
+            placeholder="Max (Deepest reasoning / verification)",
+        ),
+        ui.Stack([
+            ui.Text("Webbee Panel UI Thinking Budget (tokens)", variant="body"),
+            ui.Text("Token budget for Web Panel reasoning. Blank = maximum available model budget.", variant="caption"),
+        ], gap=0),
+        ui.Input(
+            placeholder="inherit (max)",
+            param_name="panel_thinking_budget",
+            value=str(defaults.get("panel_thinking_budget", "")),
+        ),
+        ui.Divider(),
+        ui.Stack([
+            ui.Text("Webbee Code Reasoning Effort (hardness)", variant="body"),
+            ui.Text("Reasoning effort for coding brain (purpose=code).", variant="caption"),
+        ], gap=0),
+        ui.Select(
+            options=_effort_opts,
+            param_name="code_thinking_effort",
+            value=str(defaults.get("code_thinking_effort", "")),
+            placeholder="Inherit / Provider Default",
+        ),
         ui.Stack([
             ui.Text("Webbee Code Thinking Budget (tokens)", variant="body"),
-            ui.Text("Reasoning token budget for purpose=code (terminal & marathon agent). Recommended 8000–16000 for complex architectural refactoring and zero-shot benchmark logic.", variant="caption"),
+            ui.Text("Reasoning token budget for purpose=code (terminal & marathon agent). Recommended 8000–32000 for complex architectural refactoring and zero-shot benchmark logic.", variant="caption"),
         ], gap=0),
         ui.Input(
             placeholder="inherit (default)",

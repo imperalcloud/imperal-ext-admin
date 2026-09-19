@@ -335,17 +335,65 @@ class SaveLlmConfigParams(BaseModel):
         default=None,
         description="Extended thinking mode: 'auto' (default) | 'on' (force deep reasoning) | 'off' (disable reasoning for maximum speed)",
     )
+    thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Global reasoning effort: 'none' | 'low' | 'medium' | 'high' | 'max' (OpenAI o-series / GPT-5 / Claude 3.7 / Gemini 2.5+ / Qwen / DeepSeek).",
+    )
     thinking_budget: Optional[int] = Field(
         default=None,
         ge=0,
         le=64000,
         description="Global thinking budget tokens cap for models supporting extended thinking (Anthropic Claude 3.7 / Gemini / OpenAI o-series). NULL = inherit model default.",
     )
+    code_thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Coding brain reasoning effort (purpose=code): 'none' | 'low' | 'medium' | 'high' | 'max'. Default high/max for deep reasoning.",
+    )
     code_thinking_budget: Optional[int] = Field(
         default=None,
         ge=0,
         le=64000,
         description="Coding brain thinking budget tokens cap (purpose=code). Higher = deep reasoning and plan verification before executing file/terminal actions.",
+    )
+    panel_thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Panel UI agent reasoning effort: 'none' | 'low' | 'medium' | 'high' | 'max'. Default 'max' for deepest reasoning on web-panel.",
+    )
+    panel_thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Panel UI agent thinking budget tokens cap. NULL = inherits maximum reasoning budget.",
+    )
+    webbeesmart_thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Webbee Smart tier reasoning effort ('low' | 'medium' | 'high' | 'max').",
+    )
+    webbeesmart_thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Webbee Smart tier thinking budget tokens.",
+    )
+    supersmart_thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Webbee SuperSmart tier reasoning effort ('low' | 'medium' | 'high' | 'max').",
+    )
+    supersmart_thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Webbee SuperSmart tier thinking budget tokens.",
+    )
+    ultrasmart_thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Webbee UltraSmart tier reasoning effort ('low' | 'medium' | 'high' | 'max'). Default 'max'.",
+    )
+    ultrasmart_thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Webbee UltraSmart tier thinking budget tokens. Default top reasoning budget.",
     )
     resolve_max_tokens: Optional[int] = Field(
         default=None,
