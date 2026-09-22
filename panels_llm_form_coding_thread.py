@@ -28,15 +28,12 @@ def build_coding_thread_section(defaults: dict):
         title="\U0001f9f5 Webbee Code — Thread Compaction", collapsible=True,
         children=[
             ui.Text(
-                "The coding agent's mind (the whole conversation thread) NEVER "
-                "truncates — when it grows past a budget, the OLDEST span is "
-                "folded into a maintained digest instead of being dropped. These "
-                "knobs tune that folding. A guaranteed-progress fallback (a "
-                "deterministic, no-LLM digest) kicks in automatically if the "
-                "distiller LLM is unavailable or its reply is truncated/unparseable "
-                "— the thread can never grow without bound, even during an LLM "
-                "outage. Consumer: core/coding_thread.py + "
-                "activities/coding_thread.py:compact_coding_thread.",
+                "The coding agent's mind operates on Snapshot-First mechanical retention "
+                "(I-ZERO-LLM-COMPACTION-LAG) — when thread history grows past budget, "
+                "oldest spans stream immediately into the cold vault archive (thread_archive) "
+                "with zero LLM compaction lag. These knobs tune window bounds, "
+                "verbatim message floors, and fallback retention limits. Consumer: "
+                "core/coding_thread.py + activities/coding_thread.py.",
                 variant="subtitle",
             ),
 
