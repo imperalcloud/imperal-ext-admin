@@ -25,7 +25,7 @@ def build_coding_thread_section(defaults: dict):
     when nothing is configured (core/coding_thread.py constants).
     """
     return ui.Section(
-        title="\U0001f9f5 Webbee Code — Thread Compaction", collapsible=True,
+        title="\U0001f4be Webbee Code — Snapshot-First Retention & Archive", collapsible=True,
         children=[
             ui.Text(
                 "The coding agent's mind operates on Snapshot-First mechanical retention "
@@ -38,11 +38,10 @@ def build_coding_thread_section(defaults: dict):
             ),
 
             ui.Text(
-                "coding_thread_window_budget_chars — UNIT: characters. Serialized "
-                "thread size that triggers a compaction round. Default 250000. "
-                "Lower = compacts earlier/more often (cheaper turns, more digest "
-                "cycles); higher = keeps more verbatim history before the first "
-                "fold.",
+                "coding_thread_window_budget_chars — UNIT: characters. Active thread "
+                "history budget before older spans stream to snapshot archive. "
+                "Default 250000. Lower = streams earlier (leaner active window, faster turns); "
+                "higher = keeps more verbatim history in the live active thread.",
                 variant="caption",
             ),
             ui.Slider(
@@ -54,7 +53,7 @@ def build_coding_thread_section(defaults: dict):
 
             ui.Text(
                 "coding_thread_keep_recent — UNIT: messages. How many of the "
-                "MOST RECENT messages always survive verbatim (never folded). "
+                "MOST RECENT messages always survive verbatim in the live window (never archived). "
                 "Default 20. Higher = more exact recent context, more chars per "
                 "step.",
                 variant="caption",
@@ -67,10 +66,8 @@ def build_coding_thread_section(defaults: dict):
             ),
 
             ui.Text(
-                "coding_thread_input_cap — UNIT: characters. Max size of the "
-                "oldest span folded into ONE digest LLM call (progressive "
-                "folding — a huge backlog folds over several rounds). Default "
-                "120000. Higher = fewer rounds but a heavier single call.",
+                "coding_thread_input_cap — UNIT: characters. Maximum chunk size "
+                "processed per archive retention pass. Default 120000.",
                 variant="caption",
             ),
             ui.Slider(
@@ -81,9 +78,9 @@ def build_coding_thread_section(defaults: dict):
             ),
 
             ui.Text(
-                "coding_thread_max_rounds — UNIT: rounds. Max fold rounds ONE "
-                "compact_coding_thread invocation runs (catch-up folding for a "
-                "thread that fell far behind budget). Kernel default 12.",
+                "coding_thread_max_rounds — UNIT: rounds. Max batch rounds "
+                "executed when catching up a large backlog of unarchived turns. "
+                "Kernel default 12.",
                 variant="caption",
             ),
             ui.Slider(
@@ -95,8 +92,8 @@ def build_coding_thread_section(defaults: dict):
 
             ui.Text(
                 "coding_thread_time_budget_s — UNIT: seconds. Wall-clock ceiling "
-                "for a multi-round catch-up (stays safely inside the workflow's "
-                "150s activity timeout). Default 100.",
+                "for multi-round retention catch-up (stays safely inside the workflow "
+                "timeout). Default 100.",
                 variant="caption",
             ),
             ui.Slider(
@@ -107,37 +104,20 @@ def build_coding_thread_section(defaults: dict):
             ),
 
             ui.Text(
-                "coding_thread_fold_max_tokens — UNIT: tokens. Base response cap "
-                "for the fold digest LLM call. Kernel default 24576 — on a "
-                "truncated/unparseable reply the kernel automatically retries "
-                "ONCE at coding_thread_fold_retry_max_tokens before falling back "
-                "to the mechanical digest, so raising this lowers how often that "
-                "retry is even needed (Cyrillic-heavy / other dense-token spans "
-                "truncate sooner).",
+                "coding_thread_fold_max_tokens — UNIT: tokens. Token cap for "
+                "snapshot digest synthesis. Kernel default 24576.",
                 variant="caption",
             ),
             ui.Slider(
-                # max raised 16000 -> 65536 (2026-08-18): the kernel's own
-                # constant is 24576, so the old ceiling made the REAL running
-                # value impossible to enter from the panel.
                 min=1024, max=65_536, step=256,
                 value=defaults["coding_thread_fold_max_tokens"],
                 label="coding_thread_fold_max_tokens (tokens)",
                 param_name="coding_thread_fold_max_tokens",
             ),
 
-            # ORPHAN READER FIX (2026-08-18): the kernel has read this key
-            # since the retry path shipped (activities/coding_thread.py:197,
-            # same _resolve_compact_setting table as its six sisters above) but
-            # it was the ONE row of that table with no panel control -- so the
-            # retry budget was stuck at the literal 49152 forever.
             ui.Text(
-                "coding_thread_fold_retry_max_tokens — UNIT: tokens. Response "
-                "cap for the ONE automatic retry after a truncated/unparseable "
-                "fold. Kernel default 49152 (2x the base cap). If this retry "
-                "also fails the kernel falls back to a mechanical no-LLM digest, "
-                "so the thread ALWAYS shrinks — this knob only decides how often "
-                "that cheaper fallback is reached.",
+                "coding_thread_fold_retry_max_tokens — UNIT: tokens. Token cap for "
+                "fallback retry if synthesis reply is truncated. Kernel default 49152.",
                 variant="caption",
             ),
             ui.Slider(

@@ -671,31 +671,24 @@ class SaveLlmConfigParams(BaseModel):
         ),
     )
 
-    # ── Webbee Code coding-thread compaction (I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE,
-    # 2026-07-31) -- the coherent-mind thread NEVER truncates; compaction (folding the
-    # oldest span into the working-model digest) is the ONLY scaling mechanism. These
-    # 6 knobs were previously hardcoded constants / activity-payload defaults; now
-    # tenant-wide adjustable here, with an explicit per-call payload value still
-    # winning (caller-explicit invariant, mirrors every other max_tokens knob).
+    # ── Webbee Code coding-thread retention (I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE,
+    # 2026-07-31) -- Snapshot-First mechanical retention (I-ZERO-LLM-COMPACTION-LAG).
     coding_thread_window_budget_chars: Optional[int] = Field(
         default=None, ge=20_000, le=2_000_000,
         description=(
-            "UNIT: characters. Serialized-message size that triggers compaction "
-            "(fold the oldest span into the digest). Default 250000. Lower = "
-            "compacts earlier/more often (smaller per-step thread, cheaper turns, "
-            "more digest cycles); higher = keeps more verbatim history before the "
-            "first fold. Reads at core/coding_thread.py:THREAD_WINDOW_BUDGET_CHARS "
-            "via activities/coding_thread.py:compact_coding_thread."
+            "UNIT: characters. Active thread history budget before older spans stream "
+            "to snapshot archive. Default 250000. Lower = streams earlier (leaner active "
+            "window, faster turns); higher = keeps more verbatim history in the live active thread. "
+            "Reads at core/coding_thread.py:THREAD_WINDOW_BUDGET_CHARS via activities/coding_thread.py."
         ),
     )
     coding_thread_keep_recent: Optional[int] = Field(
         default=None, ge=4, le=200,
         description=(
             "UNIT: messages. How many of the MOST RECENT messages always survive "
-            "verbatim (never folded) on every compaction round. Default 20. Higher "
-            "= more recent context stays exact, more chars per step; lower = "
-            "tighter recent window, compacts more aggressively. Reads at "
-            "core/coding_thread.py:THREAD_KEEP_RECENT."
+            "verbatim in the live window (never archived). Default 20. Higher = "
+            "more recent context stays exact, more chars per step; lower = "
+            "tighter recent window. Reads at core/coding_thread.py:THREAD_KEEP_RECENT."
         ),
     )
     coding_thread_input_cap: Optional[int] = Field(
