@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app import (
     chat, ActionResult, _admin_put, _registry_get, _registry_put, _resolve_app_id,
@@ -86,8 +86,7 @@ class SaveSkeletonParams(BaseModel):
     app_id: str = Field(description="Extension app_id")
     sections_json: str = Field(default="[]", description="JSON array of section configs")
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra='allow')
 
 
 # ── Helpers ────────────────────────────────────────────────────────── #
