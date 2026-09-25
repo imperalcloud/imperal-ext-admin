@@ -107,14 +107,14 @@ def _append_situational_card(children: list, users: list, extensions: list, llm:
                             label="Inspect Users",
                             risk="read",
                             shortcut="u",
-                            payload={"action": "navigate", "target": "management"},
+                            payload=ui.Call("__panel__tools", section="management", active="management").to_dict(),
                         ),
                         Affordance(
                             id="view_audit",
                             label="Audit Trail",
                             risk="read",
                             shortcut="a",
-                            payload={"action": "navigate", "target": "audit"},
+                            payload=ui.Call("__panel__tools", section="audit", active="audit").to_dict(),
                         ),
                     ],
                     cognitive=CognitiveContext(
@@ -137,7 +137,7 @@ def _append_situational_card(children: list, users: list, extensions: list, llm:
                 primary=True,
                 risk="write",
                 shortcut="r",
-                payload={"action": "navigate", "target": "extensions"},
+                payload=ui.Call("__panel__tools", section="extensions", active="extensions").to_dict(),
             ) if Affordance else {"id": "review_apps", "label": f"Review Apps ({len(pending_apps)})"}
         )
     if pending_payouts_count > 0:
@@ -148,7 +148,7 @@ def _append_situational_card(children: list, users: list, extensions: list, llm:
                 risk="write",
                 requires_confirmation=True,
                 shortcut="p",
-                payload={"action": "navigate", "target": "payouts"},
+                payload=ui.Call("__panel__tools", section="payouts", active="payouts").to_dict(),
             ) if Affordance else {"id": "review_payouts", "label": "Process Payouts"}
         )
 
