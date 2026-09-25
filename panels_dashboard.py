@@ -47,7 +47,7 @@ async def build_dashboard(ctx):
         ui.Card(
             title="Omnisearch (Global Control Plane)",
             content=ui.Stack([
-                ui.Input(param_name="omni_query", placeholder="Search users, roles, extensions (Cmd+K)...", label="Quick Jump"),
+                ui.Input(param_name="omni_query", placeholder="Search users, roles, extensions (Cmd+K)..."),
                 ui.Button(
                     label="Search System",
                     variant="secondary",

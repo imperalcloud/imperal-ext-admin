@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.13.1",
+  "sdk_version": "5.15.1",
   "app_id": "admin",
   "version": "5.11.0",
   "name": "Admin",
@@ -12604,6 +12604,18 @@
             "title": "Routing Provider",
             "type": "string"
           },
+          "routing_fallback_model": {
+            "default": "",
+            "description": "Routing fallback model — used for ONE retry only when routing primary errors (e.g. z-ai/glm-5.3)",
+            "title": "Routing Fallback Model",
+            "type": "string"
+          },
+          "routing_fallback_provider": {
+            "default": "",
+            "description": "Routing fallback provider (auto-inferred from model id when left blank)",
+            "title": "Routing Fallback Provider",
+            "type": "string"
+          },
           "execution_model": {
             "default": "",
             "description": "Execution model override",
@@ -13070,6 +13082,187 @@
             "description": "UNIT: tokens. max_tokens for the coding brain (purpose=code) — every Webbee Code terminal and marathon turn. NULL = inherit.",
             "title": "Code Max Tokens"
           },
+          "thinking_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Extended thinking mode: 'auto' (default) | 'on' (force deep reasoning) | 'off' (disable reasoning for maximum speed)",
+            "title": "Thinking Mode"
+          },
+          "thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Global reasoning effort: 'none' | 'low' | 'medium' | 'high' | 'max' (OpenAI o-series / GPT-5 / Claude 3.7 / Gemini 2.5+ / Qwen / DeepSeek).",
+            "title": "Thinking Effort"
+          },
+          "thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Global thinking budget tokens cap for models supporting extended thinking (Anthropic Claude 3.7 / Gemini / OpenAI o-series). NULL = inherit model default.",
+            "title": "Thinking Budget"
+          },
+          "code_thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Coding brain reasoning effort (purpose=code): 'none' | 'low' | 'medium' | 'high' | 'max'. Default high/max for deep reasoning.",
+            "title": "Code Thinking Effort"
+          },
+          "code_thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Coding brain thinking budget tokens cap (purpose=code). Higher = deep reasoning and plan verification before executing file/terminal actions.",
+            "title": "Code Thinking Budget"
+          },
+          "panel_thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Panel UI agent reasoning effort: 'none' | 'low' | 'medium' | 'high' | 'max'. Default 'max' for deepest reasoning on web-panel.",
+            "title": "Panel Thinking Effort"
+          },
+          "panel_thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Panel UI agent thinking budget tokens cap. NULL = inherits maximum reasoning budget.",
+            "title": "Panel Thinking Budget"
+          },
+          "webbeesmart_thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Webbee Smart tier reasoning effort ('low' | 'medium' | 'high' | 'max').",
+            "title": "Webbeesmart Thinking Effort"
+          },
+          "webbeesmart_thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Webbee Smart tier thinking budget tokens.",
+            "title": "Webbeesmart Thinking Budget"
+          },
+          "supersmart_thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Webbee SuperSmart tier reasoning effort ('low' | 'medium' | 'high' | 'max').",
+            "title": "Supersmart Thinking Effort"
+          },
+          "supersmart_thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Webbee SuperSmart tier thinking budget tokens.",
+            "title": "Supersmart Thinking Budget"
+          },
+          "ultrasmart_thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Webbee UltraSmart tier reasoning effort ('low' | 'medium' | 'high' | 'max'). Default 'max'.",
+            "title": "Ultrasmart Thinking Effort"
+          },
+          "ultrasmart_thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Webbee UltraSmart tier thinking budget tokens. Default top reasoning budget.",
+            "title": "Ultrasmart Thinking Budget"
+          },
           "resolve_max_tokens": {
             "anyOf": [
               {
@@ -13513,7 +13706,7 @@
               }
             ],
             "default": null,
-            "description": "UNIT: characters. Serialized-message size that triggers compaction (fold the oldest span into the digest). Default 250000. Lower = compacts earlier/more often (smaller per-step thread, cheaper turns, more digest cycles); higher = keeps more verbatim history before the first fold. Reads at core/coding_thread.py:THREAD_WINDOW_BUDGET_CHARS via activities/coding_thread.py:compact_coding_thread.",
+            "description": "UNIT: characters. Active thread history budget before older spans stream to snapshot archive. Default 250000. Lower = streams earlier (leaner active window, faster turns); higher = keeps more verbatim history in the live active thread. Reads at core/coding_thread.py:THREAD_WINDOW_BUDGET_CHARS via activities/coding_thread.py.",
             "title": "Coding Thread Window Budget Chars"
           },
           "coding_thread_keep_recent": {
@@ -13528,7 +13721,7 @@
               }
             ],
             "default": null,
-            "description": "UNIT: messages. How many of the MOST RECENT messages always survive verbatim (never folded) on every compaction round. Default 20. Higher = more recent context stays exact, more chars per step; lower = tighter recent window, compacts more aggressively. Reads at core/coding_thread.py:THREAD_KEEP_RECENT.",
+            "description": "UNIT: messages. How many of the MOST RECENT messages always survive verbatim in the live window (never archived). Default 20. Higher = more recent context stays exact, more chars per step; lower = tighter recent window. Reads at core/coding_thread.py:THREAD_KEEP_RECENT.",
             "title": "Coding Thread Keep Recent"
           },
           "coding_thread_input_cap": {
@@ -18328,7 +18521,79 @@
         "title": "BulkAppReviewParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "BulkAppReviewItem": {
+            "properties": {
+              "app_id": {
+                "title": "App Id",
+                "type": "string"
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Error"
+              }
+            },
+            "required": [
+              "app_id",
+              "status",
+              "ok"
+            ],
+            "title": "BulkAppReviewItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "success": {
+            "title": "Success",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/$defs/BulkAppReviewItem"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "action",
+          "total",
+          "success",
+          "failed",
+          "results"
+        ],
+        "title": "BulkAppReviewReceipt",
+        "type": "object"
+      },
       "event": "admin.bulk_apps_reviewed",
       "background": false,
       "long_running": false,
@@ -20952,6 +21217,94 @@
         "title": "UserSearchResponse",
         "type": "object",
         "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "omnisearch",
+      "description": "Omnisearch: instant cross-domain administrative lookup across users, extensions, roles, and platform settings",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "query": {
+            "description": "Search query across users, extensions, roles, and settings",
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "OmnisearchParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "OmnisearchResult": {
+            "properties": {
+              "category": {
+                "title": "Category",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "subtitle": {
+                "title": "Subtitle",
+                "type": "string"
+              },
+              "target_section": {
+                "title": "Target Section",
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "id",
+              "title",
+              "subtitle",
+              "target_section"
+            ],
+            "title": "OmnisearchResult",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/$defs/OmnisearchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query",
+          "total",
+          "results"
+        ],
+        "title": "OmnisearchResponse",
+        "type": "object"
       },
       "event": "",
       "background": false,
@@ -24876,7 +25229,20 @@
       "owner_chat_tool": "tool_admin_chat"
     }
   ],
-  "signals": [],
+  "signals": [
+    {
+      "name": "marketplace.app_submitted"
+    },
+    {
+      "name": "developer.payout_requested"
+    },
+    {
+      "name": "billing.payment_failed"
+    },
+    {
+      "name": "system.node_degraded"
+    }
+  ],
   "schedules": [],
   "required_scopes": [],
   "icon_size_bytes": 335,
@@ -24899,7 +25265,9 @@
       "tree": {},
       "icon": "Shield",
       "refresh": "manual",
-      "center_overlay": false
+      "center_overlay": false,
+      "stale_while_revalidate": true,
+      "cache_ttl": 60
     },
     {
       "panel_id": "tools",
@@ -24908,7 +25276,9 @@
       "tree": {},
       "icon": "LayoutDashboard",
       "refresh": "manual",
-      "center_overlay": true
+      "center_overlay": true,
+      "stale_while_revalidate": true,
+      "cache_ttl": 60
     }
   ]
 }

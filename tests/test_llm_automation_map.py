@@ -44,7 +44,8 @@ def _rendered_param_names() -> set[str]:
     for mod in ("panels_llm_form", "panels_llm_form_tbc",
                 "panels_llm_form_tbc_meta", "panels_llm_form_tiers",
                 "panels_llm_form_coding_thread"):
-        src = inspect.getsource(__import__(mod))
+        import importlib
+        src = inspect.getsource(importlib.import_module(mod))
         names.update(re.findall(r'param_name="([a-z0-9_]+)"', src))
 
     # loop-built rows: per-purpose models + per-purpose AI params

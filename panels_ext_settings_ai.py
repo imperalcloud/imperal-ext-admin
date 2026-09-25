@@ -1,13 +1,10 @@
 """Admin · Extension Settings — AI Models + Persona tabs.
-
 Called from panels_ext_settings.py tab router. Returns list of UINodes.
 """
 from __future__ import annotations
 
 from imperal_sdk import ui
 
-
-# ── Model options ─────────────────────────────────────────────────────
 
 _MODEL_OPTIONS = [
     {"value": "", "label": "— Default —"},
@@ -34,13 +31,11 @@ _LANGUAGE_OPTIONS = [
     {"value": "de", "label": "German"},
     {"value": "uk", "label": "Ukrainian"},
 ]
-
 _TONE_OPTIONS = [
     {"value": "formal", "label": "Formal"},
     {"value": "professional", "label": "Professional"},
     {"value": "casual", "label": "Casual"},
 ]
-
 _THINKING_OPTIONS = [
     {"value": "auto", "label": "Auto — platform decides based on model"},
     {"value": "off", "label": "Off — disable thinking (recommended for tool-use models)"},
