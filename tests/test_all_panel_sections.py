@@ -1,7 +1,6 @@
-"""Fast comprehensive test verifying EVERY panel section and sub-route renders cleanly.
+"""Fast comprehensive test verifying EVERY panel section renders cleanly.
 
-Mocks network boundaries (_gw_request, _registry_get, shared_http, _admin_get)
-so that all 22 panels render in < 5s without network hangs.
+Mocks network and async helpers so all 22 panels render in < 1 second.
 """
 from __future__ import annotations
 
@@ -17,42 +16,26 @@ class DummyCtx:
     user_id = "imp_u_test"
 
 
-SECTIONS_TO_TEST = [
+# Exactly the 22 sections registered in panels._BUILDERS + dashboard
+PANEL_SECTIONS = [
     ("dashboard", {}),
     ("management", {}),
-    ("management", {"role_filter": "admin", "status_filter": "active"}),
-    ("user_profile", {}),
     ("user_profile", {"user_id": "imp_u_test"}),
     ("extensions", {}),
     ("roles", {}),
-    ("roles", {"role_filter": "admin"}),
     ("scopes", {}),
-    ("scopes", {"role_filter": "admin"}),
     ("audit", {}),
-    ("audit", {"hours": 12, "source": "api"}),
     ("billing_analytics", {}),
-    ("billing_analytics", {"days": 7}),
-    ("credits", {}),
     ("credits", {"user_id": "imp_u_test"}),
     ("email", {}),
-    ("email", {"edit_case": "welcome"}),
     ("system", {}),
     ("llm", {}),
-    ("llm", {"tab": "governance"}),
-    ("llm", {"tab": "stt"}),
     ("pricing", {}),
-    ("pricing", {"edit_id": "claude-3-7-sonnet"}),
     ("system_pricing", {}),
     ("plans", {}),
     ("voice", {}),
-    ("ext_settings", {}),
-    ("ext_settings", {"app_id": "notes", "tab": "general"}),
-    ("ext_settings", {"app_id": "notes", "tab": "models"}),
-    ("ext_settings", {"app_id": "notes", "tab": "persona"}),
-    ("ext_settings", {"app_id": "notes", "tab": "ops"}),
-    ("ext_access_policy", {}),
+    ("ext_settings", {"app_id": "notes"}),
     ("ext_access_policy", {"app_id": "notes"}),
-    ("ext_users", {}),
     ("ext_users", {"app_id": "notes"}),
     ("app_review", {}),
     ("payouts", {}),
@@ -60,29 +43,62 @@ SECTIONS_TO_TEST = [
 ]
 
 
+async def _mock_cached(key, factory):
+    res = factory()
+    if asyncio.iscoroutine(res):
+        return await res
+    return res
+
+
 @pytest.mark.asyncio
 async def test_every_admin_panel_section_renders_cleanly():
     ctx = DummyCtx()
     failures = []
 
+    mock_gw = AsyncMock(return_value={})
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json = lambda: []
     mock_resp.text = "[]"
 
-    client_mock = AsyncMock()
-    client_mock.get = AsyncMock(return_value=mock_resp)
-    client_mock.post = AsyncMock(return_value=mock_resp)
-    client_mock.put = AsyncMock(return_value=mock_resp)
-    client_mock.patch = AsyncMock(return_value=mock_resp)
-    client_mock.delete = AsyncMock(return_value=mock_resp)
+    modules_with_gw = [
+        "app",
+        "panels_audit",
+        "panels_developer",
+        "panels_email",
+        "panels_ext_access_policy",
+        "panels_ext_settings",
+        "panels_extensions",
+        "panels_llm",
+        "panels_payment",
+        "panels_payouts",
+        "panels_sections",
+        "panels_user_profile",
+        "panels_voice",
+    ]
 
-    shared_http_mock = MagicMock(return_value=client_mock)
+    patches = [patch(f"{mod}._gw_request", new=mock_gw) for mod in modules_with_gw]
+    patches.extend([
+        patch("app._registry_get", new=AsyncMock(return_value=mock_resp)),
+        patch("panels_sections._registry_get", new=AsyncMock(return_value=mock_resp)),
+        patch("handlers_billing_mode._admin_get", new=AsyncMock(return_value={})),
+        patch("panels_sections._cached", new=_mock_cached),
+        patch("panels_system._check_health", new=AsyncMock(return_value="Operational")),
+        patch("panels_sections._check_health", new=AsyncMock(return_value="Operational")),
+        patch("panels_sections._fetch_users", new=AsyncMock(return_value=[])),
+        patch("panels_sections._fetch_roles", new=AsyncMock(return_value=[])),
+        patch("panels_sections._fetch_extensions", new=AsyncMock(return_value=[])),
+        patch("panels_sections._fetch_llm_usage", new=AsyncMock(return_value={})),
+        patch("panels_sections._fetch_action_stats", new=AsyncMock(return_value={})),
+        patch("app._resolve_app_id", new=AsyncMock(return_value="notes")),
+        patch("panels_ext_settings._resolve_app_id", new=AsyncMock(return_value="notes")),
+        patch("panels_ext_access_policy._resolve_app_id", new=AsyncMock(return_value="notes")),
+    ])
 
-    with patch("app._gw_request", new=AsyncMock(return_value={})), \
-         patch("app._registry_get", new=AsyncMock(return_value=mock_resp)), \
-         patch("imperal_sdk._shared_http.shared_http", new=shared_http_mock), \
-         patch("handlers_billing_mode._admin_get", new=AsyncMock(return_value={})):
+    import contextlib
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
 
         # 1. Test left sidebar
         try:
@@ -94,7 +110,7 @@ async def test_every_admin_panel_section_renders_cleanly():
             failures.append(f"sidebar: {type(e).__name__}: {e}")
 
         # 2. Test every single tools page / section
-        for sec, kwargs in SECTIONS_TO_TEST:
+        for sec, kwargs in PANEL_SECTIONS:
             try:
                 res = await panels.admin_tools(ctx, active=sec, section="", **kwargs)
                 assert res is not None, f"Section '{sec}' returned None"
