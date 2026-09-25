@@ -410,11 +410,11 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
                         value=str(attrs.get("max_concurrent_tasks", "")),
                         placeholder=f"Role default: {_role_default(roles, role, 'max_concurrent_tasks', 3)}",
                     ),
-                    ui.Text("History window (messages)", variant="caption"),
+                    ui.Text("History window (messages, default 6)", variant="caption"),
                     ui.Input(
                         param_name="context_window",
                         value=str(attrs.get("context_window", "")),
-                        placeholder=f"Role default: {_role_default(roles, role, 'context_window', 20)}",
+                        placeholder=f"Role default: {_role_default(roles, role, 'context_window', 6)}",
                     ),
                 ],
             ),

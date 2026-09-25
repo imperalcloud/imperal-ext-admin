@@ -3610,7 +3610,7 @@
               }
             ],
             "default": null,
-            "description": "History window in messages (5-200)",
+            "description": "History window in messages (1-50, default 6)",
             "title": "Context Window"
           }
         },

@@ -35,7 +35,7 @@ def _build_role_expanded(
     policy = role.get("confirmation_policy", "default_on")
     monthly_limit = role.get("monthly_action_limit", 500)
     max_tasks = role.get("max_concurrent_tasks", 3)
-    ctx_window = role.get("context_window", 20)
+    ctx_window = role.get("context_window", 6)
     default_exts = role.get("default_extensions", [])
 
     nodes: list = []
@@ -138,12 +138,12 @@ def _build_role_expanded(
                         value=str(monthly_limit),
                         placeholder="500",
                     ),
-                    ui.Text("History window in messages (5\u2013200)",
+                    ui.Text("History window in messages (1\u201350, default 6)",
                             variant="caption"),
                     ui.Input(
                         param_name="context_window",
                         value=str(ctx_window),
-                        placeholder="20",
+                        placeholder="6",
                     ),
                 ],
             ),

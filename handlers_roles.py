@@ -34,7 +34,7 @@ class UpdateRoleParams(BaseModel):
     default_scopes: Optional[list[str]] = Field(default=None, description="New default scopes")
     cascade: bool                       = Field(default=False, description="Update all users with this role")
     monthly_action_limit: Optional[int] = Field(default=None, description="Monthly action limit (0=unlimited)")
-    context_window: Optional[int]       = Field(default=None, description="History window in messages (5-200)")
+    context_window: Optional[int]       = Field(default=None, description="History window in messages (1-50, default 6)")
 
 
 class ListScopesParams(BaseModel):
