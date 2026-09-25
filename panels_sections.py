@@ -268,11 +268,7 @@ async def _check_health(name: str, url: str) -> str:
 # ── System ────────────────────────────────────────────────────────────
 
 async def build_system(ctx, **kwargs):
-    """System info — health + identity only.
-
-    Context/LLM tunables moved to LLM Config tab → Token Budget Controls
-    section (Phase 16, 2026-05-17). Federal rule 11: no orphan UI.
-    """
+    """System info — platform topology, health, temporal cluster, and services."""
     gw, reg = await asyncio.gather(
         _check_health("auth_gateway", f"{AUTH_GW}/healthz"),
         _check_health("registry", f"{REGISTRY_URL}/health"),
@@ -281,20 +277,30 @@ async def build_system(ctx, **kwargs):
     gw_color = "green" if gw == "Operational" else "red"
     reg_color = "green" if reg == "Operational" else "red"
 
+    # Core node services
+    temporal_status = "Operational" if TEMPORAL_HOST else "Unconfigured"
+    temporal_color = "green" if temporal_status == "Operational" else "amber"
+
     return ui.Stack(children=[
-        ui.Header("System", level=3),
+        ui.Header("System Architecture & Node Health", level=3),
         ui.Stats(children=[
             ui.Stat(label="Auth Gateway", value=gw, color=gw_color),
             ui.Stat(label="Registry", value=reg, color=reg_color),
+            ui.Stat(label="Temporal Cluster", value=temporal_status, color=temporal_color),
+            ui.Stat(label="Decentralized OS", value="Active", color="blue"),
         ], columns=2),
-        ui.KeyValue(items=[
-            {"key": "Platform", "value": "Imperal Cloud ICNLI OS v1.0"},
-            {"key": "Auth Gateway", "value": f"auth.imperal.io ({AUTH_GW})"},
-            {"key": "Registry", "value": f"api-server:8098 ({REGISTRY_URL})"},
-        ]),
+        ui.Card(
+            title="Cluster & Core Services",
+            content=ui.KeyValue(items=[
+                {"key": "OS Architecture", "value": "Imperal Cloud ICNLI AI Cloud OS (Decentralized)"},
+                {"key": "Auth Gateway", "value": f"auth.imperal.io ({AUTH_GW})"},
+                {"key": "Registry API", "value": f"api-server:8098 ({REGISTRY_URL})"},
+                {"key": "Temporal Host", "value": f"{TEMPORAL_HOST}:{TEMPORAL_PORT} (ns: {TEMPORAL_NAMESPACE})"},
+            ])
+        ),
         ui.Alert(
-            title="Context & LLM tunables",
-            message="Moved to the LLM Config tab → Token Budget Controls (Phase 16, 2026-05-17).",
+            title="Context & LLM Tunables",
+            message="LLM provider configurations and neural routing are managed under the LLM Config section.",
             type="info",
         ),
     ])
