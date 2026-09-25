@@ -173,8 +173,8 @@ def _append_situational_card(children: list, users: list, extensions: list, llm:
         children.append(
             ui.Alert(
                 title="Action Required",
-                content=ui.Text(summary_text),
-                variant="warning",
+                message=summary_text,
+                type="warning",
             )
         )
 
