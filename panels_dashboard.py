@@ -24,6 +24,13 @@ from panels_sections import (
     _fmt_tokens, _fmt_latency,
 )
 
+try:
+    from imperal_sdk.ui import MorphingState, Affordance, CognitiveContext
+except ImportError:
+    MorphingState = None
+    Affordance = None
+    CognitiveContext = None
+
 
 async def build_dashboard(ctx):
     """Dashboard: Card-wrapped stats + actions + LLM usage + status."""
@@ -37,16 +44,21 @@ async def build_dashboard(ctx):
 
     children = [
         ui.Header("Dashboard", level=3),
+    ]
 
-        # 1 · Overview — 2x2 grid (no icons — matches React MetricCard)
+    # Dynamic Situational Intelligence (ICNLI Liquid Intent UI)
+    _append_situational_card(children, users=users, extensions=extensions, llm=llm, billing=billing)
+
+    # 1 · Overview — 2x2 grid (no icons — matches React MetricCard)
+    children.append(
         ui.Card(title="Overview", content=ui.Stats(children=[
             ui.Stat(label="Users", value=str(len(users)), color="blue"),
             ui.Stat(label="Active", value=str(active_count), color="green"),
             ui.Stat(label="Roles", value=str(len(roles)), color="purple"),
             ui.Stat(label="Extensions", value=str(len(extensions)),
                     color="cyan"),
-        ], columns=2)),
-    ]
+        ], columns=2))
+    )
 
     _append_revenue_card(children, billing)
     _append_actions_card(children, actions)
@@ -55,6 +67,116 @@ async def build_dashboard(ctx):
     _append_status_card(children, llm)
 
     return ui.Stack(children=children, direction="v", gap=4)
+
+
+def _append_situational_card(children: list, users: list, extensions: list, llm: dict, billing: dict) -> None:
+    """Adaptive ICNLI Liquid Intent UI block.
+
+    Dynamically morphs the dashboard into an incident or alert posture
+    if pending approvals, payment configuration issues, or degraded models exist.
+    """
+    pending_apps = [e for e in extensions if e.get("status") == "pending_review"]
+    pending_payouts_count = 0
+    if billing and isinstance(billing, dict):
+        pending_payouts_count = int(billing.get("pending_payouts_count") or 0)
+
+    # Check situational triggers
+    situations = []
+    if pending_apps:
+        situations.append(f"{len(pending_apps)} app submission(s) pending marketplace review")
+    if pending_payouts_count > 0:
+        situations.append(f"{pending_payouts_count} developer payout request(s) awaiting approval")
+
+    if not situations:
+        # System operational posture: focused glance
+        if MorphingState:
+            children.append(
+                MorphingState(
+                    context="admin_system_posture",
+                    summary="All cloud OS subsystems operational",
+                    urgency="low",
+                    risk="read",
+                    details="Platform nodes, neural router, and payment webhooks are synchronized.",
+                    metrics={
+                        "Active Users": sum(1 for u in users if u.get("is_active")),
+                        "Extensions": len(extensions),
+                    },
+                    affordances=[
+                        Affordance(
+                            id="view_users",
+                            label="Inspect Users",
+                            risk="read",
+                            shortcut="u",
+                            payload={"action": "navigate", "target": "management"},
+                        ),
+                        Affordance(
+                            id="view_audit",
+                            label="Audit Trail",
+                            risk="read",
+                            shortcut="a",
+                            payload={"action": "navigate", "target": "audit"},
+                        ),
+                    ],
+                    cognitive=CognitiveContext(
+                        situation="operational_nominal",
+                        urgency="low",
+                        attention_budget="glance",
+                    ),
+                )
+            )
+        return
+
+    # Critical or elevated posture
+    summary_text = " • ".join(situations)
+    affordances = []
+    if pending_apps:
+        affordances.append(
+            Affordance(
+                id="review_apps",
+                label=f"Review Apps ({len(pending_apps)})",
+                primary=True,
+                risk="write",
+                shortcut="r",
+                payload={"action": "navigate", "target": "extensions"},
+            ) if Affordance else {"id": "review_apps", "label": f"Review Apps ({len(pending_apps)})"}
+        )
+    if pending_payouts_count > 0:
+        affordances.append(
+            Affordance(
+                id="review_payouts",
+                label="Process Payouts",
+                risk="write",
+                requires_confirmation=True,
+                shortcut="p",
+                payload={"action": "navigate", "target": "payouts"},
+            ) if Affordance else {"id": "review_payouts", "label": "Process Payouts"}
+        )
+
+    if MorphingState:
+        children.append(
+            MorphingState(
+                context="admin_attention_required",
+                summary=summary_text,
+                urgency="elevated",
+                risk="write",
+                details="Action required by administrative control plane to unblock marketplace operations.",
+                affected_entities=[app.get("app_id", "app") for app in pending_apps[:4]],
+                affordances=affordances,
+                cognitive=CognitiveContext(
+                    situation="administrative_triage",
+                    urgency="elevated",
+                    attention_budget="focused",
+                ) if CognitiveContext else None,
+            )
+        )
+    else:
+        children.append(
+            ui.Alert(
+                title="Action Required",
+                content=ui.Text(summary_text),
+                variant="warning",
+            )
+        )
 
 
 # ── Section builders ──────────────────────────────────────────────────
