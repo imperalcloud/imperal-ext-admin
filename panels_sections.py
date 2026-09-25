@@ -15,7 +15,7 @@ import httpx
 from imperal_sdk._shared_http import shared_http
 from imperal_sdk import ui
 
-from app import _gw_request, _registry_get, AUTH_GW, REGISTRY_URL
+from app import _gw_request, _registry_get, AUTH_GW, REGISTRY_URL, TEMPORAL_HOST, TEMPORAL_PORT, TEMPORAL_NAMESPACE
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
