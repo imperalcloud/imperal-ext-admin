@@ -28,7 +28,7 @@ from app import ext
 from panels_dashboard import build_dashboard
 from panels_users import build_users as build_management
 from panels_user_profile import build_user_profile
-from panels_sections import build_system
+from panels_system import build_system
 from panels_llm import build_llm
 from panels_extensions import build_extensions
 from panels_roles import build_roles

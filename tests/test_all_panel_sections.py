@@ -1,11 +1,14 @@
-"""Comprehensive test rendering EVERY section of the Admin extension panels.
+"""Fast comprehensive test verifying EVERY panel section and sub-route renders cleanly.
 
-Guarantees no NameError, AttributeError, or unhandled exceptions across every section.
+Mocks network boundaries (_gw_request, _registry_get, shared_http, _admin_get)
+so that all 22 panels render in < 5s without network hangs.
 """
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock, patch, MagicMock
 import pytest
-from app import ext
+
 import panels
 
 
@@ -14,7 +17,7 @@ class DummyCtx:
     user_id = "imp_u_test"
 
 
-SECTIONS_WITH_PARAMS = [
+SECTIONS_TO_TEST = [
     ("dashboard", {}),
     ("management", {}),
     ("management", {"role_filter": "admin", "status_filter": "active"}),
@@ -58,30 +61,50 @@ SECTIONS_WITH_PARAMS = [
 
 
 @pytest.mark.asyncio
-async def test_every_panel_section_renders():
+async def test_every_admin_panel_section_renders_cleanly():
     ctx = DummyCtx()
     failures = []
 
-    # Also test sidebar
-    try:
-        sb = await panels.admin_sidebar(ctx, active="dashboard")
-        assert sb is not None
-    except Exception as e:
-        failures.append(f"sidebar: {type(e).__name__}: {e}")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json = lambda: []
+    mock_resp.text = "[]"
 
-    # Test each section and sub-page variants
-    for sec, kwargs in SECTIONS_WITH_PARAMS:
+    client_mock = AsyncMock()
+    client_mock.get = AsyncMock(return_value=mock_resp)
+    client_mock.post = AsyncMock(return_value=mock_resp)
+    client_mock.put = AsyncMock(return_value=mock_resp)
+    client_mock.patch = AsyncMock(return_value=mock_resp)
+    client_mock.delete = AsyncMock(return_value=mock_resp)
+
+    shared_http_mock = MagicMock(return_value=client_mock)
+
+    with patch("app._gw_request", new=AsyncMock(return_value={})), \
+         patch("app._registry_get", new=AsyncMock(return_value=mock_resp)), \
+         patch("imperal_sdk._shared_http.shared_http", new=shared_http_mock), \
+         patch("handlers_billing_mode._admin_get", new=AsyncMock(return_value={})):
+
+        # 1. Test left sidebar
         try:
-            res = await panels.admin_tools(ctx, active=sec, section="", **kwargs)
-            assert res is not None, f"Section {sec} returned None"
-            # Check if res is an Alert error
-            if getattr(res, "component", None) == "Alert" and getattr(res, "props", {}).get("type") == "error":
-                failures.append(f"{sec} (kwargs={kwargs}): UI Alert Error -> {res.props.get('title')}: {res.props.get('message')}")
-            elif hasattr(res, "to_dict"):
-                d = res.to_dict()
-                assert isinstance(d, dict)
+            sb = await panels.admin_sidebar(ctx, active="dashboard")
+            assert sb is not None, "Sidebar returned None"
+            if hasattr(sb, "to_dict"):
+                assert isinstance(sb.to_dict(), dict)
         except Exception as e:
-            failures.append(f"{sec} (kwargs={kwargs}): Exception -> {type(e).__name__}: {e}")
+            failures.append(f"sidebar: {type(e).__name__}: {e}")
+
+        # 2. Test every single tools page / section
+        for sec, kwargs in SECTIONS_TO_TEST:
+            try:
+                res = await panels.admin_tools(ctx, active=sec, section="", **kwargs)
+                assert res is not None, f"Section '{sec}' returned None"
+                if getattr(res, "component", None) == "Alert" and getattr(res, "props", {}).get("type") == "error":
+                    failures.append(f"{sec} (kwargs={kwargs}): Alert Error -> {res.props.get('title')}: {res.props.get('message')}")
+                elif hasattr(res, "to_dict"):
+                    d = res.to_dict()
+                    assert isinstance(d, dict)
+            except Exception as e:
+                failures.append(f"{sec} (kwargs={kwargs}): {type(e).__name__}: {e}")
 
     if failures:
-        pytest.fail("Panel sections failed:\n" + "\n".join(failures))
+        pytest.fail("Panel sections failed rendering:\n" + "\n".join(failures))
