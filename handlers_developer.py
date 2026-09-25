@@ -126,7 +126,24 @@ async def review_app(ctx, params: AppReviewParams) -> ActionResult:
         refresh_panels=["tools"])
 
 
-@chat.function("bulk_review_apps", action_type="write", event="admin.bulk_apps_reviewed", effects=["update:app_review"], description="Bulk approve or reject multiple developer app submissions at once")
+class BulkAppReviewItem(BaseModel):
+    app_id: str
+    status: str
+    ok: bool
+    error: Optional[str] = None
+
+
+class BulkAppReviewReceipt(BaseModel):
+    action: str
+    total: int
+    success: int
+    failed: int
+    results: list[BulkAppReviewItem]
+
+
+@chat.function("bulk_review_apps", action_type="write", event="admin.bulk_apps_reviewed",
+               effects=["update:app_review"], data_model=BulkAppReviewReceipt,
+               description="Bulk approve or reject multiple developer app submissions at once")
 async def bulk_review_apps(ctx, params: BulkAppReviewParams) -> ActionResult:
     """Bulk approve or reject multiple developer app submissions at once."""
     action = params.action.lower()
@@ -171,8 +188,13 @@ async def bulk_review_apps(ctx, params: BulkAppReviewParams) -> ActionResult:
             fail_count += 1
 
     return ActionResult.success(
-        data={"action": action, "results": results, "total": len(target_ids),
-              "succeeded": success_count, "failed": fail_count},
+        data=BulkAppReviewReceipt(
+            action=action,
+            total=len(target_ids),
+            success=success_count,
+            failed=fail_count,
+            results=[BulkAppReviewItem(**r) for r in results],
+        ).model_dump(),
         summary=f"Bulk {action} completed: {success_count} succeeded, {fail_count} failed",
         refresh_panels=["tools"],
     )
