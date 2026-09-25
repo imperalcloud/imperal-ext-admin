@@ -9871,16 +9871,12 @@
             "type": "integer"
           },
           "max_history": {
-            "default": 40,
-            "minimum": 10,
+            "default": 10,
+            "minimum": 1,
             "title": "Max History",
-            "type": "integer"
-          },
-          "compress_at": {
-            "default": 30,
-            "minimum": 5,
-            "title": "Compress At",
-            "type": "integer"
+            "type": "integer",
+            "maximum": 50,
+            "description": "Max history turns stored in active session (default 10, hot wire bounded to 6)"
           },
           "history_ttl_days": {
             "default": 7,

@@ -167,8 +167,7 @@ def build_session_tab(app_id: str, settings: dict) -> list:
             defaults={
                 "app_id": app_id,
                 "timeout_hours": str(s.get("timeout_hours", 24)),
-                "max_history": str(s.get("max_history", 40)),
-                "compress_at": str(s.get("compress_at", 30)),
+                "max_history": str(s.get("max_history", 10)),
                 "history_ttl_days": str(s.get("history_ttl_days", 7)),
             },
             children=[
@@ -178,17 +177,11 @@ def build_session_tab(app_id: str, settings: dict) -> list:
                     value=str(s.get("timeout_hours", 24)),
                     placeholder="24",
                 ),
-                ui.Text("Max history messages", variant="caption"),
+                ui.Text("Max history turns (default 10, hot wire bounded to 6)", variant="caption"),
                 ui.Input(
                     param_name="max_history",
-                    value=str(s.get("max_history", 40)),
-                    placeholder="40",
-                ),
-                ui.Text("Compress at", variant="caption"),
-                ui.Input(
-                    param_name="compress_at",
-                    value=str(s.get("compress_at", 30)),
-                    placeholder="30",
+                    value=str(s.get("max_history", 10)),
+                    placeholder="10",
                 ),
                 ui.Text("History TTL (days)", variant="caption"),
                 ui.Input(

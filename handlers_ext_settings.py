@@ -70,8 +70,7 @@ class SaveRouterParams(BaseModel):
 class SaveSessionParams(BaseModel):
     app_id: str = Field(description="Extension app_id")
     timeout_hours: int = Field(default=24, ge=1)
-    max_history: int = Field(default=40, ge=10)
-    compress_at: int = Field(default=30, ge=5)
+    max_history: int = Field(default=10, ge=1, le=50, description="Max history turns stored in active session (default 10, hot wire bounded to 6)")
     history_ttl_days: int = Field(default=7, ge=1, le=90)
 
 
@@ -308,7 +307,6 @@ async def fn_save_ext_session(ctx, params: SaveSessionParams) -> ActionResult:
     return await _save_section(params.app_id, "session", {
         "timeout_hours": params.timeout_hours,
         "max_history": params.max_history,
-        "compress_at": params.compress_at,
         "history_ttl_days": params.history_ttl_days,
     })
 
