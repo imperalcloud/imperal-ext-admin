@@ -10,7 +10,8 @@ from imperal_sdk._shared_http import shared_http
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, REGISTRY_URL, _gw_request, _resolve_role_by_name, _tenant_id, EmptyParams
+from app import chat, ext, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN, REGISTRY_URL, _gw_request, _resolve_role_by_name, _tenant_id, EmptyParams
+from panels_sections import _invalidate_panel_cache
 from models_records import (
     AdminRulesListResponse, ConfirmationPolicyResponse, RuleActionReceipt, SystemHealthResponse,
     TaskLimitResponse, UserConfirmationResponse,
@@ -326,3 +327,34 @@ async def fn_get_panel_data(ctx, params: EmptyParams) -> ActionResult:
         },
         summary="Panel data loaded",
     )
+
+
+# ─── Reactive Signals (ICNLI Event Bus) ───────────────────────────────── #
+
+@ext.signal("marketplace.app_submitted")
+async def on_app_submitted(ctx, data: dict = None):
+    """React immediately when a developer submits an app for review."""
+    log.info("Signal marketplace.app_submitted received: %s", data)
+    _invalidate_panel_cache()
+
+
+@ext.signal("developer.payout_requested")
+async def on_payout_requested(ctx, data: dict = None):
+    """React immediately when a developer requests a payout."""
+    log.info("Signal developer.payout_requested received: %s", data)
+    _invalidate_panel_cache()
+
+
+@ext.signal("billing.payment_failed")
+async def on_payment_failed(ctx, data: dict = None):
+    """React immediately on critical payment failures."""
+    log.warning("Signal billing.payment_failed received: %s", data)
+    _invalidate_panel_cache()
+
+
+@ext.signal("system.node_degraded")
+async def on_node_degraded(ctx, data: dict = None):
+    """React immediately on cluster node telemetry degradation."""
+    log.error("Signal system.node_degraded received: %s", data)
+    _invalidate_panel_cache()
+

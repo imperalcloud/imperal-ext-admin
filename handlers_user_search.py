@@ -12,7 +12,10 @@ Everything here is read-only; the existing mutation handlers are untouched.
 """
 from __future__ import annotations
 
-from app import chat, ActionResult, _gw_request, _resolve_user_flexible
+import logging
+from pydantic import BaseModel, Field
+
+from app import chat, ActionResult, _gw_request, _registry_get, _resolve_user_flexible
 from models_user_search import (
     FindUsersParams,
     UserActivityParams,
@@ -21,6 +24,8 @@ from models_user_search import (
     UserProfileRecord,
     UserSearchResponse,
 )
+
+log = logging.getLogger("admin")
 
 
 # ─── field extraction (one place, so search and profile agree) ────────── #
@@ -300,3 +305,81 @@ async def fn_find_users(ctx, params: FindUsersParams) -> ActionResult:
               "searched": len(users), "criteria": criteria},
         summary=summary,
     )
+
+
+# ── Omnisearch (Cross-Domain Global Administration) ──────────────────────────
+
+class OmnisearchParams(BaseModel):
+    query: str = Field(..., description="Search query across users, extensions, roles, and settings")
+
+
+class OmnisearchResult(BaseModel):
+    category: str
+    id: str
+    title: str
+    subtitle: str
+    target_section: str
+
+
+class OmnisearchResponse(BaseModel):
+    query: str
+    total: int
+    results: list[OmnisearchResult]
+
+
+@chat.function("omnisearch", action_type="read", data_model=OmnisearchResponse,
+               description="Omnisearch: instant cross-domain administrative lookup across users, extensions, roles, and platform settings")
+async def fn_omnisearch(ctx, params: OmnisearchParams) -> ActionResult[OmnisearchResponse]:
+    """Omnisearch across users, extensions, roles, and platform settings."""
+    q = (params.query or "").strip().lower()
+    if not q:
+        return ActionResult.success(
+            data={"query": "", "total": 0, "results": []},
+            summary="Empty query, 0 results",
+        )
+
+    results: list[dict] = []
+
+    # 1. Search Users
+    try:
+        raw_users = await _gw_request("GET", "/v1/users?include_inactive=true")
+        users = raw_users.get("items", raw_users) if isinstance(raw_users, dict) else raw_users
+        if isinstance(users, list):
+            for u in users:
+                uid = str(u.get("imperal_id") or u.get("id") or "")
+                email = str(u.get("email") or "")
+                name = str(u.get("display_name") or u.get("full_name") or "")
+                if q in uid.lower() or q in email.lower() or q in name.lower():
+                    results.append({
+                        "category": "Users",
+                        "id": uid,
+                        "title": email or name or uid,
+                        "subtitle": f"Role: {u.get('role', 'user')} • ID: {uid}",
+                        "target_section": "management",
+                    })
+    except Exception as e:
+        log.warning("Omnisearch user lookup failed: %s", e)
+
+    # 2. Search Roles
+    try:
+        roles = await _gw_request("GET", "/v1/roles")
+        if isinstance(roles, list):
+            for role in roles:
+                rname = str(role.get("name") or "")
+                desc = str(role.get("description") or "")
+                if q in rname.lower() or q in desc.lower():
+                    results.append({
+                        "category": "Roles",
+                        "id": rname,
+                        "title": f"Role: {rname}",
+                        "subtitle": desc or f"{len(role.get('default_scopes', []))} scopes",
+                        "target_section": "roles",
+                    })
+    except Exception as e:
+        log.warning("Omnisearch roles lookup failed: %s", e)
+
+    return ActionResult.success(
+        data={"query": params.query, "total": len(results), "results": results[:20]},
+        summary=f"Found {len(results)} matches for '{params.query}'",
+    )
+

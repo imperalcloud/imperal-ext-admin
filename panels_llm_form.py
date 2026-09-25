@@ -23,6 +23,7 @@ from imperal_sdk import ui
 from panels_llm_form_tbc import build_tbc_section
 from panels_llm_form_coding_thread import build_coding_thread_section
 from panels_llm_form_tiers import build_tiers_section
+from panels_llm_form_sampling import build_purpose_ai_params_section, build_thinking_governance_section
 from panels_llm_form_automation import build_automation_section
 from panels_llm_form_voice import build_voice_section
 from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
@@ -498,52 +499,7 @@ def build_llm_form(
         model_children.append(ui.Divider())
 
     # ── Category 4: Per-Purpose AI Parameters ────────────────────
-    aiparam_children: list = [
-        ui.Text(
-            "Fine-tune sampling per purpose. Leave blank to inherit "
-            "(per-extension > per-purpose > global > provider default).",
-            variant="caption",
-        ),
-    ]
-    for key, label, _desc in _PURPOSE_MODELS:
-        aiparam_children.extend([
-            ui.Text(label, variant="body"),
-            ui.Stack([
-                ui.Stack([
-                    ui.Text("Temperature (0.0 – 2.0)", variant="caption"),
-                    ui.Input(
-                        param_name=f"purpose_{key}_temperature",
-                        value=defaults[f"purpose_{key}_temperature"],
-                        placeholder="inherit",
-                    ),
-                ], gap=0),
-                ui.Stack([
-                    ui.Text("Top P (0.0 – 1.0)", variant="caption"),
-                    ui.Input(
-                        param_name=f"purpose_{key}_top_p",
-                        value=defaults[f"purpose_{key}_top_p"],
-                        placeholder="inherit",
-                    ),
-                ], gap=0),
-                ui.Stack([
-                    ui.Text("Presence penalty (-2.0 – 2.0)", variant="caption"),
-                    ui.Input(
-                        param_name=f"purpose_{key}_presence_penalty",
-                        value=defaults[f"purpose_{key}_presence_penalty"],
-                        placeholder="inherit",
-                    ),
-                ], gap=0),
-                ui.Stack([
-                    ui.Text("Frequency penalty (-2.0 – 2.0)", variant="caption"),
-                    ui.Input(
-                        param_name=f"purpose_{key}_frequency_penalty",
-                        value=defaults[f"purpose_{key}_frequency_penalty"],
-                        placeholder="inherit",
-                    ),
-                ], gap=0),
-            ], direction="h", gap=1, wrap=True),
-            ui.Divider(),
-        ])
+    aiparam_children = build_purpose_ai_params_section(defaults, _PURPOSE_MODELS)
 
     # ── Category 5: Per-Purpose Token Budgets (max_tokens) ───────
     budget_children: list = [

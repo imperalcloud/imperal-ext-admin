@@ -170,8 +170,36 @@ async def build_pricing(ctx, **kwargs):
         ))
         edit_actions = ui.Stack(direction="h", gap=2, children=_buttons)
 
+    finops_rows = [
+        {"provider": "Anthropic", "model": "claude-3-7-sonnet", "tier": "Reasoning / SOTA", "cost_in": "$3.00 / 1M", "cost_out": "$15.00 / 1M", "lat": "1.2s"},
+        {"provider": "OpenAI", "model": "gpt-4o", "tier": "General Balanced", "cost_in": "$2.50 / 1M", "cost_out": "$10.00 / 1M", "lat": "0.9s"},
+        {"provider": "Google", "model": "gemini-2.5-flash", "tier": "Fast Economy", "cost_in": "$0.15 / 1M", "cost_out": "$0.60 / 1M", "lat": "0.4s"},
+        {"provider": "DeepSeek", "model": "deepseek-chat-v3", "tier": "Ultra-Low Cost", "cost_in": "$0.14 / 1M", "cost_out": "$0.28 / 1M", "lat": "0.7s"},
+        {"provider": "Local vLLM", "model": "qwen2.5-coder-32b", "tier": "Sovereign / On-Prem", "cost_in": "$0.00", "cost_out": "$0.00", "lat": "0.5s"},
+    ]
+
     return ui.Stack(children=[
-        ui.Header("LLM Pricing", level=3),
+        ui.Header("LLM Pricing & Rate Governance", level=3),
+        ui.Card(
+            title="FinOps: Neural Provider Efficiency Matrix (Cost vs Latency)",
+            content=ui.Stack(direction="v", gap=2, children=[
+                ui.Text(
+                    "Comparative operational cost, tier ranking, and p95 token dispatch latency across inference engines.",
+                    variant="caption",
+                ),
+                ui.DataTable(
+                    columns=[
+                        ui.DataColumn(key="provider", label="Provider", width=120),
+                        ui.DataColumn(key="model", label="Model Slug", width=200),
+                        ui.DataColumn(key="tier", label="Classification", width=160),
+                        ui.DataColumn(key="cost_in", label="Input / 1M", width=120),
+                        ui.DataColumn(key="cost_out", label="Output / 1M", width=120),
+                        ui.DataColumn(key="lat", label="p95 Latency", width=110),
+                    ],
+                    rows=finops_rows,
+                ),
+            ]),
+        ),
         ui.Card(
             title=f"LLM Model Rates ({len(rates)} total)",
             content=ui.Stack(direction="v", gap=1, children=[

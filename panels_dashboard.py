@@ -44,6 +44,17 @@ async def build_dashboard(ctx):
 
     children = [
         ui.Header("Dashboard", level=3),
+        ui.Card(
+            title="Omnisearch (Global Control Plane)",
+            content=ui.Stack([
+                ui.Input(param_name="omni_query", placeholder="Search users, roles, extensions (Cmd+K)...", label="Quick Jump"),
+                ui.Button(
+                    label="Search System",
+                    variant="secondary",
+                    on_click=ui.Call("omnisearch", query="{{omni_query}}"),
+                ),
+            ], direction="h", gap=2, align="end"),
+        ),
     ]
 
     # Dynamic Situational Intelligence (ICNLI Liquid Intent UI)
