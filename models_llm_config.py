@@ -172,13 +172,10 @@ class SaveLlmConfigParams(BaseModel):
     failover_api_key: str = Field(default="", description="Failover API key (write-only)")
     failover_base_url: str = Field(default="", description="Failover base URL (endpoint for custom or OpenAI-compatible failover provider)")
     custom_model: str = Field(default="", description="Manual custom model id for primary provider when not in dropdown")
-    # Voice STT (Whisper) provider/model (2026-08-29 owner report): "у нас
-    # покдлючен whisper ai, но в llm configs вообще нету настройки провайдера
-    # под это ... а это важно". Read by the auth-gateway's app.voice.service.
+    # Voice STT (Whisper) provider/model (2026-08-29 owner report): configure Whisper/STT provider and model. Read by auth-gateway app.voice.service.
     # transcribe() (blank stt_model = keep the gateway's own env default).
     #
-    # BYOK pass 2 (2026-08-29 owner report): "чтобы SST Provider можно было
-    # настроить, чтобы я свой ключ от любого провайдера мог юзать". Persisted
+    # BYOK pass 2 (2026-08-29 owner report): allow custom STT Provider key from any provider. Persisted
     # as a NESTED `stt` dict on the gateway (imperal:config:llm.stt — see
     # handlers_llm.py's dedicated stt-merge block, NOT the generic flat-field
     # loop) so the gateway's existing recursive api_key encrypt/mask helpers
@@ -577,8 +574,8 @@ class SaveLlmConfigParams(BaseModel):
             "UNIT: turns. How many recent assistant turns get their "
             "data_facts_json (FACTS:) rendered into the classifier prompt "
             "for cross-turn anaphora resolution. Default 20 (was hardcoded "
-            "5). Higher = better long-conversation memory ('какие письма я "
-            "отправлял пару турнов назад'), more classifier tokens per call. "
+            "5). Higher = better long-conversation memory ('which emails did I "
+            "send a couple turns ago'), more classifier tokens per call. "
             "Cap mirrors SessionMemory.MAX_TURNS=50 with headroom. Reads at "
             "hub/classifier/input_builder.py:build_classifier_input."
         ),

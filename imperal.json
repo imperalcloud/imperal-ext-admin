@@ -13567,7 +13567,7 @@
               }
             ],
             "default": null,
-            "description": "UNIT: turns. How many recent assistant turns get their data_facts_json (FACTS:) rendered into the classifier prompt for cross-turn anaphora resolution. Default 20 (was hardcoded 5). Higher = better long-conversation memory ('какие письма я отправлял пару турнов назад'), more classifier tokens per call. Cap mirrors SessionMemory.MAX_TURNS=50 with headroom. Reads at hub/classifier/input_builder.py:build_classifier_input.",
+            "description": "UNIT: turns. How many recent assistant turns get their data_facts_json (FACTS:) rendered into the classifier prompt for cross-turn anaphora resolution. Default 20 (was hardcoded 5). Higher = better long-conversation memory ('which emails did I send a couple turns ago'), more classifier tokens per call. Cap mirrors SessionMemory.MAX_TURNS=50 with headroom. Reads at hub/classifier/input_builder.py:build_classifier_input.",
             "title": "Classifier Fact Ledger Window"
           },
           "chain_max_refs_per_args": {

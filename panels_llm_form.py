@@ -348,9 +348,7 @@ def build_llm_form(
         "failover_custom_model": failover_model if is_custom_fo else "",
         "failover_base_url": failover_base_url,
         "failover_api_key": "",
-        # Voice / STT (Whisper) BYOK (2026-08-29 owner report, pass 2): "чтобы
-        # SST Provider можно было настроить, чтобы я свой ключ от любого
-        # провайдера мог юзать". api_key is write-only — the value here is
+        # Voice / STT (Whisper) BYOK (2026-08-29 owner report, pass 2): "allow configuring STT provider to use own key from any provider". api_key is write-only — the value here is
         # already masked by the gateway's read path (or "" if never set), so
         # a re-save with the field untouched round-trips the mask back and
         # handlers_llm.py's stt-merge block treats it as "keep current".

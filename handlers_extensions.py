@@ -183,7 +183,7 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
     # B-3 (2026-05-11): when both user_id and email are empty, default to
     # the calling user — this is the self-service path that the
     # hub_routing.txt "extensions/apps" intent class targets. Closes the
-    # anti-fab fallback class where 'какие у меня расширения?' used to
+    # anti-fab fallback class where 'what extensions do I have?' used to
     # route to conversational and hit the now-deleted hardcoded apps list.
     ref = params.user_id or (
         await _resolve_user_by_email(params.email) if params.email else None

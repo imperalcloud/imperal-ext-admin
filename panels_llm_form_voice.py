@@ -1,12 +1,8 @@
 """Admin · Voice / STT (Whisper) panel section (2026-08-29).
 
 Owner report, two passes:
-  1. "у нас есть в системе нашей возможность voice ... для этого функционала
-     у нас подключен whisper ai, но в llm configs вообще нету настройки
-     провайдера под это, понимаешь? А это важно!" (model override only).
-  2. "SST Provider можно было настроить, чтобы я свой ключ от любого
-     провайдера мог юзать ... автоматически подкружать доступные ... модели
-     для STT" (full bring-your-own-key + live model discovery).
+  1. Voice STT provider configuration in LLM configs (model override only).
+  2. STT Provider configuration with custom BYOK key from any provider and live model discovery.
 
 Persisted at ``imperal:config:llm.stt`` (a NESTED dict, not flat top-level
 keys) — the auth-gateway's existing recursive api_key encrypt/mask helpers

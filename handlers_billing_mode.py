@@ -1,9 +1,6 @@
 """Admin · manual billing control — HOW and WHEN a customer pays.
 
-Owner design 2026-08-13: "для enterprise я бы хотел иметь доступ выбора когда
-и как я хочу чтобы человек платил ... может у нас расчет с компанией Enterprise
-не через карту ... нужно какое-то ручное управление! И для enterprise карту НЕ
-обязательно."
+Owner design 2026-08-13: "for enterprise I would like to have access to choose when and how the person pays ... maybe our settlement with the Enterprise company is not via card ... manual control is needed! And for enterprise a card is NOT mandatory."
 
 Until now this was not expressible at all: whether a subscription got charged
 was DERIVED from `plans.price > 0`, so a price-0 enterprise plan could never be

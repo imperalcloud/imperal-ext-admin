@@ -102,8 +102,7 @@ async def _fetch_billing_mode(user_id: str, acting: str) -> dict:
 async def _fetch_credits(user_id: str, acting: str) -> dict:
     """This account's credit story: bought / granted / spent, plus its history.
 
-    Answers the per-user half of the owner ask (2026-08-13): "видеть наглядно
-    разницу сколько кредитов было куплено и потрачено ... по юзеру отдельно".
+    Answers the per-user half of the owner ask (2026-08-13): "see clearly the difference between credits bought and spent per user separately".
     The wallet balance already on this page is ONE number with no history —
     it cannot say whether those credits were paid for or handed out.
 

@@ -1,7 +1,5 @@
 """Dynamic STT (speech-to-text) model catalogue — fetched live using the
-admin's own BYOK key (2026-08-29, owner report pass 2: "чтобы я свой ключ от
-любого провайдера мог юзать ... автоматически подгружать доступные ... модели
-для STT").
+admin's own BYOK key (2026-08-29, owner report pass 2: allow custom key from any provider with live STT model discovery).
 
 Mirrors panels_llm_models.py's pattern (Redis-stored key → Fernet decrypt →
 live provider fetch → Redis cache → static fallback) but filtered for

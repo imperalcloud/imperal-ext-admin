@@ -285,8 +285,7 @@ async def build_extensions(ctx: Any, category_filter: str = "",
         if cat:
             parts.append(cat.capitalize())
 
-        # Author, right on the collapsed card (owner: "видеть автора приложения
-        # сразу"). System apps (no developer_id, e.g. admin/billing) simply omit it.
+        # Author, right on the collapsed card (owner: "see app author immediately"). System apps (no developer_id, e.g. admin/billing) simply omit it.
         author = _author_label(app)
         subtitle = f"{app_id} · by {author}" if author else app_id
 

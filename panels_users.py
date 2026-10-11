@@ -98,8 +98,7 @@ def _build_billing_rows(billing: dict | None) -> list:
 def _build_orphan_rows(orphans: list[dict], q: str = "") -> list:
     """Subscriptions whose user account no longer exists.
 
-    Owner ask 2026-08-13: "в users я не вижу часть тех, что ты показала, где
-    только ID". Those rows are NOT hidden users — their user_id is absent
+    Owner ask 2026-08-13: "in users I do not see some of those where only ID was shown". Those rows are NOT hidden users — their user_id is absent
     from the users table entirely (deleted accounts, subscription left
     behind). The user list therefore had nothing to render for them, while
     the billing figures still counted their money. This block is the only

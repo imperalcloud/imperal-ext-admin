@@ -1,15 +1,13 @@
 """Admin · Credits — bought must never quietly absorb admin grants.
 
-Owner ask (2026-08-13): "я до сих пор не вижу где можно посмотреть историю
-покупки системных кредитов. А так же видеть наглядно разницу сколько кредитов
-было куплено и потрачено и всего по системе и по юзеру отдельно."
+Owner ask (2026-08-13): "I still do not see where system credit purchase history can be viewed. As well as seeing the difference between credits bought and spent, across the system and per user separately."
 
 WHY THIS SUITE EXISTS
 ---------------------
 `token_ledger.reason` is FREE TEXT, not an enum. Production proves it: next to
 the machine-written `topup` sit hand-typed strings — 'admin_grant',
 'admin_credit_1M', 'grant_tokens', 'rhtlbnjd', and
-'выдача 1M по просьбе администратора'. The tempting implementation ("sum every
+'grant 1M per admin request'. The tempting implementation ("sum every
 positive amount") renders a confident, beautiful, WRONG number: it folds ~42.6M
 of credits nobody paid for into a revenue-shaped figure.
 

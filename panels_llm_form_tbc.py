@@ -138,7 +138,7 @@ def build_tbc_section(defaults: dict):
             "assistant turns get their data_facts_json (FACTS:) rendered into "
             "the classifier prompt for cross-turn anaphora resolution. "
             "Default 20 (was hardcoded 5). Higher = lets the user reference "
-            "older turn results ('те 2 письма, что я отправлял') without the "
+            "older turn results ('those 2 emails that I sent') without the "
             "classifier doing a fresh search. Tradeoff: more classifier tokens "
             "per call. Consumer: hub/classifier/input_builder.py.",
             variant="caption",

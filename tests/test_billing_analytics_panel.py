@@ -1,7 +1,6 @@
 """Admin · Billing Analytics — the money figures must come from real fields.
 
-Owner ask (2026-08-13): "сколько реально paid юзеров — именно тех у кого есть
-карточки привязанные, и когда конкретно будут списания".
+Owner ask (2026-08-13): "how many real paid users - specifically those with linked cards, and when exactly charges will occur".
 
 WHY THIS SUITE EXISTS
 ---------------------

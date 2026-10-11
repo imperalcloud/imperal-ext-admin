@@ -1,9 +1,6 @@
 """Regression: LLM Pricing must support a GUARANTEED (hard) delete.
 
-INCIDENT (2026-08-29, admin): "у меня еще есть LLM Pricing страница ... и
-фишка в том, что я не могу удалять, а мне многое что оттуда нужно удалить,
-причем удаление должно быть гарантированным, чтобы исчезало и из базы и из
-Редис ... в общем полноценное правильное удаление".
+INCIDENT (2026-08-29, admin): "LLM Pricing page hard delete - ensure deletion from both DB and Redis".
 
 BEFORE: delete_llm_model_rate only ever called DELETE .../model-rates/{id}
 with no query flag, and the gateway route only ever did
@@ -73,10 +70,7 @@ def test_panel_offers_hard_delete_with_destructive_confirm_text():
 
 # ── "+ Add New Model" vanishes in edit mode (owner, 2026-08-29) ─────────
 #
-# "когда я жму на какую-то модель из таблицы (уже добавленные), то
-# открывается снизу возможность редактировать данные, но нельзя увидеть
-# кнопку добавления модели ... нужно перезагружать страницу чтобы ее
-# увидеть снова" -- the Add/Edit form is ONE ui.Form whose submit button
+# When clicking a model from the table to edit, allow resetting back to Add Model form without full reload -- the Add/Edit form is ONE ui.Form whose submit button
 # always reads "Save Rate" while editing, so there was no way back to Add
 # mode short of a full reload. Fixed with a "+ Add New Model" button that
 # clears edit_id via a normal panel round-trip.

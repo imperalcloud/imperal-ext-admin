@@ -1,8 +1,6 @@
 """Admin · Credits panel section — bought vs spent, and the purchase history.
 
-Owner ask (2026-08-13): "я до сих пор не вижу где можно посмотреть историю
-покупки системных кредитов. А так же видеть наглядно разницу сколько кредитов
-было куплено и потрачено и всего по системе и по юзеру отдельно."
+Owner ask (2026-08-13): "I still do not see where system credit purchase history can be viewed. As well as seeing the difference between credits bought and spent, across the system and per user separately."
 
 WHY A SEPARATE SECTION
 ----------------------
@@ -17,7 +15,7 @@ THE TWO HONESTY RULES (enforced gateway-side in app/billing/credits.py)
 -----------------------------------------------------------------------
 1. `reason` in token_ledger is FREE TEXT, not an enum. Alongside the machine
    written `topup` sit hand-typed strings: 'admin_grant', 'admin_credit_1M',
-   'rhtlbnjd', 'выдача 1M по просьбе администратора'. So BOUGHT and GRANTED
+   'rhtlbnjd', 'grant 1M per admin request'. So BOUGHT and GRANTED
    are shown as two different numbers and are never added together — folding
    ~42.6M of admin gifts into "bought" would invent revenue that nobody paid.
 

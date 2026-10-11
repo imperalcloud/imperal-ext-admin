@@ -1,8 +1,6 @@
 """Admin · Billing Analytics panel section.
 
-Owner ask (2026-08-13): "сколько реально paid юзеров — именно тех у кого есть
-карточки привязанные, и когда конкретно будут списания... какие были списания,
-может, но не прошли... или прошли и каким методом".
+Owner ask (2026-08-13): "how many real paid users - specifically those with linked cards, and when exactly charges will occur... what charges were attempted, failed, or succeeded and via which method".
 
 WHY A SEPARATE SECTION
 ----------------------

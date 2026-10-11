@@ -1,10 +1,7 @@
 """Owner report (2026-08-29), two passes:
 
-  1. 'у нас подключен whisper ai, но в llm configs вообще нету настройки
-     провайдера под это, понимаешь? А это важно!' (model override only).
-  2. 'SST Provider можно было настроить, чтобы я свой ключ от любого
-     провайдера мог юзать ... автоматически подкружать доступные ... модели
-     для STT' (full bring-your-own-key + live model discovery).
+  1. Whisper AI STT provider settings in LLM configs (model override only).
+  2. STT Provider configuration with custom BYOK key from any provider and live model discovery.
 
 Pins the Voice / STT (Whisper) BYOK section: it renders with a real
 provider dropdown (not hardcoded to one provider), pre-fills from the saved

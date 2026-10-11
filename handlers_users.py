@@ -102,7 +102,7 @@ async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
     # SDL entity-list (NO legacy {users} wrapper): each user is a canonical SDL
     # entity (id=imperal_id, title=display name, kind="user"); gateway fields are
     # kept verbatim for rendering. The kernel reads data["items"] + title to
-    # resolve a user SET ("обоим ignat") and fan out by id. Data conforms to the
+    # resolve a user SET ("to both ignats") and fan out by id. Data conforms to the
     # sdl.EntityList[UserRecord] contract (data_model carries x-sdl="entity-list").
     items = []
     for _u in users:

@@ -124,8 +124,8 @@ async def admin_sidebar(ctx, active: str = "dashboard", **kwargs):
     """Left sidebar — section navigation."""
     if not _is_admin(ctx):
         return ui.Card(
-            title="Доступ запрещён",
-            content=ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", variant="body")
+            title="Access Denied",
+            content=ui.Text("403 Forbidden: Access denied. Administrator privileges required.", variant="body")
         )
     items = [_sidebar_item(s, active) for s in _SECTIONS]
     root = ui.List(items=items)
@@ -181,8 +181,8 @@ async def admin_tools(ctx, active: str = "dashboard", section: str = "",
     """
     if not _is_admin(ctx):
         return ui.Card(
-            title="Доступ запрещён",
-            content=ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", variant="body")
+            title="Access Denied",
+            content=ui.Text("403 Forbidden: Access denied. Administrator privileges required.", variant="body")
         )
     current = section or active or "dashboard"
     try:

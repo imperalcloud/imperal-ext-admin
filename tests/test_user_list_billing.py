@@ -1,9 +1,6 @@
 """Admin · User list — identity, next charge date, and search by ANY field.
 
-Owner ask (2026-08-13): "в users я не вижу часть тех, что ты показала, где
-только ID... в карточке я сразу хочу видеть и email и его ID, и план... и
-сразу next due date по оплате... и чтобы поиск юзеров по любым параметрам
-искал".
+Owner ask (2026-08-13): "in users cards show email, ID, plan, next due date, and support multi-parameter search".
 
 WHY THIS SUITE EXISTS
 ---------------------

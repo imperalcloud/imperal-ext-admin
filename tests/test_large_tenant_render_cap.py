@@ -1,8 +1,6 @@
 """Admin · Users & Extensions panels page through 100% of a large tenant.
 
-Owner report #1 (2026-08-29): "uers and extensions pages в админском плагине
-тупо не загружают юзеров и плагины. Их слишком много и страница грузит
-10 минут и ничего не показывает все равно" -- a large tenant (thousands of
+Owner report #1 (2026-08-29): "users and extensions pages in admin plugin do not load users and plugins when large" -- a large tenant (thousands of
 accounts, or a marketplace with hundreds of extensions) had no server-side
 cap at all: build_users/build_extensions built one ui.ListItem PER ROW with
 no limit, so a big enough result set meant minutes of work building +
@@ -17,9 +15,7 @@ serialize past 256KB and 169 real extensions past 256KB -- both UNDER their
 "safe" fixed caps of 200/150. Second fix: render_cap.build_capped_list, a
 byte-aware stop condition instead of a guessed row count.
 
-Owner report #3, same day: "я должен page selector использовать чтобы
-видеть ВЕСЬ список, все 100% без исключения... за 1 раз на 1 страницу все
-не выкидывать, а по страничке подгружать" -- capping (dropping) rows past
+Owner report #3, same day: "use page selector to view entire list with pagination rather than dumping all rows at once" -- capping rows past
 N, even byte-safely, still made the tail of a large tenant PERMANENTLY
 UNREACHABLE. Third and final fix: real server-side pagination (offset
 param + Prev/Next buttons that re-call __panel__tools with a new offset),
@@ -256,7 +252,7 @@ def test_build_extensions_status_filter_covers_every_real_status(monkeypatch):
 
 
 def test_build_extensions_card_shows_author_without_expanding(monkeypatch):
-    """Owner: 'видеть автора приложения сразу' -- resolved from developer_id
+    """Owner: 'see app author immediately' -- resolved from developer_id
     to the real user's email, visible on the collapsed card subtitle."""
     exts = [{**_many_extensions(1)[0], "app_id": "ext-a", "developer_id": "imp_u_dev1"}]
     users = [{"imperal_id": "imp_u_dev1", "email": "dev1@example.com"}]
