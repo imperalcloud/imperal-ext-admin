@@ -105,13 +105,27 @@ def _sidebar_item(section: dict, active: str) -> UINode:
     return UINode(type="ListItem", props=props)
 
 
+
+def _is_admin(ctx) -> bool:
+    if getattr(ctx, "is_admin", False):
+        return True
+    if getattr(ctx, "user_role", None) == "admin":
+        return True
+    u = getattr(ctx, "user", None)
+    if isinstance(u, dict):
+        return u.get("role") == "admin"
+    if hasattr(u, "role"):
+        return getattr(u, "role") == "admin"
+    return False
+
+
 @ext.panel("sidebar", slot="left", title="Administration", icon="Shield")
 async def admin_sidebar(ctx, active: str = "dashboard", **kwargs):
     """Left sidebar — section navigation."""
-    if getattr(ctx, "user_role", None) != "admin" and not getattr(ctx, "is_admin", False):
+    if not _is_admin(ctx):
         return ui.Card(
-            ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", color="red"),
-            padding=4
+            title="Доступ запрещён",
+            content=ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", variant="body")
         )
     items = [_sidebar_item(s, active) for s in _SECTIONS]
     root = ui.List(items=items)
@@ -165,10 +179,10 @@ async def admin_tools(ctx, active: str = "dashboard", section: str = "",
     would otherwise be drowned by the host-supplied `active=<current>` and the
     target section would never open.
     """
-    if getattr(ctx, "user_role", None) != "admin" and not getattr(ctx, "is_admin", False):
+    if not _is_admin(ctx):
         return ui.Card(
-            ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", color="red"),
-            padding=4
+            title="Доступ запрещён",
+            content=ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", variant="body")
         )
     current = section or active or "dashboard"
     try:
