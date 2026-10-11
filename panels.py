@@ -108,6 +108,11 @@ def _sidebar_item(section: dict, active: str) -> UINode:
 @ext.panel("sidebar", slot="left", title="Administration", icon="Shield")
 async def admin_sidebar(ctx, active: str = "dashboard", **kwargs):
     """Left sidebar — section navigation."""
+    if getattr(ctx, "user_role", None) != "admin" and not getattr(ctx, "is_admin", False):
+        return ui.Card(
+            ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", color="red"),
+            padding=4
+        )
     items = [_sidebar_item(s, active) for s in _SECTIONS]
     root = ui.List(items=items)
     # Auto-open center on first mount so the user lands on a populated workspace.
@@ -160,6 +165,11 @@ async def admin_tools(ctx, active: str = "dashboard", section: str = "",
     would otherwise be drowned by the host-supplied `active=<current>` and the
     target section would never open.
     """
+    if getattr(ctx, "user_role", None) != "admin" and not getattr(ctx, "is_admin", False):
+        return ui.Card(
+            ui.Text("403 Forbidden: Доступ запрещён. Требуются права администратора.", color="red"),
+            padding=4
+        )
     current = section or active or "dashboard"
     try:
         builder = _BUILDERS.get(current)

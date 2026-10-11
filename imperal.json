@@ -25240,7 +25240,9 @@
     }
   ],
   "schedules": [],
-  "required_scopes": [],
+  "required_scopes": [
+    "admin:*"
+  ],
   "icon_size_bytes": 335,
   "lifecycle": {
     "on_install": true,
@@ -25276,5 +25278,11 @@
       "stale_while_revalidate": true,
       "cache_ttl": 60
     }
-  ]
+  ],
+  "access_policy": {
+    "mode": "restricted",
+    "required_scopes": [
+      "admin:*"
+    ]
+  }
 }
