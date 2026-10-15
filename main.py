@@ -39,8 +39,6 @@ import handlers_admin_reads    # noqa: F401  # Webbee read-gaps: payments/cards/
 import handlers_user_search    # noqa: F401  # Find a person by id/email/name/company/role/country/status
 import handlers_user_profile_360  # noqa: F401  # Full 360° user profile + per-user audit activity
 import handlers_email          # noqa: F401  # Email tab: durable log + per-case template control + test send
-import handlers_repo_index     # noqa: F401  # Repo index map: read the coding agent's code map from ANY surface
-import handlers_repo_contract_graph  # noqa: F401  # Account cross-repo endpoint/schema graph
 import handlers_model_governance  # noqa: F401  # WHICH model runs per purpose + extension model-pin audit/reset
 import skeleton                # noqa: F401
 import panels                  # noqa: F401
