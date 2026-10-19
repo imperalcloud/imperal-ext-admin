@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "6.0.1",
   "app_id": "admin",
-  "version": "5.13.0",
+  "version": "5.14.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -9872,11 +9872,11 @@
           },
           "max_history": {
             "default": 10,
+            "description": "Max history turns stored in active session (default 10, hot wire bounded to 6)",
+            "maximum": 50,
             "minimum": 1,
             "title": "Max History",
-            "type": "integer",
-            "maximum": 50,
-            "description": "Max history turns stored in active session (default 10, hot wire bounded to 6)"
+            "type": "integer"
           },
           "history_ttl_days": {
             "default": 7,
@@ -13332,21 +13332,6 @@
             "description": "UNIT: tokens. max_tokens for chain narrator LLM (multi-step result rendering). Default 8000 (Sprint 2 fix #12 — long mail body markdown). Reads at hub/chain_renderer.py purpose=chain_narrative.",
             "title": "Chain Narrative Max Tokens"
           },
-          "judge_max_tokens": {
-            "anyOf": [
-              {
-                "maximum": 32000,
-                "minimum": 256,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UNIT: tokens. max_tokens for federal prose-judge LLM (anti-fab Gate 6). Default 4096. Distinct from prose_judge_max_tokens (narration/prose_judge.py); this is responses/judge.py LLM. Reads at llm/provider.py purpose=judge.",
-            "title": "Judge Max Tokens"
-          },
           "conversational_max_tokens": {
             "anyOf": [
               {
@@ -13376,21 +13361,6 @@
             "default": null,
             "description": "UNIT: tokens. max_tokens for Two-Phase Sprint 1 per-step re-classifier LLM (Sonnet) that binds args from prior step data. Default 8000 (Sprint 2 fix #20 — long mail.body markdown synthesis from web-tools 3-5KB JSON). Reads at hub/step_classifier.py:_call_provider.",
             "title": "Step Reclassify Max Tokens"
-          },
-          "tool_picker_max_tokens": {
-            "anyOf": [
-              {
-                "maximum": 16000,
-                "minimum": 256,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UNIT: tokens. max_tokens for chain_executor LLM tool picker (action_plan=null disambiguation path). Default 1024. Reads at orchestration/chain_executor.py:_llm_pick_tool_for_ext.",
-            "title": "Tool Picker Max Tokens"
           },
           "chain_arg_refs_max_tokens": {
             "anyOf": [
@@ -13675,21 +13645,6 @@
             "description": "UNIT: characters. Cap on message/response preview length stored in SessionMemory turn digest (was hardcoded 1500). Default 1500. Higher = richer history context but more Redis storage. Reads at core/session_memory.py:_truncate_preview.",
             "title": "String Truncate Chars"
           },
-          "history_ttl_days": {
-            "anyOf": [
-              {
-                "maximum": 90,
-                "minimum": 1,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UNIT: days. SessionMemory Redis TTL (was hardcoded 1 day / 86400s). Default 1 day. Higher = users keep more conversation history but more Redis storage. Reads via IMPERAL_HISTORY_TTL_SECONDS env at core/session_memory.py:_history_ttl_seconds (env set on worker boot).",
-            "title": "History Ttl Days"
-          },
           "coding_thread_window_budget_chars": {
             "anyOf": [
               {
@@ -13749,51 +13704,6 @@
             "default": null,
             "description": "UNIT: rounds. Max fold rounds ONE compact_coding_thread activity call may run (catch-up folding: keeps compacting until under budget or this cap). Kernel default 12. Higher = a badly-behind thread converges fully in one call; lower = spreads catch-up over more activity invocations. Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS.",
             "title": "Coding Thread Max Rounds"
-          },
-          "coding_thread_time_budget_s": {
-            "anyOf": [
-              {
-                "maximum": 140,
-                "minimum": 10,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UNIT: seconds. Wall-clock budget for the WHOLE compact_coding_thread call across all its rounds -- must stay safely under the coding workflow's activity start_to_close timeout. Default 100. Reads at activities/coding_thread.py:_COMPACT_TIME_BUDGET_S.",
-            "title": "Coding Thread Time Budget S"
-          },
-          "coding_thread_fold_max_tokens": {
-            "anyOf": [
-              {
-                "maximum": 65536,
-                "minimum": 1024,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UNIT: tokens. Response cap for the digest-fold LLM call. I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy spans (~1-2 tokens/char) truncating the digest JSON mid-string at the old fixed 4096, so the fold silently skipped and the thread never shrank. On any truncation/parse failure the call now automatically retries ONCE at coding_thread_fold_retry_max_tokens before falling back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, never stalls. Kernel default 24576. Reads at activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS.",
-            "title": "Coding Thread Fold Max Tokens"
-          },
-          "coding_thread_fold_retry_max_tokens": {
-            "anyOf": [
-              {
-                "maximum": 131072,
-                "minimum": 1024,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UNIT: tokens. Response cap for the ONE automatic RETRY of a fold digest call whose first attempt came back truncated/unparseable (dense-token spans truncate sooner). Must exceed coding_thread_fold_max_tokens or the retry cannot fit what the first attempt could not. Kernel default 49152 (2x the 24576 base). Reads at activities/coding_thread.py:_COMPACT_FOLD_RETRY_MAX_TOKENS.",
-            "title": "Coding Thread Fold Retry Max Tokens"
           },
           "knowledge_pick_max_tokens": {
             "anyOf": [

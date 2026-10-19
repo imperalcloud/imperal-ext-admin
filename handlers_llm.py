@@ -17,7 +17,7 @@ from panels_sections import _invalidate_panel_cache
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-from models_llm_config import SaveLlmConfigParams  # extracted; keeps file under 300 lines
+from models_llm_config import DEAD_LLM_KEYS, SaveLlmConfigParams  # extracted; keeps file under 300 lines
 
 
 # SDL: save_llm_config returns a config-save receipt whose runtime keys are
@@ -100,6 +100,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             # provider/model/api_key/base_url land together under one key the
             # gateway's recursive api_key encrypt/mask helpers already protect.
             "stt_provider", "stt_model", "stt_api_key", "stt_base_url",
+            # Manual model-id inputs: they REPLACE model / failover_model below
+            # and are not settings of their own.
+            "custom_model", "failover_custom_model",
         }
         updates = {}
         # Apply custom model inputs if provided (overrides dropdown if admin typed one)
@@ -234,6 +237,10 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                 current.pop(_url_key, None)
 
         current.update(updates)
+        # Keys nothing reads (audit 2026-10-19) leave the store on every save,
+        # so a stale copy can never come back (models_llm_config.DEAD_LLM_KEYS).
+        for _dead in DEAD_LLM_KEYS:
+            current.pop(_dead, None)
 
         # ── Atomically prune stale empty keys / ghost overrides ─────
         # If a purpose model is set to the same as default or empty, ensure both
@@ -304,7 +311,6 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.cross_turn_max_refs is not None: tb_payload["cross_turn_max_refs"] = params.cross_turn_max_refs
         if params.quality_ceiling_tokens is not None: tb_payload["quality_ceiling_tokens"] = params.quality_ceiling_tokens
         if params.string_truncate_chars is not None: tb_payload["string_truncate_chars"] = params.string_truncate_chars
-        if params.history_ttl_days is not None: tb_payload["history_ttl_days"] = params.history_ttl_days
 
         tb_updated: list = []
         if tb_payload:

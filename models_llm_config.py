@@ -12,6 +12,26 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, model_validator
 
 
+# Keys the platform no longer reads anywhere (kernel, gateway, panel) -- the
+# LLM config audit of 2026-10-19 checked each against the live kernel. The save
+# handler drops them from imperal:config:llm on every save, so a stale copy
+# cannot linger or come back. Re-adding a setting = a field + a kernel reader
+# (tests/test_llm_orphan_readers.py), never an entry here.
+DEAD_LLM_KEYS: tuple[str, ...] = (
+    "failover",                      # nested {"enabled"}: the switch is failover_enabled
+    "custom_model", "failover_custom_model",  # form inputs, not settings
+    "extensions",                    # legacy alias of extension_overrides
+    "stt_provider",                  # flat copy; STT lives in the nested "stt"
+    "judge_max_tokens",              # the judge reads responses_judge_max_tokens
+    "tool_picker_max_tokens",        # the tool picker makes no LLM call
+    "coding_thread_fold_max_tokens", "coding_thread_fold_retry_max_tokens",
+    "coding_thread_time_budget_s",   # coding-thread compaction is mechanical
+    "unified_turn_enabled", "unified_turn_coding_enabled", "unified_turn_panel_enabled",
+    "history_ttl_days",              # session TTL is fixed in the kernel
+    "narration_history_limit",       # lives in tenant-defaults, not here
+)
+
+
 class SaveLlmConfigParams(BaseModel):
     """Save LLM provider/model configuration."""
 
@@ -433,15 +453,6 @@ class SaveLlmConfigParams(BaseModel):
             "body markdown). Reads at hub/chain_renderer.py purpose=chain_narrative."
         ),
     )
-    judge_max_tokens: Optional[int] = Field(
-        default=None, ge=256, le=32000,
-        description=(
-            "UNIT: tokens. max_tokens for federal prose-judge LLM (anti-fab "
-            "Gate 6). Default 4096. Distinct from prose_judge_max_tokens "
-            "(narration/prose_judge.py); this is responses/judge.py LLM. "
-            "Reads at llm/provider.py purpose=judge."
-        ),
-    )
     conversational_max_tokens: Optional[int] = Field(
         default=None, ge=512, le=32000,
         description=(
@@ -458,14 +469,6 @@ class SaveLlmConfigParams(BaseModel):
             "data. Default 8000 (Sprint 2 fix #20 — long mail.body markdown "
             "synthesis from web-tools 3-5KB JSON). Reads at "
             "hub/step_classifier.py:_call_provider."
-        ),
-    )
-    tool_picker_max_tokens: Optional[int] = Field(
-        default=None, ge=256, le=16000,
-        description=(
-            "UNIT: tokens. max_tokens for chain_executor LLM tool picker "
-            "(action_plan=null disambiguation path). Default 1024. Reads "
-            "at orchestration/chain_executor.py:_llm_pick_tool_for_ext."
         ),
     )
     chain_arg_refs_max_tokens: Optional[int] = Field(
@@ -658,15 +661,6 @@ class SaveLlmConfigParams(BaseModel):
             "core/session_memory.py:_truncate_preview."
         ),
     )
-    history_ttl_days: Optional[int] = Field(
-        default=None, ge=1, le=90,
-        description=(
-            "UNIT: days. SessionMemory Redis TTL (was hardcoded 1 day / 86400s). "
-            "Default 1 day. Higher = users keep more conversation history but more "
-            "Redis storage. Reads via IMPERAL_HISTORY_TTL_SECONDS env at "
-            "core/session_memory.py:_history_ttl_seconds (env set on worker boot)."
-        ),
-    )
 
     # ── Webbee Code coding-thread retention (I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE,
     # 2026-07-31) -- Snapshot-First mechanical retention (I-ZERO-LLM-COMPACTION-LAG).
@@ -708,48 +702,14 @@ class SaveLlmConfigParams(BaseModel):
             "Reads at activities/coding_thread.py:_COMPACT_MAX_ROUNDS."
         ),
     )
-    coding_thread_time_budget_s: Optional[int] = Field(
-        default=None, ge=10, le=140,
-        description=(
-            "UNIT: seconds. Wall-clock budget for the WHOLE compact_coding_thread "
-            "call across all its rounds -- must stay safely under the coding "
-            "workflow's activity start_to_close timeout. Default 100. Reads at "
-            "activities/coding_thread.py:_COMPACT_TIME_BUDGET_S."
-        ),
-    )
     # le raised 16000 -> 65536 (2026-08-18): the kernel's own constant is
     # 24576, so the OLD ceiling made the real running value impossible to
     # enter -- a panel bound that silently contradicted the kernel.
-    coding_thread_fold_max_tokens: Optional[int] = Field(
-        default=None, ge=1024, le=65_536,
-        description=(
-            "UNIT: tokens. Response cap for the digest-fold LLM call. "
-            "I-CODING-THREAD-NEVER-OVERFLOWS: a live incident showed Cyrillic-heavy "
-            "spans (~1-2 tokens/char) truncating the digest JSON mid-string at the "
-            "old fixed 4096, so the fold silently skipped and the thread never "
-            "shrank. On any truncation/parse failure the call now automatically "
-            "retries ONCE at coding_thread_fold_retry_max_tokens before falling "
-            "back to a mechanical (no-LLM) digest -- the thread ALWAYS shrinks, "
-            "never stalls. Kernel default 24576. Reads at "
-            "activities/coding_thread.py:_COMPACT_FOLD_MAX_TOKENS."
-        ),
-    )
     # ORPHAN READER FIX (2026-08-18): the 7th coding-thread knob. Its six
     # sisters all got a panel field when the section shipped; this one was
     # missed, so the retry cap stayed frozen at the kernel literal while the
     # base cap next to it was tunable -- the exact asymmetry that makes a
     # "raise the fold budget" change behave unpredictably.
-    coding_thread_fold_retry_max_tokens: Optional[int] = Field(
-        default=None, ge=1024, le=131_072,
-        description=(
-            "UNIT: tokens. Response cap for the ONE automatic RETRY of a fold "
-            "digest call whose first attempt came back truncated/unparseable "
-            "(dense-token spans truncate sooner). Must exceed "
-            "coding_thread_fold_max_tokens or the retry cannot fit what the "
-            "first attempt could not. Kernel default 49152 (2x the 24576 base). "
-            "Reads at activities/coding_thread.py:_COMPACT_FOLD_RETRY_MAX_TOKENS."
-        ),
-    )
 
     # ── Docs knowledge retrieval (2026-08-18) ────────────────────────────────
     # ORPHAN READER FIX: the kernel has read this knob since the knowledge

@@ -103,15 +103,11 @@ _TOKEN_BUDGETS: list[tuple[str, str, str, str]] = [
     ("chain_narrative_max_tokens", "Chain Narrator", "8000",
      "Cap for the multi-step narrator — large so long mail bodies and 10-step "
      "summaries aren't truncated."),
-    ("judge_max_tokens", "Judge (Anti-Fab)", "4096",
-     "Cap for the anti-fabrication judge pass (purpose=judge)."),
     ("conversational_max_tokens", "Conversational (Chitchat)", "4096",
      "Cap for chitchat / empty-apps fallback replies."),
     ("step_reclassify_max_tokens", "Step Reclassify (Sonnet)", "8000",
      "Cap for the per-step reclassifier — large so long mail.body synthesis "
      "from tool JSON isn't truncated mid-emit."),
-    ("tool_picker_max_tokens", "Tool Picker", "1024",
-     "Cap for the chain-disambiguation tool pick."),
     ("chain_arg_refs_max_tokens", "Chain $REF Formatter", "2000",
      "Cap for the $REF→markdown formatter (renders content-shaped fields "
      "like mail.body / notes.content_text)."),
@@ -298,10 +294,8 @@ def build_llm_form(
         "execution_max_tokens": int(_pmt.get("execution_max_tokens", _td.get("execution_max_tokens", 4096))),
         "navigate_max_tokens": int(_pmt.get("navigate_max_tokens", _td.get("navigate_max_tokens", 4096))),
         "chain_narrative_max_tokens": int(_pmt.get("chain_narrative_max_tokens", _td.get("chain_narrative_max_tokens", 8000))),
-        "judge_max_tokens": int(_pmt.get("judge_max_tokens", _td.get("judge_max_tokens", 4096))),
         "conversational_max_tokens": int(_pmt.get("conversational_max_tokens", _td.get("conversational_max_tokens", 4096))),
         "step_reclassify_max_tokens": int(_pmt.get("step_reclassify_max_tokens", _td.get("step_reclassify_max_tokens", 8000))),
-        "tool_picker_max_tokens": int(_pmt.get("tool_picker_max_tokens", _td.get("tool_picker_max_tokens", 1024))),
         "chain_arg_refs_max_tokens": int(_pmt.get("chain_arg_refs_max_tokens", _td.get("chain_arg_refs_max_tokens", 2000))),
         "semantic_verifier_max_tokens": int(_pmt.get("semantic_verifier_max_tokens", _td.get("semantic_verifier_max_tokens", 128))),
         "action_narrator_max_tokens": int(_pmt.get("action_narrator_max_tokens", _td.get("action_narrator_max_tokens", 1024))),
@@ -384,11 +378,6 @@ def build_llm_form(
         "coding_thread_keep_recent": int((coding_thread_config or {}).get("coding_thread_keep_recent", 20)),
         "coding_thread_input_cap": int((coding_thread_config or {}).get("coding_thread_input_cap", 120000)),
         "coding_thread_max_rounds": int((coding_thread_config or {}).get("coding_thread_max_rounds", 12)),
-        "coding_thread_time_budget_s": int((coding_thread_config or {}).get("coding_thread_time_budget_s", 100)),
-        "coding_thread_fold_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_max_tokens", 24576)),
-        # Kernel constant is 49152 (activities/coding_thread.py:181). The panel
-        # must show what the kernel RUNS with, never a prettier number.
-        "coding_thread_fold_retry_max_tokens": int((coding_thread_config or {}).get("coding_thread_fold_retry_max_tokens", 49152)),
         # Docs router budget. Fallback mirrors the kernel's own
         # _DEFAULT_PICK_MAX_TOKENS (200) so a blank store renders the value the
         # kernel actually runs with — not an aspirational number.
@@ -403,7 +392,6 @@ def build_llm_form(
         "cross_turn_max_refs": int(_td.get("cross_turn_max_refs", 5)),
         "quality_ceiling_tokens": int(_td.get("quality_ceiling_tokens", 50000)),
         "string_truncate_chars": int(_td.get("string_truncate_chars", 1500)),
-        "history_ttl_days": int(_td.get("history_ttl_days", 1)),
     }
 
     # ── Per-purpose AI params (LCU-4, 2026-04-30) ────────────────

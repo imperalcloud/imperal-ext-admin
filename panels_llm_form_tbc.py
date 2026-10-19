@@ -106,21 +106,6 @@ def build_tbc_section(defaults: dict):
         ),
 
         ui.Text(
-            "history_ttl_days — UNIT: days. SessionMemory Redis TTL (was "
-            "hardcoded 1 day). Default 1. Higher = longer history retention "
-            "but more Redis storage. Floor 1 day to prevent data loss. "
-            "Consumer: core/session_memory.py:_history_ttl_seconds "
-            "(via IMPERAL_HISTORY_TTL_SECONDS env on worker boot).",
-            variant="caption",
-        ),
-        ui.Slider(
-            min=1, max=90, step=1,
-            value=defaults.get("history_ttl_days", 1),
-            label="history_ttl_days (days)",
-            param_name="history_ttl_days",
-        ),
-
-        ui.Text(
             "list_truncate_items — UNIT: count. Max items rendered when $REF "
             "resolver shows a list as markdown bullets/rows. Default 50. Higher = "
             "longer tables in chat. Consumer: chain_arg_refs.py.",

@@ -90,41 +90,5 @@ def build_coding_thread_section(defaults: dict):
                 param_name="coding_thread_max_rounds",
             ),
 
-            ui.Text(
-                "coding_thread_time_budget_s — UNIT: seconds. Wall-clock ceiling "
-                "for multi-round retention catch-up (stays safely inside the workflow "
-                "timeout). Default 100.",
-                variant="caption",
-            ),
-            ui.Slider(
-                min=10, max=140, step=5,
-                value=defaults["coding_thread_time_budget_s"],
-                label="coding_thread_time_budget_s (seconds)",
-                param_name="coding_thread_time_budget_s",
-            ),
-
-            ui.Text(
-                "coding_thread_fold_max_tokens — UNIT: tokens. Token cap for "
-                "snapshot digest synthesis. Kernel default 24576.",
-                variant="caption",
-            ),
-            ui.Slider(
-                min=1024, max=65_536, step=256,
-                value=defaults["coding_thread_fold_max_tokens"],
-                label="coding_thread_fold_max_tokens (tokens)",
-                param_name="coding_thread_fold_max_tokens",
-            ),
-
-            ui.Text(
-                "coding_thread_fold_retry_max_tokens — UNIT: tokens. Token cap for "
-                "fallback retry if synthesis reply is truncated. Kernel default 49152.",
-                variant="caption",
-            ),
-            ui.Slider(
-                min=1024, max=131_072, step=1024,
-                value=defaults["coding_thread_fold_retry_max_tokens"],
-                label="coding_thread_fold_retry_max_tokens (tokens)",
-                param_name="coding_thread_fold_retry_max_tokens",
-            ),
         ],
     )

@@ -63,9 +63,6 @@ KERNEL_READ_KEYS: dict[str, str] = {
     "coding_thread_keep_recent": "activities/coding_thread.py:193",
     "coding_thread_max_rounds": "activities/coding_thread.py:194",
     "coding_thread_input_cap": "activities/coding_thread.py:195",
-    "coding_thread_fold_max_tokens": "activities/coding_thread.py:196",
-    "coding_thread_fold_retry_max_tokens": "activities/coding_thread.py:197",
-    "coding_thread_time_budget_s": "activities/coding_thread.py:200",
     # --- 2026-08-28 audit: purpose="code" max_tokens read generically by
     # LLMProvider._extract_per_purpose_admin (provider.py:666) via the flat
     # f"{purpose}_max_tokens" key -- like every other purpose in this dict --
@@ -90,9 +87,6 @@ KERNEL_DEFAULTS: dict[str, object] = {
     "coding_thread_keep_recent": 20,               # core/coding_thread.py:325
     "coding_thread_input_cap": 120_000,            # core/coding_thread.py:326
     "coding_thread_max_rounds": 12,                # activities/coding_thread.py:154
-    "coding_thread_time_budget_s": 100,            # activities/coding_thread.py:155
-    "coding_thread_fold_max_tokens": 24_576,       # activities/coding_thread.py:180
-    "coding_thread_fold_retry_max_tokens": 49_152,  # activities/coding_thread.py:181
 }
 
 
@@ -226,7 +220,7 @@ def test_stored_value_is_rendered_back():
         "frame_v2_enabled": True,
         "judge_enabled": True,
         "step_reclassify_enabled": False,
-        "coding_thread_fold_retry_max_tokens": 65_536,
+        "coding_thread_keep_recent": 30,
     }
     tree = _plain(_build_form(
         knowledge_config=stored,
@@ -257,10 +251,8 @@ def test_purpose_max_tokens_stored_in_cfg_is_rendered_back():
         "execution_max_tokens": 8001,
         "navigate_max_tokens": 8002,
         "chain_narrative_max_tokens": 12000,
-        "judge_max_tokens": 8003,
         "conversational_max_tokens": 8004,
         "step_reclassify_max_tokens": 12001,
-        "tool_picker_max_tokens": 8005,
         "chain_arg_refs_max_tokens": 8006,
         "semantic_verifier_max_tokens": 500,
         "action_narrator_max_tokens": 8007,
@@ -299,3 +291,46 @@ def test_toggle_off_survives_the_save_filter():
         assert (value is not None and value != "") is should_save, (
             f"save filter changed: {value!r} -> expected saved={should_save}"
         )
+
+
+# ---------------------------------------------------------------------------
+# The other direction: ORPHAN WRITERS. A key nothing reads must not be
+# declared, rendered, or left in the store (LLM config audit 2026-10-19:
+# coding-thread fold/time caps, judge/tool-picker caps, history TTL, the
+# unified-turn toggles and the nested failover flag were all written and
+# shown while the platform ignored them).
+# ---------------------------------------------------------------------------
+from models_llm_config import DEAD_LLM_KEYS  # noqa: E402
+
+# Dead in imperal:config:llm but legitimately on the form: the manual model-id
+# inputs (they replace model / failover_model on save), stt_provider (merged
+# into the nested "stt" dict) and narration_history_limit (saved to
+# tenant-defaults, where the kernel reads it).
+_FORM_ONLY = {"custom_model", "failover_custom_model", "stt_provider", "narration_history_limit"}
+
+
+@pytest.mark.parametrize("key", sorted(set(DEAD_LLM_KEYS) - _FORM_ONLY))
+def test_dead_key_has_no_control(key):
+    assert not _controls(_plain(_build_form()), key), (
+        f"{key} is read by nothing, but the panel still renders a control for it"
+    )
+
+
+@pytest.mark.parametrize("key", sorted(set(DEAD_LLM_KEYS) - _FORM_ONLY))
+def test_dead_key_is_not_a_save_field(key):
+    assert key not in SaveLlmConfigParams.model_fields, (
+        f"{key} is read by nothing -- a save field for it only writes a value "
+        "the platform ignores"
+    )
+
+
+def test_dead_key_is_never_a_kernel_read_key():
+    assert not set(DEAD_LLM_KEYS) & set(KERNEL_READ_KEYS)
+
+
+def test_save_purges_dead_keys_from_the_store():
+    src = open("handlers_llm.py").read()
+    purge = src.find("for _dead in DEAD_LLM_KEYS")
+    write = src.find('await r.set("imperal:config:llm", json.dumps(current))', purge)
+    assert purge != -1 and write != -1, "dead keys must be dropped before the store write"
+    assert '"custom_model", "failover_custom_model"' in _skip_fields_literal()
