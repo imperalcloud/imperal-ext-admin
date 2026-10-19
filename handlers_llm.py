@@ -111,12 +111,19 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if getattr(params, "failover_custom_model", "") and str(params.failover_custom_model).strip():
             params.failover_model = str(params.failover_custom_model).strip()
 
+        _cleared: list = []
         for field in SaveLlmConfigParams.model_fields:
             if field in skip_fields:
                 continue
             val = getattr(params, field)
             if val is not None and val != "":
                 updates[field] = val
+            elif field in params.model_fields_set and "api_key" not in field:
+                # The form renders the stored value, so a submitted blank is the
+                # admin clearing it ("inherit"): drop it. Secrets keep the
+                # write-only convention (blank = keep). Without this a value
+                # such as thinking_budget could be set but never removed.
+                _cleared.append(field)
         # Sprint 2 hotfix (2026-04-28): per-purpose Model Select is cross-provider.
         # If admin picks e.g. claude-sonnet for execution while the global provider
         # is openai, the resolver would pair incompatible model+provider → 404 from
@@ -237,6 +244,8 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                 current.pop(_url_key, None)
 
         current.update(updates)
+        for _field in _cleared:
+            current.pop(_field, None)
         # Keys nothing reads (audit 2026-10-19) leave the store on every save,
         # so a stale copy can never come back (models_llm_config.DEAD_LLM_KEYS).
         for _dead in DEAD_LLM_KEYS:

@@ -382,16 +382,27 @@ def build_llm_form(
         # _DEFAULT_PICK_MAX_TOKENS (200) so a blank store renders the value the
         # kernel actually runs with — not an aspirational number.
         "knowledge_pick_max_tokens": int((knowledge_config or {}).get("knowledge_pick_max_tokens", 200)),
-        # Phase 16 (2026-05-17): orphans wired from System tab
-        "narrator_structured_data_chars": int(_td.get("narrator_structured_data_chars", 8000)),
-        "default_max_result_tokens": int(_td.get("default_max_result_tokens", 3000)),
-        "list_truncate_items": int(_td.get("list_truncate_items", 50)),
-        "classifier_fact_ledger_window": int(_td.get("classifier_fact_ledger_window", 20)),
-        # P5 (2026-05-28): federal I-REF-CAP-PER-ARGS + I-REF-CAP-CROSS-TURN.
-        "chain_max_refs_per_args": int(_td.get("chain_max_refs_per_args", 20)),
-        "cross_turn_max_refs": int(_td.get("cross_turn_max_refs", 5)),
-        "quality_ceiling_tokens": int(_td.get("quality_ceiling_tokens", 50000)),
-        "string_truncate_chars": int(_td.get("string_truncate_chars", 1500)),
+        # Context caps the kernel reads from cfg (imperal:config:llm, the kctx
+        # overlay in kernel_resolve). Rendered cfg-first: rendering them from
+        # tenant_defaults (or not at all, for the two classifier_* caps) made
+        # EVERY save write the form's stale number over the stored one
+        # (live 2026-10-19: 12500 -> 3000, 4000 -> 1500). tenant_defaults stays
+        # as the fallback for values an older build wrote only there.
+        **{
+            _k: int(_pmt.get(_k, _td.get(_k, _dflt)))
+            for _k, _dflt in (
+                ("narrator_structured_data_chars", 8000),
+                ("default_max_result_tokens", 3000),
+                ("list_truncate_items", 50),
+                ("classifier_fact_ledger_window", 20),
+                ("chain_max_refs_per_args", 20),
+                ("cross_turn_max_refs", 5),
+                ("quality_ceiling_tokens", 50000),
+                ("string_truncate_chars", 1500),
+                ("classifier_data_facts_chars", 1500),
+                ("classifier_turn_facts_agg_chars", 3000),
+            )
+        },
     }
 
     # ── Per-purpose AI params (LCU-4, 2026-04-30) ────────────────

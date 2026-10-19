@@ -334,3 +334,29 @@ def test_save_purges_dead_keys_from_the_store():
     write = src.find('await r.set("imperal:config:llm", json.dumps(current))', purge)
     assert purge != -1 and write != -1, "dead keys must be dropped before the store write"
     assert '"custom_model", "failover_custom_model"' in _skip_fields_literal()
+
+
+def test_context_caps_render_from_cfg_not_stale_tenant_defaults():
+    """Live 2026-10-19: these caps were rendered from tenant_defaults (or not
+    at all), so every save wrote the form's stale number over the stored one
+    (classifier_turn_facts_agg_chars 12500 -> 3000, string_truncate_chars
+    4000 -> 1500). cfg must win; tenant_defaults is only a fallback."""
+    cfg = {
+        "narrator_structured_data_chars": 20000, "default_max_result_tokens": 20000,
+        "list_truncate_items": 100, "classifier_fact_ledger_window": 30,
+        "chain_max_refs_per_args": 25, "cross_turn_max_refs": 12,
+        "quality_ceiling_tokens": 64000, "string_truncate_chars": 4000,
+        "classifier_data_facts_chars": 6000, "classifier_turn_facts_agg_chars": 12500,
+    }
+    stale = {k: 7 for k in cfg}
+    tree = _plain(_build_form(purpose_max_tokens_config=cfg, tenant_defaults=stale))
+    for key, want in cfg.items():
+        hits = _controls(tree, key)
+        assert hits and int(hits[0].get("value")) == want, (key, hits[:1])
+
+
+def test_submitted_blank_clears_a_stored_value():
+    """thinking_budget could be set but never removed: a blank was 'keep'."""
+    src = open("handlers_llm.py").read()
+    assert 'elif field in params.model_fields_set and "api_key" not in field:' in src
+    assert "for _field in _cleared:\n            current.pop(_field, None)" in src
