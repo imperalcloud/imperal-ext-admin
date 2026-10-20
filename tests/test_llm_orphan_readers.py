@@ -91,7 +91,7 @@ KERNEL_DEFAULTS: dict[str, object] = {
 
 
 def _skip_fields_literal() -> str:
-    src = open("handlers_llm.py").read()
+    src = open(__import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__file__)), "handlers_llm.py")).read()
     start = src.find(_SKIP_MARKER)
     assert start != -1, "skip_fields literal not found in handlers_llm.py"
     return src[start:src.find("}", start)]
@@ -329,7 +329,7 @@ def test_dead_key_is_never_a_kernel_read_key():
 
 
 def test_save_purges_dead_keys_from_the_store():
-    src = open("handlers_llm.py").read()
+    src = open(__import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__file__)), "handlers_llm.py")).read()
     purge = src.find("for _dead in DEAD_LLM_KEYS")
     write = src.find('await r.set("imperal:config:llm", json.dumps(current))', purge)
     assert purge != -1 and write != -1, "dead keys must be dropped before the store write"
@@ -357,6 +357,6 @@ def test_context_caps_render_from_cfg_not_stale_tenant_defaults():
 
 def test_submitted_blank_clears_a_stored_value():
     """thinking_budget could be set but never removed: a blank was 'keep'."""
-    src = open("handlers_llm.py").read()
+    src = open(__import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__file__)), "handlers_llm.py")).read()
     assert 'elif field in params.model_fields_set and "api_key" not in field:' in src
     assert "for _field in _cleared:\n            current.pop(_field, None)" in src
