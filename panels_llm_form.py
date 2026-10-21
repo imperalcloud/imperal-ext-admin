@@ -401,6 +401,8 @@ def build_llm_form(
                 ("string_truncate_chars", 1500),
                 ("classifier_data_facts_chars", 1500),
                 ("classifier_turn_facts_agg_chars", 3000),
+                ("chat_max_input_chars", 32768),
+                ("max_micro_context_bytes", 32768),
             )
         },
     }
@@ -779,6 +781,34 @@ def build_llm_form(
                     value=defaults["knowledge_pick_max_tokens"],
                     label="knowledge_pick_max_tokens (tokens)",
                     param_name="knowledge_pick_max_tokens",
+                ),
+                ui.Divider(),
+                ui.Text(
+                    "chat_max_input_chars — UNIT: chars. Maximum character length of an "
+                    "incoming user message in Panel / Chat (/v1/chat/send). Previously "
+                    "hardcoded at 8,192 chars, which rejected long prompts with a validation "
+                    "error. Default 32,768. Consumer: auth-gateway app/chat/router.py & "
+                    "kernel tenant_vault_turn_bridge.py.",
+                    variant="caption",
+                ),
+                ui.Slider(
+                    min=1024, max=200000, step=1024,
+                    value=defaults.get("chat_max_input_chars", 32768),
+                    label="chat_max_input_chars (chars)",
+                    param_name="chat_max_input_chars",
+                ),
+                ui.Text(
+                    "max_micro_context_bytes — UNIT: bytes. Maximum UTF-8 byte budget for "
+                    "the assembled micro-step context window in TenantVaultTurnBridge "
+                    "(previously hardcoded at 8,192 bytes). Default 32,768. Consumer: "
+                    "workflows/tenant_vault_turn_bridge.py.",
+                    variant="caption",
+                ),
+                ui.Slider(
+                    min=4096, max=256000, step=1024,
+                    value=defaults.get("max_micro_context_bytes", 32768),
+                    label="max_micro_context_bytes (bytes)",
+                    param_name="max_micro_context_bytes",
                 ),
             ]),
 

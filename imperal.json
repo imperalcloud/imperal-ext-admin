@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "6.0.1",
+  "sdk_version": "5.15.1",
   "app_id": "admin",
-  "version": "5.15.0",
+  "version": "5.15.1",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -13720,6 +13720,36 @@
             "description": "UNIT: tokens. max_tokens for the Stage-1 docs ROUTER LLM that picks which documentation sections answer a question (search_docs). Kernel fallback when unset: 200 -- too small for a reasoning model, whose thinking tokens then eat the whole budget and the reply arrives with an EMPTY text block (measured ~25% of calls -> 'no documentation found' on docs that exist). Recommended 1500. Reads at activities/knowledge.py:_pick_llm.",
             "title": "Knowledge Pick Max Tokens"
           },
+          "chat_max_input_chars": {
+            "anyOf": [
+              {
+                "maximum": 200000,
+                "minimum": 1024,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: characters. Maximum length of an incoming user chat message accepted by the chat ingress and kernel turn dispatcher. Default 32768 (raised from legacy 8192). Reads at imperal-auth-gateway app/chat/router.py and kernel turn ingress.",
+            "title": "Chat Max Input Chars"
+          },
+          "max_micro_context_bytes": {
+            "anyOf": [
+              {
+                "maximum": 256000,
+                "minimum": 2048,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UNIT: bytes. Maximum micro-step context payload budget in TenantVaultTurnBridge. Kernel fallback when unset: 32768. Reads at workflows/tenant_vault_turn_bridge.py:MAX_MICRO_CONTEXT_BYTES.",
+            "title": "Max Micro Context Bytes"
+          },
           "purpose_code_temperature": {
             "default": "",
             "description": "Per-purpose temperature for code (coding brain; blank = inherit)",
@@ -24034,9 +24064,7 @@
     }
   ],
   "schedules": [],
-  "required_scopes": [
-    "admin:*"
-  ],
+  "required_scopes": [],
   "icon_size_bytes": 335,
   "lifecycle": {
     "on_install": true,

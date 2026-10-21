@@ -320,6 +320,8 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         if params.cross_turn_max_refs is not None: tb_payload["cross_turn_max_refs"] = params.cross_turn_max_refs
         if params.quality_ceiling_tokens is not None: tb_payload["quality_ceiling_tokens"] = params.quality_ceiling_tokens
         if params.string_truncate_chars is not None: tb_payload["string_truncate_chars"] = params.string_truncate_chars
+        if params.chat_max_input_chars is not None: tb_payload["chat_max_input_chars"] = params.chat_max_input_chars
+        if params.max_micro_context_bytes is not None: tb_payload["max_micro_context_bytes"] = params.max_micro_context_bytes
 
         tb_updated: list = []
         if tb_payload:

@@ -739,6 +739,23 @@ class SaveLlmConfigParams(BaseModel):
             "Recommended 1500. Reads at activities/knowledge.py:_pick_llm."
         ),
     )
+    chat_max_input_chars: Optional[int] = Field(
+        default=None, ge=1024, le=200000,
+        description=(
+            "UNIT: characters. Maximum length of an incoming user chat message "
+            "accepted by the chat ingress and kernel turn dispatcher. "
+            "Default 32768 (raised from legacy 8192). Reads at "
+            "imperal-auth-gateway app/chat/router.py and kernel turn ingress."
+        ),
+    )
+    max_micro_context_bytes: Optional[int] = Field(
+        default=None, ge=2048, le=256000,
+        description=(
+            "UNIT: bytes. Maximum micro-step context payload budget in "
+            "TenantVaultTurnBridge. Kernel fallback when unset: 32768. "
+            "Reads at workflows/tenant_vault_turn_bridge.py:MAX_MICRO_CONTEXT_BYTES."
+        ),
+    )
 
     # ── Per-purpose AI params (LCU-4, 2026-04-30) — empty string = inherit
     purpose_code_temperature: str = Field(default="", description="Per-purpose temperature for code (coding brain; blank = inherit)")

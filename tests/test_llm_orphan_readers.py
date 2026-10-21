@@ -68,6 +68,8 @@ KERNEL_READ_KEYS: dict[str, str] = {
     # f"{purpose}_max_tokens" key -- like every other purpose in this dict --
     # but had no panel row at all until this fix.
     "code_max_tokens": "llm/provider.py:_extract_per_purpose_admin (flat key 'code_max_tokens')",
+    "chat_max_input_chars": "workflows/tenant_vault_turn_bridge.py & auth-gateway app/chat/router.py",
+    "max_micro_context_bytes": "workflows/tenant_vault_turn_bridge.py:get_max_micro_context_bytes",
 }
 
 # Keys the SAVE handler deliberately routes to the tenant-defaults endpoint
@@ -87,6 +89,8 @@ KERNEL_DEFAULTS: dict[str, object] = {
     "coding_thread_keep_recent": 20,               # core/coding_thread.py:325
     "coding_thread_input_cap": 120_000,            # core/coding_thread.py:326
     "coding_thread_max_rounds": 12,                # activities/coding_thread.py:154
+    "chat_max_input_chars": 32_768,                # app/chat/router.py & tenant_vault_turn_bridge.py
+    "max_micro_context_bytes": 32_768,             # workflows/tenant_vault_turn_bridge.py
 }
 
 
