@@ -76,6 +76,17 @@ class AdjustBalanceParams(BaseModel):
     user_id: str = Field(description="The target user — imperal_id (imp_u_*), email, display name, or a partial/fragment of any of those. Resolved flexibly server-side; ambiguous matches return a clear error instead of guessing.")
     amount: int = Field(description="Token amount (positive=credit, negative=deduct)")
     reason: str = Field(default="admin_adjustment", description="Reason for adjustment")
+    idempotency_key: str | None = Field(default=None, description="Optional unique token: the same key never adjusts twice.")
+
+
+def _money_mode() -> str:
+    """Billing stage E (kernel env MONEY_MODE): redis = the Redis wallet; shadow = Redis decides,
+    the gateway money door follows; mysql = the gateway money door only."""
+    return (os.getenv("MONEY_MODE", "redis") or "redis").strip()
+
+
+async def _door(path: str, body: dict) -> dict:
+    return await _gw_request("POST", f"/v1/internal/billing/wallet/{path}", body)
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #
@@ -157,17 +168,19 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
     if err:
         return ActionResult.error(err)
     try:
-        r = await _redis()
-        try:
-            bal = int(await r.get(f"{WALLET_PREFIX}{target_id}") or 0)
-            hold_keys = await _scan_keys(r, f"{HOLD_PREFIX}{target_id}:*")
-            holds = []
-            for key in hold_keys:
-                held = int(await r.get(key) or 0)
-                trace = key.split(":")[-1]
-                holds.append({"trace_id": trace, "held": held})
-        finally:
-            await r.aclose()
+        holds = []
+        bal = None
+        if _money_mode() != "mysql":
+            r = await _redis()
+            try:
+                bal = int(await r.get(f"{WALLET_PREFIX}{target_id}") or 0)
+                hold_keys = await _scan_keys(r, f"{HOLD_PREFIX}{target_id}:*")
+                for key in hold_keys:
+                    held = int(await r.get(key) or 0)
+                    trace = key.split(":")[-1]
+                    holds.append({"trace_id": trace, "held": held})
+            finally:
+                await r.aclose()
 
         total_held = sum(h["held"] for h in holds)
 
@@ -185,10 +198,13 @@ async def fn_get_user_balance(ctx, params: UserBalanceParams) -> ActionResult:
         cancel = bool(sub.get("cancel_at_period_end"))
         cap = int(bl.get("cap") or 0)
         included = int(bl.get("included_tokens") or 0)
+        if bal is None:                       # mysql: the gateway wallet is the balance
+            bal = int(bl.get("balance") or 0)
+        sub_b, purchased_b = int(bl.get("sub") or 0), int(bl.get("purchased") or bal)
 
         renew_txt = f" · renews {str(expires)[:10]}" if expires else ""
         return ActionResult.success(
-            data={"user_id": target_id, "balance": bal,
+            data={"user_id": target_id, "balance": bal, "sub": sub_b, "purchased": purchased_b,
                   "available": bal - total_held, "holds": holds, "holds_total": total_held,
                   "plan": plan, "status": status, "expires_at": expires,
                   "cancel_at_period_end": cancel, "cap": cap, "included_tokens": included},
@@ -212,31 +228,59 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
     target_id, err = await _normalize_to_imperal_id(params.user_id)
     if err:
         return ActionResult.error(err)
+    admin_id = ctx.user.imperal_id if hasattr(ctx, "user") and ctx.user else "system"
+    key = f"admin:{params.idempotency_key or uuid.uuid4()}"
+    meta = {"admin_id": admin_id, "description": f"Admin adjustment: {params.reason}"}
+    mode = _money_mode()
     try:
-        r = await _redis()
-        try:
-            wallet_key = f"{WALLET_PREFIX}{target_id}"
+        if mode == "mysql":
+            # billing stage E: purchased credits, once per key; a deduct never goes below zero
             if params.amount > 0:
-                new_bal = await r.incrby(wallet_key, params.amount)
+                res = await _door("credit", {"user_id": target_id, "amount": params.amount, "key": key,
+                                             "reason": params.reason, "bucket": "purchased", "metadata": meta})
             else:
-                current = int(await r.get(wallet_key) or 0)
-                if current + params.amount < 0:
-                    return ActionResult.error(
-                        f"Insufficient: {current} tokens, cannot deduct {abs(params.amount)}")
-                new_bal = await r.decrby(wallet_key, abs(params.amount))
+                res = await _door("charge", {"user_id": target_id, "amount": abs(params.amount), "key": key,
+                                             "reason": params.reason, "allow_negative": False, "metadata": meta})
+            if not isinstance(res, dict) or "error" in res:
+                return ActionResult.error(f"Failed: {(res or {}).get('error')}", retryable=True)
+            if not res.get("ok"):
+                return ActionResult.error(
+                    f"Insufficient: {res.get('balance')} tokens, cannot deduct {abs(params.amount)}")
+            new_bal = int(res["balance"])
+        else:
+            r = await _redis()
+            try:
+                wallet_key = f"{WALLET_PREFIX}{target_id}"
+                if params.amount > 0:
+                    new_bal = await r.incrby(wallet_key, params.amount)
+                else:
+                    current = int(await r.get(wallet_key) or 0)
+                    if current + params.amount < 0:
+                        return ActionResult.error(
+                            f"Insufficient: {current} tokens, cannot deduct {abs(params.amount)}")
+                    new_bal = await r.decrby(wallet_key, abs(params.amount))
 
-            admin_id = ctx.user.imperal_id if hasattr(ctx, "user") and ctx.user else "system"
-            ev_type = "credit" if params.amount > 0 else "deduct"
-            await r.xadd(STREAM_KEY, {
-                "event_id": str(uuid.uuid4()), "type": ev_type,
-                "data": json.dumps({
-                    "user_id": target_id, "amount": abs(params.amount),
-                    "reason": params.reason, "admin_id": admin_id,
-                    "description": f"Admin adjustment: {params.reason}",
-                }),
-            })
-        finally:
-            await r.aclose()
+                ev_type = "credit" if params.amount > 0 else "deduct"
+                await r.xadd(STREAM_KEY, {
+                    "event_id": key if mode == "shadow" else str(uuid.uuid4()), "type": ev_type,
+                    "data": json.dumps({
+                        "user_id": target_id, "amount": abs(params.amount),
+                        "reason": params.reason, "admin_id": admin_id,
+                        "description": f"Admin adjustment: {params.reason}",
+                    }),
+                })
+            finally:
+                await r.aclose()
+            if mode == "shadow":          # Redis decided; the door follows with the same key
+                try:
+                    if params.amount > 0:
+                        await _door("credit", {"user_id": target_id, "amount": params.amount, "key": key,
+                                               "reason": params.reason, "bucket": "purchased", "metadata": meta})
+                    else:
+                        await _door("charge", {"user_id": target_id, "amount": abs(params.amount), "key": key,
+                                               "reason": params.reason, "allow_negative": True, "metadata": meta})
+                except Exception:
+                    log.exception("money.shadow_error admin adjust user=%s key=%s", target_id, key)
 
         verb = "credited" if params.amount > 0 else "deducted"
         return ActionResult.success(
