@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
+import time
 import uuid
 
 import httpx
@@ -80,9 +82,22 @@ class AdjustBalanceParams(BaseModel):
 
 
 def _money_mode() -> str:
-    """Billing stage E (kernel env MONEY_MODE): redis = the Redis wallet; shadow = Redis decides,
-    the gateway money door follows; mysql = the gateway money door only."""
-    return (os.getenv("MONEY_MODE", "redis") or "redis").strip()
+    """Billing stage E (kernel env MONEY_MODE): redis = the Redis wallet; mysql = the gateway
+    money door only."""
+    mode = (os.getenv("MONEY_MODE", "redis") or "redis").strip()
+    if mode not in ("redis", "mysql"):
+        raise ValueError(f"MONEY_MODE must be redis|mysql, got {mode!r}")
+    return mode
+
+
+def _adjust_key(target_id: str, params) -> str:
+    """One key per adjustment: the caller's idempotency_key, else the request itself within a
+    10-minute window -- an LLM retry of the same adjustment is then the same operation."""
+    if params.idempotency_key:
+        return f"admin:{params.idempotency_key}"
+    window = int(time.time() // 600)
+    digest = hashlib.sha1(f"{target_id}:{params.amount}:{params.reason}:{window}".encode()).hexdigest()[:16]
+    return f"admin:{target_id}:{digest}"
 
 
 async def _door(path: str, body: dict) -> dict:
@@ -133,6 +148,17 @@ async def fn_billing_overview(ctx, params: EmptyParams) -> ActionResult:
 async def fn_list_user_balances(ctx, params: EmptyParams) -> ActionResult:
     """List all user wallet balances with totals."""
     try:
+        if _money_mode() == "mysql":
+            res = await _gw_request("GET", "/v1/internal/billing/wallet/list")
+            if not isinstance(res, dict) or "items" not in res:
+                return ActionResult.error(f"Failed: {(res or {}).get('error')}", retryable=True)
+            wallets = sorted(res["items"], key=lambda w: w["balance"], reverse=True)
+            total = sum(w["balance"] for w in wallets)
+            return ActionResult.success(
+                data={"items": wallets, "total": len(wallets), "total_users": len(wallets),
+                      "total_tokens_in_circulation": total},
+                summary=f"{len(wallets)} wallets, {total} total tokens",
+            )
         r = await _redis()
         try:
             all_keys = await _scan_keys(r, f"{WALLET_PREFIX}*")
@@ -229,7 +255,7 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
     if err:
         return ActionResult.error(err)
     admin_id = ctx.user.imperal_id if hasattr(ctx, "user") and ctx.user else "system"
-    key = f"admin:{params.idempotency_key or uuid.uuid4()}"
+    key = _adjust_key(target_id, params)
     meta = {"admin_id": admin_id, "description": f"Admin adjustment: {params.reason}"}
     mode = _money_mode()
     try:
@@ -250,19 +276,26 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
         else:
             r = await _redis()
             try:
+                # the Redis wallet is not keyed: claim the adjustment's key first (once per key)
+                if not await r.set(f"imperal:billing:idem:{key}", "1", nx=True, ex=86400):
+                    return ActionResult.success(
+                        data={"user_id": target_id, "adjustment": params.amount, "reason": params.reason,
+                              "duplicate": True},
+                        summary=f"Already adjusted ({key}) -- not applied twice")
                 wallet_key = f"{WALLET_PREFIX}{target_id}"
                 if params.amount > 0:
                     new_bal = await r.incrby(wallet_key, params.amount)
                 else:
                     current = int(await r.get(wallet_key) or 0)
                     if current + params.amount < 0:
+                        await r.delete(f"imperal:billing:idem:{key}")
                         return ActionResult.error(
                             f"Insufficient: {current} tokens, cannot deduct {abs(params.amount)}")
                     new_bal = await r.decrby(wallet_key, abs(params.amount))
 
                 ev_type = "credit" if params.amount > 0 else "deduct"
                 await r.xadd(STREAM_KEY, {
-                    "event_id": key if mode == "shadow" else str(uuid.uuid4()), "type": ev_type,
+                    "event_id": str(uuid.uuid4()), "type": ev_type,
                     "data": json.dumps({
                         "user_id": target_id, "amount": abs(params.amount),
                         "reason": params.reason, "admin_id": admin_id,
@@ -271,16 +304,6 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
                 })
             finally:
                 await r.aclose()
-            if mode == "shadow":          # Redis decided; the door follows with the same key
-                try:
-                    if params.amount > 0:
-                        await _door("credit", {"user_id": target_id, "amount": params.amount, "key": key,
-                                               "reason": params.reason, "bucket": "purchased", "metadata": meta})
-                    else:
-                        await _door("charge", {"user_id": target_id, "amount": abs(params.amount), "key": key,
-                                               "reason": params.reason, "allow_negative": True, "metadata": meta})
-                except Exception:
-                    log.exception("money.shadow_error admin adjust user=%s key=%s", target_id, key)
 
         verb = "credited" if params.amount > 0 else "deducted"
         return ActionResult.success(
