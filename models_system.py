@@ -288,12 +288,13 @@ class CategoryDefaultsReceipt(sdl.Entity):
 
 class CodingPricingReceipt(sdl.Entity):
     """Receipt for save_coding_pricing (kind='codingpricing').
-    Mirrors handler return keys: {markup, credits_per_dollar, min_charge, grace_cap, low_warn_threshold, action}."""
+    Mirrors handler return keys: {markup, credits_per_dollar, min_charge, grace_cap, low_warn_threshold, mcp_frame, action}."""
     markup: Optional[float] = None
     credits_per_dollar: Optional[int] = None
     min_charge: Optional[int] = None
     grace_cap: Optional[int] = None
     low_warn_threshold: Optional[int] = None
+    mcp_frame: Optional[int] = None
     action: Optional[str] = None
 
     @model_validator(mode="before")

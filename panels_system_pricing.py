@@ -21,7 +21,7 @@ log = logging.getLogger("admin")
 _DEFAULT_FEES = {"economy": 60, "standard": 250, "premium": 2200}
 _DEFAULT_RATE = 1000
 _DEFAULT_CATS = {"read": 1, "write": 5, "destructive": 10}
-_DEFAULT_CODING = {"markup": 3.0, "credits_per_dollar": 1000, "min_charge": 0, "grace_cap": 1000, "low_warn_threshold": 500}
+_DEFAULT_CODING = {"markup": 3.0, "credits_per_dollar": 1000, "min_charge": 0, "grace_cap": 1000, "low_warn_threshold": 500, "mcp_frame": 5}
 
 
 async def _get(path: str) -> dict:
@@ -126,6 +126,7 @@ async def build_system_pricing(ctx, **kwargs):
             "min_charge": int(coding.get("min_charge", _DEFAULT_CODING["min_charge"])),
             "grace_cap": int(coding.get("grace_cap", _DEFAULT_CODING["grace_cap"])),
             "low_warn_threshold": int(coding.get("low_warn_threshold", _DEFAULT_CODING["low_warn_threshold"])),
+            "mcp_frame": int(coding.get("mcp_frame", _DEFAULT_CODING["mcp_frame"])),
         },
         children=[
             ui.Section(title="Coding agent (webbee-code terminal) pricing", children=[
@@ -142,6 +143,8 @@ async def build_system_pricing(ctx, **kwargs):
                 ui.Input(param_name="grace_cap", placeholder="e.g. 1000"),
                 ui.Text("Low-balance warn threshold (credits)", variant="caption"),
                 ui.Input(param_name="low_warn_threshold", placeholder="e.g. 500"),
+                ui.Text("imperal-mcp frame price (credits per frame, 0 = free)", variant="caption"),
+                ui.Input(param_name="mcp_frame", placeholder="e.g. 5"),
             ]),
         ],
     )

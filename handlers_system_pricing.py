@@ -112,15 +112,16 @@ class SaveCodingPricingParams(BaseModel):
     min_charge: int = Field(..., ge=0, le=100_000, description="Minimum credits per billed coding turn")
     grace_cap: int = Field(..., ge=0, le=20_000, description="Max in-flight overdraft (credits); server-capped at 20000")
     low_warn_threshold: int = Field(..., ge=0, le=1_000_000, description="Warn the user when balance drops below this")
+    mcp_frame: int = Field(5, ge=0, le=100_000, description="Credits per imperal-mcp frame (0 = free)")
 
 
 @chat.function("save_coding_pricing", action_type="write", effects=["update:coding_pricing"],
                event="coding_pricing_saved", data_model=CodingPricingReceipt,
                description="Save the coding-agent (webbee-code terminal) pricing: markup on the real "
-                           "LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and "
-                           "low-balance warn threshold, to the billing config.")
+                           "LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, "
+                           "low-balance warn threshold and the imperal-mcp frame price, to the billing config.")
 async def fn_save_coding_pricing(ctx, params: SaveCodingPricingParams) -> ActionResult:
-    """Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and low-balance warn threshold, to the billing config."""
+    """Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, low-balance warn threshold and the imperal-mcp frame price, to the billing config."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     body = params.model_dump()
@@ -135,6 +136,7 @@ async def fn_save_coding_pricing(ctx, params: SaveCodingPricingParams) -> Action
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Coding pricing saved (markup x{params.markup} / {params.credits_per_dollar} cr per $ / "
-                f"min {params.min_charge} / grace {params.grace_cap} / warn {params.low_warn_threshold}). Applies within ~1 min.",
+                f"min {params.min_charge} / grace {params.grace_cap} / warn {params.low_warn_threshold} / "
+                f"frame {params.mcp_frame}). Applies within ~1 min.",
         refresh_panels=["tools"],
     )
