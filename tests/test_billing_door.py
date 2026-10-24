@@ -97,3 +97,30 @@ def test_mistyped_money_mode_is_an_error(monkeypatch):
     monkeypatch.setenv("MONEY_MODE", "shadow")
     with pytest.raises(ValueError):
         hb._money_mode()
+
+
+@pytest.mark.asyncio
+async def test_mysql_replay_is_reported_as_already_done(ctx, user, monkeypatch):
+    monkeypatch.setenv("MONEY_MODE", "mysql")
+    spy = GatewaySpy({("POST", "/wallet/credit"): {"ok": True, "applied": False, "balance": 1500}})
+    monkeypatch.setattr(hb, "_gw_request", spy)
+    res = await hb.fn_adjust_balance(ctx, hb.AdjustBalanceParams(user_id="x", amount=500, idempotency_key="t-1"))
+    assert "already" in (res.summary or "").lower() and res.data.get("duplicate") is True
+
+
+@pytest.mark.asyncio
+async def test_redis_claim_released_when_the_wallet_write_fails(ctx, user, monkeypatch):
+    import fakeredis.aioredis
+    monkeypatch.setenv("MONEY_MODE", "redis")
+    r = fakeredis.aioredis.FakeRedis(decode_responses=True)
+
+    async def _r():
+        return r
+    monkeypatch.setattr(hb, "_redis", _r)
+    monkeypatch.setattr(r, "aclose", lambda: __import__("asyncio").sleep(0), raising=False)
+
+    async def _boom(*a, **k):
+        raise ConnectionError("redis blip")
+    monkeypatch.setattr(r, "incrby", _boom)
+    await hb.fn_adjust_balance(ctx, hb.AdjustBalanceParams(user_id="x", amount=500, idempotency_key="t-2"))
+    assert await r.get("imperal:billing:idem:admin:t-2") is None

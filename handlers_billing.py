@@ -272,6 +272,11 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
             if not res.get("ok"):
                 return ActionResult.error(
                     f"Insufficient: {res.get('balance')} tokens, cannot deduct {abs(params.amount)}")
+            if not res.get("applied", True):
+                return ActionResult.success(
+                    data={"user_id": target_id, "balance": int(res["balance"]), "adjustment": params.amount,
+                          "reason": params.reason, "duplicate": True},
+                    summary=f"Already adjusted ({key}) -- not applied twice; balance: {res['balance']}")
             new_bal = int(res["balance"])
         else:
             r = await _redis()
@@ -283,15 +288,19 @@ async def fn_adjust_balance(ctx, params: AdjustBalanceParams) -> ActionResult:
                               "duplicate": True},
                         summary=f"Already adjusted ({key}) -- not applied twice")
                 wallet_key = f"{WALLET_PREFIX}{target_id}"
-                if params.amount > 0:
-                    new_bal = await r.incrby(wallet_key, params.amount)
-                else:
-                    current = int(await r.get(wallet_key) or 0)
-                    if current + params.amount < 0:
-                        await r.delete(f"imperal:billing:idem:{key}")
-                        return ActionResult.error(
-                            f"Insufficient: {current} tokens, cannot deduct {abs(params.amount)}")
-                    new_bal = await r.decrby(wallet_key, abs(params.amount))
+                try:
+                    if params.amount > 0:
+                        new_bal = await r.incrby(wallet_key, params.amount)
+                    else:
+                        current = int(await r.get(wallet_key) or 0)
+                        if current + params.amount < 0:
+                            await r.delete(f"imperal:billing:idem:{key}")
+                            return ActionResult.error(
+                                f"Insufficient: {current} tokens, cannot deduct {abs(params.amount)}")
+                        new_bal = await r.decrby(wallet_key, abs(params.amount))
+                except Exception:
+                    await r.delete(f"imperal:billing:idem:{key}")     # nothing applied: a retry may apply
+                    raise
 
                 ev_type = "credit" if params.amount > 0 else "deduct"
                 await r.xadd(STREAM_KEY, {
