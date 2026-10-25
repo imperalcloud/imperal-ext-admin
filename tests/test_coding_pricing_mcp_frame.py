@@ -32,3 +32,19 @@ def test_the_panel_form_carries_the_mcp_frame_price():
     import panels_system_pricing as psp
     src = inspect.getsource(psp)
     assert 'param_name="mcp_frame"' in src and '"mcp_frame": int(coding.get("mcp_frame"' in src
+
+
+@pytest.mark.asyncio
+async def test_a_save_without_the_frame_price_leaves_it_alone(ctx, monkeypatch):
+    """Review I5: "set markup to 2.5" through chat must not reset an admin's frame price to the default."""
+    sent = {}
+
+    async def fake_put(path, body, acting=None, forbidden_message=""):
+        sent[path] = body
+        return {"action": "saved"}, None
+    monkeypatch.setattr(hsp, "_admin_put_checked", fake_put)
+    monkeypatch.setattr(hsp, "AUTH_GW", "http://gw")
+    monkeypatch.setattr(hsp, "AUTH_SERVICE_TOKEN", "t")
+    res = await hsp.fn_save_coding_pricing(ctx, hsp.SaveCodingPricingParams(
+        markup=2.5, credits_per_dollar=1000, min_charge=0, grace_cap=1000, low_warn_threshold=500))
+    assert "mcp_frame" not in sent["/v1/internal/billing/coding-pricing"] and "frame kept" in res.summary
