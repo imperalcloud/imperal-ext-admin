@@ -14,6 +14,7 @@ Spec: kernel docs/superpowers/specs/2026-10-28-living-matrix-design.md.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -22,6 +23,8 @@ from app import chat, ActionResult, _acting, _gw_request, _tenant_id
 from models_system import ProactivityResponse
 
 LOCKS = ("on", "off", "")
+# the id goes into the gateway path: an imperal id only, so no "/" or ".." reaches another endpoint
+_USER_ID = re.compile(r"^imp_u_[A-Za-z0-9_-]{1,64}$")
 
 
 class TenantProactivityParams(BaseModel):
@@ -91,6 +94,8 @@ async def fn_set_proactivity(ctx, params: TenantProactivityParams) -> ActionResu
                            "(master switch: lock on/off overrides the user's own choice, \"\" unlocks).")
 async def fn_set_user_proactivity(ctx, params: UserProactivityParams) -> ActionResult:
     """One user's switch and lock -- the effective value read back is what the kernel will see."""
+    if not _USER_ID.match(params.user_id or ""):
+        return ActionResult.error("user_id must be an imperal id (imp_u_...)")
     patch = _patch(params)
     if not patch:
         return ActionResult.error("Nothing to set: give enabled and/or lock")
@@ -116,6 +121,8 @@ async def fn_set_user_proactivity(ctx, params: UserProactivityParams) -> ActionR
 @chat.function("get_proactivity", action_type="read", data_model=ProactivityResponse,
                description="Show Webbee's proactivity: the tenant default and lock, and one user's effective value.")
 async def fn_get_proactivity(ctx, params: ProactivityReadParams) -> ActionResult:
+    if params.user_id and not _USER_ID.match(params.user_id):
+        return ActionResult.error("user_id must be an imperal id (imp_u_...)")
     tenant = _tenant_id(ctx)
     t = await _gw_request("GET", f"/v1/admin/tenant-defaults?tenant_id={tenant}")
     if isinstance(t, dict) and t.get("error"):

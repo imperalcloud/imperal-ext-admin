@@ -51,6 +51,9 @@ async def test_bad_lock_and_empty_call_touch_nothing(monkeypatch, ctx, spy):
     monkeypatch.setattr(hp, "_gw_request", gw)
     assert (await hp.fn_set_user_proactivity(ctx, UserProactivityParams(user_id=UID, lock="always"))).status == "error"
     assert (await hp.fn_set_proactivity(ctx, TenantProactivityParams())).status == "error"
+    for bad in ("../../admin/tenant-defaults", "imp_u_x/settings", "someone"):   # never a path into another endpoint
+        assert (await hp.fn_set_user_proactivity(ctx, UserProactivityParams(user_id=bad, enabled=True))).status == "error"
+        assert (await hp.fn_get_proactivity(ctx, ProactivityReadParams(user_id=bad))).status == "error"
     assert gw.calls == []
 
 
