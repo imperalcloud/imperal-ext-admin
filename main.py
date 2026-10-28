@@ -24,6 +24,7 @@ import handlers_rbac           # noqa: F401
 import handlers_extensions     # noqa: F401
 import handlers_ext_settings   # noqa: F401
 import handlers_system         # noqa: F401
+import handlers_proactivity    # noqa: F401  # Webbee's proactivity: tenant default, per-user switch, the admin's lock
 import handlers_llm            # noqa: F401
 import handlers_pricing        # noqa: F401  # Sprint 4 LLM rate CRUD
 import panels_pricing          # noqa: F401  # Sprint 4 LLM Pricing panel

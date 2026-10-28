@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.15.1",
   "app_id": "admin",
-  "version": "5.15.1",
+  "version": "5.16.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -12159,6 +12159,650 @@
           "title"
         ],
         "title": "UserConfirmationResponse",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_proactivity",
+      "description": "Turn Webbee's proactivity on or off for the whole tenant (the default users start from), and/or lock it for everyone (master switch: lock on/off, \"\" unlocks).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:proactivity"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set Webbee's proactivity for everyone in the tenant.",
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The tenant default: on or off (users may change theirs)",
+            "title": "Enabled"
+          },
+          "lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Master lock for everyone: \"on\", \"off\", or \"\" to unlock",
+            "title": "Lock"
+          }
+        },
+        "title": "TenantProactivityParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "set_proactivity / set_user_proactivity / get_proactivity return shape — Webbee's proactivity for the tenant\nor one user: the effective switch, the admin's lock, whether the user may change it.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "scope": {
+            "default": "",
+            "title": "Scope",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lock"
+          },
+          "user_can_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Can Change"
+          },
+          "tenant_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Enabled"
+          },
+          "tenant_lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Lock"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ProactivityResponse",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "proactivity_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "set_user_proactivity",
+      "description": "Turn Webbee's proactivity on or off for ONE user, and/or lock it for them (master switch: lock on/off overrides the user's own choice, \"\" unlocks).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:proactivity"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set Webbee's proactivity for one user.",
+        "properties": {
+          "user_id": {
+            "description": "User imperal_id",
+            "title": "User Id",
+            "type": "string"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "On or off for this user",
+            "title": "Enabled"
+          },
+          "lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Master lock for this user: \"on\", \"off\", or \"\" to unlock",
+            "title": "Lock"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "UserProactivityParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "set_proactivity / set_user_proactivity / get_proactivity return shape — Webbee's proactivity for the tenant\nor one user: the effective switch, the admin's lock, whether the user may change it.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "scope": {
+            "default": "",
+            "title": "Scope",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lock"
+          },
+          "user_can_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Can Change"
+          },
+          "tenant_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Enabled"
+          },
+          "tenant_lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Lock"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ProactivityResponse",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "proactivity_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_proactivity",
+      "description": "Show Webbee's proactivity: the tenant default and lock, and one user's effective value.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Read Webbee's proactivity: the tenant's, and one user's when given.",
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User imperal_id (omit for the tenant only)",
+            "title": "User Id"
+          }
+        },
+        "title": "ProactivityReadParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "set_proactivity / set_user_proactivity / get_proactivity return shape — Webbee's proactivity for the tenant\nor one user: the effective switch, the admin's lock, whether the user may change it.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "scope": {
+            "default": "",
+            "title": "Scope",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lock"
+          },
+          "user_can_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Can Change"
+          },
+          "tenant_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Enabled"
+          },
+          "tenant_lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tenant Lock"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ProactivityResponse",
         "type": "object",
         "x-sdl": "entity"
       },

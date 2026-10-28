@@ -151,6 +151,28 @@ class UserConfirmationResponse(sdl.Entity):
         return data
 
 
+class ProactivityResponse(sdl.Entity):
+    """set_proactivity / set_user_proactivity / get_proactivity return shape — Webbee's proactivity for the tenant
+    or one user: the effective switch, the admin's lock, whether the user may change it."""
+    scope: str = ""
+    tenant_id: Optional[str] = None
+    user_id: Optional[str] = None
+    enabled: Optional[bool] = None
+    lock: Optional[str] = None
+    user_can_change: Optional[bool] = None
+    tenant_enabled: Optional[bool] = None
+    tenant_lock: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sdl_canon(cls, data):
+        if isinstance(data, dict):
+            data.setdefault("id", data.get("user_id") or data.get("tenant_id") or "")
+            data.setdefault("title", f"proactivity · {data.get('user_id') or data.get('tenant_id') or ''}")
+            data.setdefault("kind", "proactivity")
+        return data
+
+
 class TaskLimitResponse(sdl.Entity):
     """get_task_limit return shape — a single role task-limit entity."""
     role: str
