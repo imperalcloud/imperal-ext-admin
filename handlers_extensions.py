@@ -49,6 +49,8 @@ class SetAccessPolicyParams(BaseModel):
     required_scopes: Optional[list[str]] = Field(default=None, description="Scopes for restricted mode")
     denied_roles: Optional[list[str]]  = Field(default=None, description="Roles to deny")
     denied_users: Optional[list[str]]  = Field(default=None, description="User IDs to deny")
+    guest_enabled: Optional[bool]      = Field(default=None, description="Whether role 'guest' is allowed to access this extension")
+    guest_allowed_functions: Optional[list[str]] = Field(default=None, description="Explicit list of function names allowed for role 'guest'")
 
 
 class DenyAllowParams(BaseModel):
@@ -215,6 +217,159 @@ async def fn_list_user_extensions(ctx, params: UserExtParams) -> ActionResult:
     return ActionResult.success(data={"items": items, "total": len(items)}, summary=f"{len(items)} extensions for {ref}")
 
 
+def _clean_guest_functions(raw_fns) -> list[str]:
+    """Normalize guest_allowed_functions: strip, drop empty & wildcards, deduplicate in order."""
+    if not isinstance(raw_fns, list):
+        return []
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for item in raw_fns:
+        fn = str(item or "").strip()
+        if not fn or "*" in fn or fn in seen:
+            continue
+        seen.add(fn)
+        cleaned.append(fn)
+    return cleaned
+
+
+def _extract_read_only_functions(app_id: str, data: dict) -> set[str] | None:
+    """Resolve registered read-only function names from Registry settings payload + on-disk manifest.
+
+    Registry's `GET /v1/apps/{app_id}/settings` queries `SELECT activity_name, name,
+    description, domains FROM app_tools` — `app_tools` has no `action_type` column,
+    and `imperal deploy` stores `activity_name='tool_<fn>'` with title-cased
+    `name='<Fn>'`. When `action_type` is absent from the Registry payload, we resolve
+    each tool's `action_type` from `/opt/extensions/{app_id}/imperal.json` (or
+    `app.ir.json`). Fails closed (`None`) if `action_type` cannot be verified.
+    """
+    if not isinstance(data, dict):
+        return None
+    tools = data.get("tools") if "tools" in data else data.get("functions")
+    if tools is None:
+        tools = []
+    if not isinstance(tools, list):
+        return None
+
+    def _candidates(t: dict) -> list[str]:
+        raw_name = str(t.get("name") or "").strip()
+        raw_act = str(t.get("activity_name") or t.get("activity") or "").strip()
+        act_fn = raw_act[5:] if raw_act.startswith("tool_") and len(raw_act) > 5 else raw_act
+        snake_name = "_".join(raw_name.lower().split()) if " " in raw_name else raw_name
+        out: list[str] = []
+        ordered = (
+            (act_fn, snake_name, raw_name)
+            if " " in raw_name
+            else (raw_name, act_fn, snake_name)
+        )
+        for c in ordered:
+            if c and "*" not in c and " " not in c and c not in out:
+                out.append(c)
+        return out
+
+    has_explicit_action_type = any(
+        isinstance(t, dict) and t.get("action_type") is not None for t in tools
+    )
+    if has_explicit_action_type:
+        allowed: set[str] = set()
+        for t in tools:
+            if not isinstance(t, dict):
+                continue
+            action_type = str(t.get("action_type") or "").strip().lower()
+            if action_type != "read":
+                continue
+            cands = _candidates(t)
+            if cands:
+                allowed.add(cands[0])
+        return allowed
+
+    import json as _json
+    import os as _os
+
+    import re as _re
+
+    aid_clean = str(app_id or "").strip()
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,127}", aid_clean):
+        return None
+    ext_root = _os.environ.get("EXTENSIONS_DIR", "/opt/extensions")
+    manifest_path = _os.path.join(ext_root, aid_clean, "imperal.json")
+    ir_path = _os.path.join(ext_root, aid_clean, "app.ir.json")
+
+    manifest_action_types: dict[str, str] = {}
+    owner_chat_map: dict[str, list[str]] = {}
+    loaded_manifest = False
+
+    if _os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as fh:
+                mdoc = _json.load(fh)
+            if isinstance(mdoc, dict) and isinstance(mdoc.get("tools"), list):
+                loaded_manifest = True
+                for mt in mdoc["tools"]:
+                    if not isinstance(mt, dict):
+                        continue
+                    m_name = str(mt.get("name") or "").strip()
+                    m_atype = str(mt.get("action_type") or "").strip().lower()
+                    if m_name and "*" not in m_name and " " not in m_name and m_atype:
+                        manifest_action_types[m_name] = m_atype
+                        owner_tool = str(mt.get("owner_chat_tool") or "").strip()
+                        if owner_tool and m_atype == "read":
+                            owner_chat_map.setdefault(owner_tool, []).append(m_name)
+        except Exception:
+            loaded_manifest = False
+
+    if not loaded_manifest and _os.path.isfile(ir_path):
+        try:
+            with open(ir_path, "r", encoding="utf-8") as fh:
+                irdoc = _json.load(fh)
+            funcs = ((irdoc.get("app") or {}).get("functions") or []) if isinstance(irdoc, dict) else []
+            if isinstance(funcs, list):
+                loaded_manifest = True
+                for fn_obj in funcs:
+                    if not isinstance(fn_obj, dict):
+                        continue
+                    m_name = str(fn_obj.get("name") or "").strip()
+                    m_atype = str(fn_obj.get("action_type") or "").strip().lower()
+                    if m_name and "*" not in m_name and " " not in m_name and m_atype:
+                        manifest_action_types[m_name] = m_atype
+        except Exception:
+            loaded_manifest = False
+
+    if not loaded_manifest:
+        return None
+
+    allowed_from_manifest: set[str] = set()
+    if tools:
+        for t in tools:
+            if not isinstance(t, dict):
+                continue
+            for cand in _candidates(t):
+                if manifest_action_types.get(cand) == "read":
+                    allowed_from_manifest.add(cand)
+                    break
+                if cand in owner_chat_map:
+                    allowed_from_manifest.update(owner_chat_map[cand])
+                elif f"tool_{cand}" in owner_chat_map:
+                    allowed_from_manifest.update(owner_chat_map[f"tool_{cand}"])
+    else:
+        for m_name, m_atype in manifest_action_types.items():
+            if m_atype == "read":
+                allowed_from_manifest.add(m_name)
+
+    return allowed_from_manifest
+
+
+async def _fetch_registered_read_functions(app_id: str) -> set[str] | None:
+    """Return the set of registered function names with action_type == 'read' for app_id, or None on error."""
+    try:
+        r = await _registry_get(f"/v1/apps/{app_id}/settings")
+        if getattr(r, "status_code", 500) != 200:
+            return None
+        data = r.json() if hasattr(r, "json") else {}
+        return _extract_read_only_functions(app_id, data)
+    except Exception:
+        return None
+
+
 @chat.function("set_access_policy", action_type="write", effects=["update:extension_access_policy"], event="access_policy_set", data_model=ExtSettingsReceipt, description="Set extension access policy.")
 async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResult:
     """Set extension access policy."""
@@ -223,6 +378,23 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
     policy: dict = {}
     if params.mode: policy["mode"] = params.mode
     if params.required_scopes is not None: policy["required_scopes"] = params.required_scopes
+    if params.guest_enabled is not None:
+        policy["guest_enabled"] = bool(params.guest_enabled)
+    if params.guest_allowed_functions is not None:
+        cleaned_fns = _clean_guest_functions(params.guest_allowed_functions)
+        if cleaned_fns:
+            read_only_fns = await _fetch_registered_read_functions(aid)
+            if read_only_fns is None:
+                return ActionResult.error(
+                    f"Cannot verify registered read-only functions for '{aid}' from Registry"
+                )
+            invalid_fns = [fn for fn in cleaned_fns if fn not in read_only_fns]
+            if invalid_fns:
+                return ActionResult.error(
+                    f"Disallowed guest function(s) for '{aid}': {', '.join(invalid_fns)}. "
+                    "Only registered functions with action_type='read' can be enabled for guests."
+                )
+        policy["guest_allowed_functions"] = cleaned_fns
     exceptions: dict = {}
     if params.denied_roles is not None: exceptions["denied_roles"] = params.denied_roles
     if params.denied_users is not None: exceptions["denied_users"] = params.denied_users
@@ -234,12 +406,61 @@ async def fn_set_access_policy(ctx, params: SetAccessPolicyParams) -> ActionResu
     merged = {**cur_policy, **policy}
     if "exceptions" in policy:
         merged["exceptions"] = {**cur_policy.get("exceptions", {}), **policy["exceptions"]}
+    merged_guest_fns = _clean_guest_functions(merged.get("guest_allowed_functions"))
+    if "guest_allowed_functions" in merged:
+        merged["guest_allowed_functions"] = merged_guest_fns
+    if merged.get("guest_enabled") is True and merged_guest_fns and params.guest_allowed_functions is None:
+        read_only_fns = await _fetch_registered_read_functions(aid)
+        if read_only_fns is None:
+            return ActionResult.error(
+                f"Cannot verify registered read-only functions for '{aid}' from Registry"
+            )
+        invalid_fns = [fn for fn in merged_guest_fns if fn not in read_only_fns]
+        if invalid_fns:
+            return ActionResult.error(
+                f"Disallowed guest function(s) for '{aid}': {', '.join(invalid_fns)}. "
+                "Only registered functions with action_type='read' can be enabled for guests."
+            )
     await _gw_request("PUT", f"/v1/internal/config/app/{aid}?tenant_id={tid}&app_id={aid}", {"config": {"access_policy": merged}})
+    await _invalidate_extension_caches()
+    guest_on = bool(merged.get("guest_enabled", False))
+    guest_fns = _clean_guest_functions(merged.get("guest_allowed_functions"))
     return ActionResult.success(
-        data={"app_id": aid, "policy": merged},
-        summary=f"Policy for {aid}: mode={merged.get('mode', '?')}",
+        data={
+            "app_id": aid,
+            "updated": True,
+            "policy": merged,
+            "guest_enabled": guest_on,
+            "guest_allowed_functions": guest_fns,
+        },
+        summary=f"Policy for {aid}: mode={merged.get('mode', '?')}, guest_enabled={guest_on}",
         refresh_panels=["tools"],
     )
+
+
+def _resolve_guest_role_status(policy: dict) -> str:
+    """Compute human-readable resolution status for the 'guest' role (deny-by-default)."""
+    denied = (policy.get("exceptions") or {}).get("denied_roles") or []
+    if "guest" in denied:
+        return "DENIED (role exception)"
+    guest_on = policy.get("guest_enabled") is True
+    guest_fns = _clean_guest_functions(policy.get("guest_allowed_functions"))
+    if not guest_on or not guest_fns:
+        return "DENIED (guest deny-by-default)"
+    return f"PARTIAL ({len(guest_fns)} fns)"
+
+
+def _build_guest_resolution_row(policy: dict) -> dict:
+    denied = (policy.get("exceptions") or {}).get("denied_roles") or []
+    guest_on = policy.get("guest_enabled") is True and "guest" not in denied
+    guest_fns = _clean_guest_functions(policy.get("guest_allowed_functions"))
+    allowed = bool(guest_on and guest_fns)
+    return {
+        "role": "guest",
+        "status": _resolve_guest_role_status(policy),
+        "allowed": allowed,
+        "allowed_functions": guest_fns if allowed else [],
+    }
 
 
 @chat.function("get_access_policy", action_type="read", data_model=AccessPolicyRecord, description="Show access policy with per-role resolution.")
@@ -253,10 +474,14 @@ async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
     resolution = []
     if isinstance(roles, list):
         for role in roles:
+            rname = role.get("name", "")
             rs = role.get("default_scopes") or []
             req = policy.get("required_scopes", [])
             denied = policy.get("exceptions", {}).get("denied_roles", [])
-            if role["name"] in denied:
+            if rname == "guest":
+                resolution.append(_build_guest_resolution_row(policy))
+                continue
+            elif rname in denied:
                 st = "DENIED (role exception)"
             elif req:
                 st = "PASS" if all(r in rs or "*" in rs or f"{r.split(':')[0]}:*" in rs for r in req) else f"DENIED (missing {req})"
@@ -264,9 +489,21 @@ async def fn_get_access_policy(ctx, params: AppIdParams) -> ActionResult:
                 st = "DENIED (restricted)"
             else:
                 st = "PASS"
-            resolution.append({"role": role["name"], "status": st})
-    return ActionResult.success(data={"app_id": aid, "policy": policy, "role_resolution": resolution},
-                                summary=f"Policy for {aid}: mode={policy.get('mode', 'public')}")
+            resolution.append({"role": rname, "status": st})
+    if not any(r.get("role") == "guest" for r in resolution):
+        resolution.append(_build_guest_resolution_row(policy))
+    guest_on = bool(policy.get("guest_enabled", False))
+    guest_fns = _clean_guest_functions(policy.get("guest_allowed_functions"))
+    return ActionResult.success(
+        data={
+            "app_id": aid,
+            "policy": policy,
+            "guest_enabled": guest_on,
+            "guest_allowed_functions": guest_fns,
+            "role_resolution": resolution,
+        },
+        summary=f"Policy for {aid}: mode={policy.get('mode', 'public')}",
+    )
 
 
 @chat.function("list_extension_users", action_type="read", data_model=ExtensionUsersResponse, description="List users who can access an extension.")

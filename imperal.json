@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.15.1",
+  "sdk_version": "6.5.3",
   "app_id": "admin",
-  "version": "5.16.0",
+  "version": "5.17.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -6197,6 +6197,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -6418,6 +6445,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -6626,6 +6680,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -6836,6 +6917,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -7044,6 +7152,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -7416,6 +7551,35 @@
             "default": null,
             "description": "User IDs to deny",
             "title": "Denied Users"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether role 'guest' is allowed to access this extension",
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Explicit list of function names allowed for role 'guest'",
+            "title": "Guest Allowed Functions"
           }
         },
         "required": [
@@ -7567,6 +7731,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -7726,6 +7917,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "role_resolution": {
             "anyOf": [
@@ -8184,6 +8402,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -8404,6 +8649,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -8626,6 +8898,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -8845,6 +9144,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -9114,6 +9440,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -9354,6 +9707,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -9581,6 +9961,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -9806,6 +10213,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -10036,6 +10470,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -10262,6 +10723,33 @@
             "default": null,
             "title": "Policy"
           },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
+          },
           "denied": {
             "anyOf": [
               {
@@ -10476,6 +10964,33 @@
             ],
             "default": null,
             "title": "Policy"
+          },
+          "guest_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Enabled"
+          },
+          "guest_allowed_functions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Guest Allowed Functions"
           },
           "denied": {
             "anyOf": [
@@ -12169,6 +12684,270 @@
       "owner_chat_tool": "tool_admin_chat"
     },
     {
+      "name": "set_task_limit",
+      "description": "Set max concurrent tasks for a role (1-50).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:task_limit"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set task limit for a role.",
+        "properties": {
+          "role_name": {
+            "description": "Role name",
+            "title": "Role Name",
+            "type": "string"
+          },
+          "max_tasks": {
+            "default": 3,
+            "description": "Max concurrent tasks (1-50)",
+            "title": "Max Tasks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "role_name"
+        ],
+        "title": "TaskLimitParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "get_task_limit return shape — a single role task-limit entity.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "max_tasks": {
+            "title": "Max Tasks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "role",
+          "max_tasks"
+        ],
+        "title": "TaskLimitResponse",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "task_limit_set",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_task_limit",
+      "description": "Get max concurrent tasks for a role.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Target a role by name.",
+        "properties": {
+          "role_name": {
+            "description": "Role name",
+            "title": "Role Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_name"
+        ],
+        "title": "RoleNameParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "get_task_limit return shape — a single role task-limit entity.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "max_tasks": {
+            "title": "Max Tasks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "role",
+          "max_tasks"
+        ],
+        "title": "TaskLimitResponse",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "get_panel_data",
+      "description": "Get panel Declarative UI data for admin extension.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
       "name": "set_proactivity",
       "description": "Turn Webbee's proactivity on or off for the whole tenant (the default users start from), and/or lock it for everyone (master switch: lock on/off, \"\" unlocks).",
       "action_type": "write",
@@ -12806,270 +13585,6 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "set_task_limit",
-      "description": "Set max concurrent tasks for a role (1-50).",
-      "action_type": "write",
-      "chain_callable": true,
-      "effects": [
-        "update:task_limit"
-      ],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Set task limit for a role.",
-        "properties": {
-          "role_name": {
-            "description": "Role name",
-            "title": "Role Name",
-            "type": "string"
-          },
-          "max_tasks": {
-            "default": 3,
-            "description": "Max concurrent tasks (1-50)",
-            "title": "Max Tasks",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "role_name"
-        ],
-        "title": "TaskLimitParams",
-        "type": "object"
-      },
-      "return_schema": {
-        "description": "get_task_limit return shape — a single role task-limit entity.",
-        "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Id"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "kind": {
-            "default": "",
-            "title": "Kind",
-            "type": "string"
-          },
-          "subtitle": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Subtitle"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Description"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Status"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Url"
-          },
-          "role": {
-            "title": "Role",
-            "type": "string"
-          },
-          "max_tasks": {
-            "title": "Max Tasks",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "role",
-          "max_tasks"
-        ],
-        "title": "TaskLimitResponse",
-        "type": "object",
-        "x-sdl": "entity"
-      },
-      "event": "task_limit_set",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "get_task_limit",
-      "description": "Get max concurrent tasks for a role.",
-      "action_type": "read",
-      "chain_callable": true,
-      "effects": [],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Target a role by name.",
-        "properties": {
-          "role_name": {
-            "description": "Role name",
-            "title": "Role Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "role_name"
-        ],
-        "title": "RoleNameParams",
-        "type": "object"
-      },
-      "return_schema": {
-        "description": "get_task_limit return shape — a single role task-limit entity.",
-        "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Id"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "kind": {
-            "default": "",
-            "title": "Kind",
-            "type": "string"
-          },
-          "subtitle": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Subtitle"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Description"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Status"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Url"
-          },
-          "role": {
-            "title": "Role",
-            "type": "string"
-          },
-          "max_tasks": {
-            "title": "Max Tasks",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "role",
-          "max_tasks"
-        ],
-        "title": "TaskLimitResponse",
-        "type": "object",
-        "x-sdl": "entity"
-      },
-      "event": "",
-      "background": false,
-      "long_running": false,
-      "scopes": [],
-      "owner_chat_tool": "tool_admin_chat"
-    },
-    {
-      "name": "get_panel_data",
-      "description": "Get panel Declarative UI data for admin extension.",
-      "action_type": "read",
-      "chain_callable": true,
-      "effects": [],
-      "id_projection": "",
-      "params_schema": {
-        "description": "Federal V17 placeholder for handlers that take no parameters.\n\n`@chat.function` MUST declare a Pydantic params model — this is the\ncanonical empty model reused by read-only handlers (list_*, get_*,\n*_health) that don't need any input.",
-        "properties": {},
-        "title": "EmptyParams",
-        "type": "object"
-      },
-      "return_schema": {},
       "event": "",
       "background": false,
       "long_running": false,
@@ -15921,7 +16436,7 @@
     },
     {
       "name": "save_coding_pricing",
-      "description": "Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, and low-balance warn threshold, to the billing config.",
+      "description": "Save the coding-agent (webbee-code terminal) pricing: markup on the real LLM cost, $-to-credit rate, minimum charge, in-flight grace overdraft cap, low-balance warn threshold and the imperal-mcp frame price, to the billing config.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -15964,6 +16479,21 @@
             "minimum": 0,
             "title": "Low Warn Threshold",
             "type": "integer"
+          },
+          "mcp_frame": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Credits per imperal-mcp frame (0 = free); leave out to keep it",
+            "title": "Mcp Frame"
           }
         },
         "required": [
@@ -15977,7 +16507,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Receipt for save_coding_pricing (kind='codingpricing').\nMirrors handler return keys: {markup, credits_per_dollar, min_charge, grace_cap, low_warn_threshold, action}.",
+        "description": "Receipt for save_coding_pricing (kind='codingpricing').\nMirrors handler return keys: {markup, credits_per_dollar, min_charge, grace_cap, low_warn_threshold, mcp_frame, action}.",
         "properties": {
           "id": {
             "anyOf": [
@@ -16106,6 +16636,18 @@
             ],
             "default": null,
             "title": "Low Warn Threshold"
+          },
+          "mcp_frame": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mcp Frame"
           },
           "action": {
             "anyOf": [
@@ -17285,6 +17827,19 @@
             "description": "Reason for adjustment",
             "title": "Reason",
             "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional unique token: the same key never adjusts twice.",
+            "title": "Idempotency Key"
           }
         },
         "required": [

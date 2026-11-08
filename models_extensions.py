@@ -82,6 +82,8 @@ class AccessPolicyRecord(sdl.Entity):
     ``role_resolution`` (NOT the older per_role/per_user/resolved guesses)."""
     app_id: Optional[str] = None
     policy: Optional[dict] = None
+    guest_enabled: Optional[bool] = None
+    guest_allowed_functions: Optional[list[str]] = None
     role_resolution: Optional[list] = None
 
     @model_validator(mode="before")
@@ -108,6 +110,8 @@ class ExtSettingsReceipt(sdl.Entity):
     previous: Optional[str] = None
     verified: Optional[bool] = None
     policy: Optional[dict] = None
+    guest_enabled: Optional[bool] = None
+    guest_allowed_functions: Optional[list[str]] = None
     denied: Optional[list] = None
     removed: Optional[list] = None
 
