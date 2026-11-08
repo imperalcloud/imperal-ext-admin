@@ -410,7 +410,9 @@ def test_admin_imperal_json_rebuilt_with_guest_fields():
 
     manifest_path = Path(__file__).resolve().parent.parent / "imperal.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest["version"] == "5.16.0"
+    import re
+    app_version = re.search(r'version="([^"]+)"', (manifest_path.parent / "app.py").read_text(encoding="utf-8"))
+    assert manifest["version"] == app_version.group(1)          # the manifest is rebuilt with each release
     tools_by_name = {t["name"]: t for t in manifest.get("tools", [])}
     set_pol = tools_by_name["set_access_policy"]
     props = set_pol["params_schema"]["properties"]

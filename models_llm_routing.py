@@ -33,7 +33,7 @@ PURPOSE_SLOTS: tuple[tuple[str, str], ...] = (
     ("execution",       "Execution · tool dispatch and automation actions"),
     ("navigate",        "Navigate · clarifying questions and offers"),
     ("chain_narrative", "Chain Narrator · final multi-step reply"),
-    ("judge",           "Judge · anti-fabrication gate"),
+    ("judge",           "Judge · truth door, step review, Gate 6"),
     ("conversational",  "Conversational · chitchat fall-through"),
     ("step_reclassify", "Step Reclassify · binds args before write steps"),
     ("tool_picker",     "Tool Picker · chain disambiguation"),

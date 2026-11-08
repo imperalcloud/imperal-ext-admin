@@ -72,9 +72,10 @@ _PURPOSE_MODELS: list[tuple[str, str, str]] = [
     ("chain_narrative", "Chain Narrator",
      "Weaves multi-step chain results into the final user-facing reply "
      "(purpose=chain_narrative)."),
-    ("judge", "Judge · Anti-Fabrication",
-     "Federal Gate-6 judge — reviews narrator output for fabricated "
-     "entities/IDs before it reaches the user (purpose=judge)."),
+    ("judge", "Judge · Truth & Step Review",
+     "The kernel's judges (purpose=judge), always on: the truth door reads each claim of an answer beside the "
+     "task's facts, and the step review reads how a marathon's work is going. The optional Gate-6 prose judge "
+     "(Feature Flags toggle) uses this model too; the toggle switches only Gate 6."),
     ("conversational", "Conversational · Chitchat",
      "Free-form chat and the empty-apps fallback reply (purpose=conversational)."),
     ("step_reclassify", "Step Reclassify · Two-Phase",
@@ -840,7 +841,8 @@ def build_llm_form(
                 ui.Text(
                     "When ON: every narrator output is reviewed by a judge LLM "
                     "that flags fabricated entities/IDs. Default OFF (opt-in). "
-                    "Higher cost per chat turn.",
+                    "Higher cost per chat turn. Switches only Gate 6: the truth "
+                    "door and the step review always run on the Judge model.",
                     variant="caption",
                 ),
 
