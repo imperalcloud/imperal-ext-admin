@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "6.5.3",
   "app_id": "admin",
-  "version": "5.17.0",
+  "version": "5.17.1",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -14305,6 +14305,34 @@
             "default": null,
             "description": "Coding brain thinking budget tokens cap (purpose=code). Higher = deep reasoning and plan verification before executing file/terminal actions.",
             "title": "Code Thinking Budget"
+          },
+          "judge_thinking_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Truth judge reasoning effort (purpose=judge: the final's claim check, the step review): 'low' | 'medium' | 'high' | 'max'. Blank = global. Live 2026-11-14: medium thought 2800-3300 tokens on a batch and took 20-24 s, past the 25 s deadline; low thinks ~0 on a classification.",
+            "title": "Judge Thinking Effort"
+          },
+          "judge_thinking_budget": {
+            "anyOf": [
+              {
+                "maximum": 64000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Truth judge thinking budget tokens (purpose=judge). Blank = by the effort.",
+            "title": "Judge Thinking Budget"
           },
           "panel_thinking_effort": {
             "anyOf": [

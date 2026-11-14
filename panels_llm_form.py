@@ -313,6 +313,8 @@ def build_llm_form(
         "thinking_budget": int(_kf.get("thinking_budget", 0)) or "",
         "code_thinking_effort": str(_kf.get("code_thinking_effort", "") or ""),
         "code_thinking_budget": int(_kf.get("code_thinking_budget", 0)) or "",
+        "judge_thinking_effort": str(_kf.get("judge_thinking_effort", "") or ""),
+        "judge_thinking_budget": int(_kf.get("judge_thinking_budget", 0)) or "",
         "panel_thinking_effort": str(_kf.get("panel_thinking_effort", "max") or "max"),
         "panel_thinking_budget": int(_kf.get("panel_thinking_budget", 0)) or "",
         "webbeesmart_thinking_effort": str(_kf.get("webbeesmart_thinking_effort", "") or ""),
@@ -607,6 +609,27 @@ def build_llm_form(
             placeholder="inherit (default)",
             param_name="code_thinking_budget",
             value=str(defaults.get("code_thinking_budget", "")),
+        ),
+        ui.Divider(),
+        ui.Stack([
+            ui.Text("Truth Judge Reasoning Effort", variant="body"),
+            ui.Text("Reasoning effort for purpose=judge (the final's claim check, the step review). It answers "
+                    "within 25 s; 'low' fits a classification against quoted lines.", variant="caption"),
+        ], gap=0),
+        ui.Select(
+            options=_effort_opts,
+            param_name="judge_thinking_effort",
+            value=str(defaults.get("judge_thinking_effort", "")),
+            placeholder="Inherit / Global",
+        ),
+        ui.Stack([
+            ui.Text("Truth Judge Thinking Budget (tokens)", variant="body"),
+            ui.Text("Reasoning token budget for purpose=judge. Blank = by the effort.", variant="caption"),
+        ], gap=0),
+        ui.Input(
+            placeholder="inherit (by effort)",
+            param_name="judge_thinking_budget",
+            value=str(defaults.get("judge_thinking_budget", "")),
         ),
     ]
 

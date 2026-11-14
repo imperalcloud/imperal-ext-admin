@@ -65,3 +65,13 @@ def test_tiers_section_thinking_effort_inputs():
     }
     section = build_tiers_section(defaults=defaults, all_models=[{"label": "Sonnet", "value": "claude-sonnet"}])
     assert section is not None
+
+
+def test_the_judge_has_its_own_thinking_level():
+    # live 2026-11-14: the judge (purpose=judge) reasoned at the global "medium" (2800-3300 tokens, 20-24 s per batch)
+    # and ran past its 25 s deadline; the kernel reads judge_thinking_effort / _budget (effective_tokens._levels)
+    params = SaveLlmConfigParams(judge_thinking_effort="low", judge_thinking_budget=0)
+    assert params.judge_thinking_effort == "low" and params.judge_thinking_budget == 0
+    form = _call_form(kernel_flags_config={"judge_thinking_effort": "low", "judge_thinking_budget": 512})
+    flat = str(form.to_dict() if hasattr(form, "to_dict") else form)
+    assert "judge_thinking_effort" in flat and "judge_thinking_budget" in flat and "512" in flat

@@ -372,6 +372,18 @@ class SaveLlmConfigParams(BaseModel):
         le=64000,
         description="Coding brain thinking budget tokens cap (purpose=code). Higher = deep reasoning and plan verification before executing file/terminal actions.",
     )
+    judge_thinking_effort: Optional[str] = Field(
+        default=None,
+        description="Truth judge reasoning effort (purpose=judge: the final's claim check, the step review): "
+                    "'low' | 'medium' | 'high' | 'max'. Blank = global. Live 2026-11-14: medium thought 2800-3300 "
+                    "tokens on a batch and took 20-24 s, past the 25 s deadline; low thinks ~0 on a classification.",
+    )
+    judge_thinking_budget: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=64000,
+        description="Truth judge thinking budget tokens (purpose=judge). Blank = by the effort.",
+    )
     panel_thinking_effort: Optional[str] = Field(
         default=None,
         description="Panel UI agent reasoning effort: 'none' | 'low' | 'medium' | 'high' | 'max'. Default 'max' for deepest reasoning on web-panel.",
