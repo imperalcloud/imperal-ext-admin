@@ -15,7 +15,7 @@ from typing import Optional
 
 import httpx
 from imperal_sdk._shared_http import shared_http
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app import chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN
 from models_records import LLMModelRateReceipt
@@ -51,6 +51,23 @@ class SaveLlmModelRateParams(BaseModel):
         description="Deprecated/unused — per-action fees are per-tier in System Pricing.",
     )
     is_available: bool = Field(default=True)
+    # The provider's price of input it serves from its own cache. The kernel
+    # prices a call term by term (fresh input, cached input, output), so a
+    # coding turn is charged the provider's real cost x the coding markup.
+    # Left out = the row keeps what it has; empty/null = the row states none,
+    # and the kernel then gives cached input NO discount (never a guessed one).
+    cached_input_cost_per_1k: Optional[float] = Field(
+        default=None, ge=0, le=1000,
+        description=("Provider's price of CACHED input per 1k tokens, USD "
+                     "(most providers: one tenth of the input price). Omit to "
+                     "keep the row's current value; null clears it."),
+    )
+
+    @field_validator("cached_input_cost_per_1k", mode="before")
+    @classmethod
+    def _blank_is_none(cls, v):
+        # the panel form sends an emptied field as "" -- that is "no cached price"
+        return None if isinstance(v, str) and not v.strip() else v
 
 
 class DeleteLlmModelRateParams(BaseModel):
@@ -88,6 +105,14 @@ async def fn_save_llm_model_rate(ctx, params: SaveLlmModelRateParams) -> ActionR
     }
     if params.platform_fee_default is not None:
         body["platform_fee_default"] = params.platform_fee_default
+    if "cached_input_cost_per_1k" in params.model_fields_set:
+        if (params.cached_input_cost_per_1k is not None
+                and params.cached_input_cost_per_1k > params.input_cost_per_1k):
+            return ActionResult.error(
+                "cached_input_cost_per_1k is above input_cost_per_1k -- a provider "
+                "never charges more for cached input than for new input"
+            )
+        body["cached_input_cost_per_1k"] = params.cached_input_cost_per_1k
     try:
         async with shared_http(timeout=5.0) as client:
             resp = await client.put(

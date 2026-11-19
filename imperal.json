@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "6.5.3",
   "app_id": "admin",
-  "version": "5.17.1",
+  "version": "5.18.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -15588,6 +15588,21 @@
             "default": true,
             "title": "Is Available",
             "type": "boolean"
+          },
+          "cached_input_cost_per_1k": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Provider's price of CACHED input per 1k tokens, USD (most providers: one tenth of the input price). Omit to keep the row's current value; null clears it.",
+            "title": "Cached Input Cost Per 1K"
           }
         },
         "required": [

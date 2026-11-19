@@ -45,6 +45,14 @@ async def _fetch_rates() -> list[dict]:
         return []
 
 
+def _per_million(per_1k) -> str:
+    """A per-1k USD price shown per 1M tokens -- the unit providers publish, and
+    one that does not round a small price away ($0.0000825 per 1k = $0.0825 per 1M)."""
+    if per_1k is None:
+        return "—"
+    return f"${float(per_1k) * 1000:.4f}".rstrip("0").rstrip(".")
+
+
 async def build_pricing(ctx, **kwargs):
     """LLM Pricing: DataTable of rates + Form to add/edit a rate.
 
@@ -62,8 +70,9 @@ async def build_pricing(ctx, **kwargs):
         rows.append({
             "id": model_id,
             "tier": r.get("tier", ""),
-            "input": f"${float(r.get('input_cost_per_1k', 0)):.4f}",
-            "output": f"${float(r.get('output_cost_per_1k', 0)):.4f}",
+            "input": _per_million(r.get("input_cost_per_1k", 0)),
+            "cached": _per_million(r.get("cached_input_cost_per_1k")),
+            "output": _per_million(r.get("output_cost_per_1k", 0)),
             "available": "Yes" if r.get("is_available", True)
                          else "No (disabled)",
         })
@@ -84,6 +93,9 @@ async def build_pricing(ctx, **kwargs):
             "tier": edit_row.get("tier", "standard"),
             "input_cost_per_1k": float(edit_row.get("input_cost_per_1k", 0)),
             "output_cost_per_1k": float(edit_row.get("output_cost_per_1k", 0)),
+            "cached_input_cost_per_1k": (
+                "" if edit_row.get("cached_input_cost_per_1k") is None
+                else float(edit_row["cached_input_cost_per_1k"])),
             "is_available": bool(edit_row.get("is_available", True)),
         },
         children=[
@@ -117,14 +129,24 @@ async def build_pricing(ctx, **kwargs):
                     ),
                     ui.Input(
                         param_name="input_cost_per_1k",
-                        placeholder="e.g. 3.0",
+                        placeholder="e.g. 0.003  (= $3 per 1M)",
+                    ),
+                    ui.Text(
+                        "Cached input cost per 1k tokens (USD) — the provider's "
+                        "price for input it serves from its cache. Empty = no "
+                        "cached discount is applied for this model.",
+                        variant="caption",
+                    ),
+                    ui.Input(
+                        param_name="cached_input_cost_per_1k",
+                        placeholder="e.g. 0.0003  (usually one tenth of input)",
                     ),
                     ui.Text(
                         "Output cost per 1k tokens (USD)", variant="caption",
                     ),
                     ui.Input(
                         param_name="output_cost_per_1k",
-                        placeholder="e.g. 15.0",
+                        placeholder="e.g. 0.015  (= $15 per 1M)",
                     ),
                     ui.Toggle(label="Available", param_name="is_available"),
                 ],
@@ -207,18 +229,22 @@ async def build_pricing(ctx, **kwargs):
                     columns=[
                         ui.DataColumn(key="id", label="Model ID", width=280),
                         ui.DataColumn(key="tier", label="Tier", width=110),
-                        ui.DataColumn(key="input", label="Input $/1k", width=110),
-                        ui.DataColumn(key="output", label="Output $/1k", width=110),
+                        ui.DataColumn(key="input", label="Input $/1M", width=110),
+                        ui.DataColumn(key="cached", label="Cached in $/1M", width=130),
+                        ui.DataColumn(key="output", label="Output $/1M", width=110),
                         ui.DataColumn(key="available", label="Available", width=130),
                     ],
                     rows=rows,
                     on_row_click=ui.Call("__panel__tools", section="pricing"),
                 ),
                 ui.Text(
-                    "These rates set the model's TIER and Imperal's raw provider "
-                    "cost (USD, for cost attribution). What users PAY per action "
-                    "is the per-tier platform fee — set in System Pricing, not "
-                    "here. Click a row to edit it.",
+                    "These rates are the provider's own prices (shown per 1M "
+                    "tokens; entered per 1k below) and set the model's TIER. "
+                    "A Webbee Code turn is charged its real provider cost — "
+                    "fresh input, cached input and output each at its price — "
+                    "times the coding markup (System Pricing). Per-action "
+                    "platform fees are per tier, also in System Pricing. "
+                    "Click a row to edit it.",
                     variant="caption",
                 ),
             ]),
