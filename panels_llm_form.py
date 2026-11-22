@@ -25,7 +25,6 @@ from panels_llm_form_coding_thread import build_coding_thread_section
 from panels_llm_form_tiers import build_tiers_section
 from panels_llm_form_sampling import build_purpose_ai_params_section, build_thinking_governance_section
 from panels_llm_form_automation import build_automation_section
-from panels_llm_form_voice import build_voice_section
 from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
 
 _PROVIDERS = [
@@ -200,17 +199,6 @@ def build_llm_form(
     # caught in the 2026-08-18 orphan-reader audit, these 11 were not.
     # panels_llm.py passes cfg straight in, like kernel_flags_config.
     purpose_max_tokens_config: dict | None = None,
-    # Voice / STT (Whisper) (2026-08-29): blank stt_model = use the
-    # gateway's own platform default (whisper-1). Read by
-    # app.voice.service.transcribe() through get_llm_config().
-    stt_provider: str = "",
-    stt_model: str = "",
-    stt_api_key: str = "",
-    stt_base_url: str = "",
-    # Live STT model catalogue fetched from the STT provider's own API using
-    # the admin's BYOK key (panels_llm_models.fetch_stt_model_catalog). None
-    # -> the section falls back to a plain text Model input (no dropdown).
-    stt_model_catalog: list[str] | None = None,
 ) -> object:
     """Full save_llm_config Form — seven categories (see module docstring)."""
 
@@ -345,14 +333,6 @@ def build_llm_form(
         "failover_custom_model": failover_model if is_custom_fo else "",
         "failover_base_url": failover_base_url,
         "failover_api_key": "",
-        # Voice / STT (Whisper) BYOK (2026-08-29 owner report, pass 2): "allow configuring STT provider to use own key from any provider". api_key is write-only — the value here is
-        # already masked by the gateway's read path (or "" if never set), so
-        # a re-save with the field untouched round-trips the mask back and
-        # handlers_llm.py's stt-merge block treats it as "keep current".
-        "stt_provider": stt_provider or "openai",
-        "stt_model": stt_model,
-        "stt_api_key": stt_api_key,
-        "stt_base_url": stt_base_url,
         # Token Budget Controls (admin-only kernel-internal knobs)
         "narration_history_limit": int(_td.get("narration_history_limit", 12)),
         "confirmation_card_tokens": int(_td.get("confirmation_card_tokens", 300)),
@@ -755,9 +735,6 @@ def build_llm_form(
 
             # ── 3b · Webbee Code Model Tiers (2026-07-30) ─────────
             build_tiers_section(defaults, _all_models),
-
-            # ── 3c · Voice / STT (Whisper) (2026-08-29, BYOK pass 2) ──
-            build_voice_section(defaults, stt_model_catalog),
 
             # ── 4 · Per-Purpose AI Parameters ─────────────────────
             ui.Section(title="\U0001f39b Per-Purpose AI Parameters",

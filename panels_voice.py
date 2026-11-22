@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Imperal, Inc., Valentin Scerbacov, and contributors.
 # Licensed under the AGPL-3.0 License.
-"""Admin · Voice panel — STT/TTS pricing, global master-switch, per-role access.
+"""Admin · Voice panel — the provider of each voice function, STT/TTS pricing,
+global master-switch, per-role access.
 
 Prefills from the gateway internal GET endpoints + /v1/roles; saves via the
 save_voice_costs / save_voice_enabled / set_role_voice handlers.
@@ -13,6 +14,7 @@ import logging
 from imperal_sdk import ui
 
 from app import _gw_request
+from panels_voice_provider import build_voice_provider
 
 log = logging.getLogger("admin")
 
@@ -30,11 +32,12 @@ async def _get(path: str) -> dict:
         return {}
 
 
-async def build_voice(ctx, **kwargs):
-    costs, master, roles = await asyncio.gather(
+async def build_voice(ctx, run_test: str = "", **kwargs):
+    costs, master, roles, provider = await asyncio.gather(
         _get("/v1/internal/billing/voice-costs"),
         _get("/v1/internal/billing/voice-enabled"),
         _gw_request("GET", "/v1/roles"),
+        build_voice_provider(ctx, run_test=run_test),
     )
     costs = costs or {}
     master = master or {}
@@ -53,7 +56,7 @@ async def build_voice(ctx, **kwargs):
             ui.Section(title="Per-action voice cost (credits)", children=[
                 ui.Text("Charged per voice action. STT = transcribing an inbound voice "
                         "message; TTS = synthesizing a spoken reply. A cache hit is free. "
-                        "Voice is Imperal's OpenAI cost, so it is billed even for BYOLLM "
+                        "Voice is the platform's provider cost, so it is billed even for BYOLLM "
                         "users. Applies within ~1 min.", variant="caption"),
                 ui.Text("Transcription (STT) — per voice message", variant="caption"),
                 ui.Input(param_name="stt", placeholder="e.g. 20"),
@@ -108,7 +111,9 @@ async def build_voice(ctx, **kwargs):
         ui.Text("Control voice pricing, the global on/off, and which roles / users can use voice. "
                 "Connector & Connections access per role moved to the Roles tab; per-plan features "
                 "to the Plans tab.", variant="caption"),
-        ui.Card(title="Voice Pricing (Imperal OpenAI cost — STT + TTS)", content=costs_form),
+        ui.Header("Voice provider", level=4),
+        *provider,
+        ui.Card(title="Voice Pricing (provider cost — STT + TTS)", content=costs_form),
         master_card,
         access_card,
     ])

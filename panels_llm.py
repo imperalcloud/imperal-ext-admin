@@ -17,7 +17,6 @@ from panels_sections import (
 )
 from panels_llm_form import build_llm_form
 from panels_llm_models import fetch_model_catalog, catalog_to_options
-from panels_llm_models_stt import fetch_stt_model_catalog
 
 log = logging.getLogger("admin")
 
@@ -230,13 +229,12 @@ def _build_add_override_form(
 
 async def build_llm(ctx, run_test: str = "", **kwargs):
     """Build LLM Config panel. run_test='main'|'failover' triggers inline test."""
-    cfg, usage, extensions, tenant_defaults, model_catalog, stt_model_catalog = await asyncio.gather(
+    cfg, usage, extensions, tenant_defaults, model_catalog = await asyncio.gather(
         _fetch_llm_config(),
         _fetch_llm_usage(),
         _fetch_extensions(),
         _fetch_tenant_defaults(),
         fetch_model_catalog(),
-        fetch_stt_model_catalog(),
     )
 
     provider = cfg.get("provider", "anthropic")
@@ -276,14 +274,6 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
     fo_provider = cfg.get("failover_provider", "")
     fo_model = cfg.get("failover_model", "")
     fo_base_url = cfg.get("failover_base_url", "")
-    # BYOK (2026-08-29 pass 2): stt now lives as a nested dict so the
-    # gateway's api_key encrypt/mask helpers protect stt.api_key for free —
-    # see handlers_llm.py's dedicated stt-merge block for the write side.
-    _stt_cfg = cfg.get("stt") if isinstance(cfg.get("stt"), dict) else {}
-    stt_provider = _stt_cfg.get("provider", "")
-    stt_model = _stt_cfg.get("model", "")
-    stt_api_key = _stt_cfg.get("api_key", "")  # already masked by the gateway's read path
-    stt_base_url = _stt_cfg.get("base_url", "")
     base_url = cfg.get("base_url", "")
     ext_overrides = cfg.get("extension_overrides", {})
     available = _env_providers()
@@ -318,9 +308,6 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             failover_enabled=bool(failover_on),
             failover_provider=fo_provider, failover_model=fo_model,
             failover_base_url=fo_base_url,
-            stt_provider=stt_provider, stt_model=stt_model,
-            stt_api_key=stt_api_key, stt_base_url=stt_base_url,
-            stt_model_catalog=stt_model_catalog,
             available_providers=available,
             tenant_defaults=tenant_defaults,
             # LCU-4 (2026-04-30): cfg["purpose"] is the kernel cascade

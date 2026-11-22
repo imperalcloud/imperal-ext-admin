@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Imperal, Inc., Valentin Scerbacov, and contributors.
 # Licensed under the AGPL-3.0 License.
-"""Admin · Voice handlers — STT/TTS pricing, global master-switch, and per-role
+"""Admin · Voice handlers — the provider of each voice function, STT/TTS pricing,
+global master-switch, and per-role
 voice access (the ``voice:use`` scope on a role's default_scopes).
 
 Pricing + master write the platform/global billing config via the admin-gated
@@ -54,6 +55,74 @@ async def fn_save_voice_costs(ctx, params: SaveVoiceCostsParams) -> ActionResult
     return ActionResult.success(
         data={**body, "action": "saved"},
         summary=f"Voice pricing saved (STT {params.stt} / TTS {params.speak} cr). Applies within ~1 min.",
+        refresh_panels=["tools"],
+    )
+
+
+# ── Voice provider (per function: format, address, key, model, voices) ───
+
+class SaveVoiceProviderParams(BaseModel):
+    function: str = Field(..., pattern="^(stt|tts|speechify)$",
+                          description="Voice function: 'stt' (speech to text), 'tts' (text to speech), 'speechify' (the model that rewrites an answer for speaking)")
+    api: str = Field(default="openai", pattern="^(openai|gemini)$",
+                     description="Provider format: 'openai' (any OpenAI-compatible API) or 'gemini' (the Gemini API)")
+    base_url: str = Field(default="", description="Provider base URL (https). Blank = the format's own address")
+    api_key: str = Field(default="", description="Provider API key (write-only, kept in Vault). Blank = keep the saved key")
+    clear_key: bool = Field(default=False, description="Remove the saved key of this function")
+    model: str = Field(default="", description="Model id for this function")
+    custom_model: str = Field(default="", description="A model id typed by hand; overrides 'model' when given")
+    voices: list[str] = Field(default_factory=list, description="tts only: the voices users may choose. Empty = the format's own list")
+    default_voice: str = Field(default="", description="tts only: the voice used when a user has chosen none")
+    style: str | None = Field(default=None, description="tts only: the speaking style sent to the provider")
+
+
+@chat.function("save_voice_provider", action_type="write", effects=["update:voice_provider"],
+               event="voice_provider_saved", data_model=_Receipt,
+               description="Save the provider of one voice function (speech to text, text to speech, or the spoken-form model): "
+                           "its format (OpenAI-compatible or Gemini), base URL, API key, model and - for text to speech - voices and style.")
+async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> ActionResult:
+    """Save the provider of one voice function. The key goes to the gateway, which keeps it in Vault; it is never echoed."""
+    if not AUTH_GW or not AUTH_SERVICE_TOKEN:
+        return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
+    fn = params.function
+    section: dict = {
+        "api": params.api,
+        "base_url": params.base_url.strip(),
+        "model": (params.custom_model or params.model).strip(),
+    }
+    if params.api_key.strip() and "\u2022" not in params.api_key:
+        section["api_key"] = params.api_key.strip()
+    if params.clear_key:
+        section["clear_key"] = True
+    if fn == "tts":
+        section["voices"] = [v.strip() for v in params.voices if v and v.strip()]
+        if params.default_voice.strip() in section["voices"] or not section["voices"]:
+            section["default_voice"] = params.default_voice.strip()
+        if params.style is not None:
+            section["style"] = params.style
+    try:
+        resp = await _admin_put("/v1/internal/billing/voice-config", {fn: section}, _acting(ctx), timeout=15.0)
+    except Exception as e:
+        return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
+    if resp.status_code == 403:
+        return ActionResult.error("admin role required to change the voice provider")
+    if resp.status_code == 503:
+        return ActionResult.error("the key store (Vault) is unavailable - nothing was saved")
+    if resp.status_code != 200:
+        return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:300]}")
+    try:
+        saved = (resp.json() or {}).get(fn) or {}
+    except Exception as e:
+        return ActionResult.error(f"save failed: non-JSON reply: {type(e).__name__}: {e}")
+    if saved.get("api") != section["api"] or (section["model"] and saved.get("model") != section["model"]):
+        return ActionResult.error(
+            f"the gateway did not reflect the save: asked {section['api']}/{section['model']}, "
+            f"got {saved.get('api')}/{saved.get('model')}")
+    key_state = "key set" if saved.get("key_set") else "NO KEY - the function will not work until a key is saved"
+    return ActionResult.success(
+        data={"function": fn, "api": saved.get("api"), "model": saved.get("model"),
+              "base_url": saved.get("base_url"), "key_set": bool(saved.get("key_set")), "action": "saved"},
+        summary=f"Voice {fn} provider saved: {saved.get('api')} / {saved.get('model')} ({key_state}).",
         refresh_panels=["tools"],
     )
 

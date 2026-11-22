@@ -307,10 +307,10 @@ def test_toggle_off_survives_the_save_filter():
 from models_llm_config import DEAD_LLM_KEYS  # noqa: E402
 
 # Dead in imperal:config:llm but legitimately on the form: the manual model-id
-# inputs (they replace model / failover_model on save), stt_provider (merged
-# into the nested "stt" dict) and narration_history_limit (saved to
+# inputs (they replace model / failover_model on save) and
+# narration_history_limit (saved to
 # tenant-defaults, where the kernel reads it).
-_FORM_ONLY = {"custom_model", "failover_custom_model", "stt_provider", "narration_history_limit"}
+_FORM_ONLY = {"custom_model", "failover_custom_model", "narration_history_limit"}
 
 
 @pytest.mark.parametrize("key", sorted(set(DEAD_LLM_KEYS) - _FORM_ONLY))

@@ -21,7 +21,7 @@ DEAD_LLM_KEYS: tuple[str, ...] = (
     "failover",                      # nested {"enabled"}: the switch is failover_enabled
     "custom_model", "failover_custom_model",  # form inputs, not settings
     "extensions",                    # legacy alias of extension_overrides
-    "stt_provider",                  # flat copy; STT lives in the nested "stt"
+    "stt_provider", "stt",           # voice has its own page and store (Admin > Voice)
     "judge_max_tokens",              # the judge reads responses_judge_max_tokens
     "tool_picker_max_tokens",        # the tool picker makes no LLM call
     "coding_thread_fold_max_tokens", "coding_thread_fold_retry_max_tokens",
@@ -192,20 +192,6 @@ class SaveLlmConfigParams(BaseModel):
     failover_api_key: str = Field(default="", description="Failover API key (write-only)")
     failover_base_url: str = Field(default="", description="Failover base URL (endpoint for custom or OpenAI-compatible failover provider)")
     custom_model: str = Field(default="", description="Manual custom model id for primary provider when not in dropdown")
-    # Voice STT (Whisper) provider/model (2026-08-29 owner report): configure Whisper/STT provider and model. Read by auth-gateway app.voice.service.
-    # transcribe() (blank stt_model = keep the gateway's own env default).
-    #
-    # BYOK pass 2 (2026-08-29 owner report): allow custom STT Provider key from any provider. Persisted
-    # as a NESTED `stt` dict on the gateway (imperal:config:llm.stt — see
-    # handlers_llm.py's dedicated stt-merge block, NOT the generic flat-field
-    # loop) so the gateway's existing recursive api_key encrypt/mask helpers
-    # protect stt.api_key automatically, exactly like the top-level api_key.
-    # api_key is write-only (never rendered back to the browser; blank = keep
-    # current) — identical convention to the top-level `api_key` field above.
-    stt_provider: str = Field(default="", description="Voice transcription (STT) provider — openai / groq / custom (any OpenAI-Whisper-API-compatible endpoint). Blank = openai (Whisper).")
-    stt_model: str = Field(default="", description="Voice transcription (STT) model override — blank = platform default (whisper-1)")
-    stt_api_key: str = Field(default="", description="Voice transcription (STT) API key — YOUR OWN key for the STT provider selected above (write-only, leave blank to keep current)")
-    stt_base_url: str = Field(default="", description="Custom base URL for the STT provider's OpenAI-compatible endpoint — required for 'custom', optional preset override for others")
     set_extension_override: str = Field(default="", description="Extension ID to set override for")
     override_model: str = Field(default="", description="Model for extension override")
     override_provider: str = Field(default="", description="Provider for extension override")

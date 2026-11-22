@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "6.5.3",
+  "sdk_version": "6.8.1",
   "app_id": "admin",
-  "version": "5.18.0",
+  "version": "5.19.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -13981,30 +13981,6 @@
             "title": "Custom Model",
             "type": "string"
           },
-          "stt_provider": {
-            "default": "",
-            "description": "Voice transcription (STT) provider — openai / groq / custom (any OpenAI-Whisper-API-compatible endpoint). Blank = openai (Whisper).",
-            "title": "Stt Provider",
-            "type": "string"
-          },
-          "stt_model": {
-            "default": "",
-            "description": "Voice transcription (STT) model override — blank = platform default (whisper-1)",
-            "title": "Stt Model",
-            "type": "string"
-          },
-          "stt_api_key": {
-            "default": "",
-            "description": "Voice transcription (STT) API key — YOUR OWN key for the STT provider selected above (write-only, leave blank to keep current)",
-            "title": "Stt Api Key",
-            "type": "string"
-          },
-          "stt_base_url": {
-            "default": "",
-            "description": "Custom base URL for the STT provider's OpenAI-compatible endpoint — required for 'custom', optional preset override for others",
-            "title": "Stt Base Url",
-            "type": "string"
-          },
           "set_extension_override": {
             "default": "",
             "description": "Extension ID to set override for",
@@ -16764,6 +16740,111 @@
         "type": "object"
       },
       "event": "voice_costs_saved",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_voice_provider",
+      "description": "Save the provider of one voice function (speech to text, text to speech, or the spoken-form model): its format (OpenAI-compatible or Gemini), base URL, API key, model and - for text to speech - voices and style.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:voice_provider"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "function": {
+            "description": "Voice function: 'stt' (speech to text), 'tts' (text to speech), 'speechify' (the model that rewrites an answer for speaking)",
+            "pattern": "^(stt|tts|speechify)$",
+            "title": "Function",
+            "type": "string"
+          },
+          "api": {
+            "default": "openai",
+            "description": "Provider format: 'openai' (any OpenAI-compatible API) or 'gemini' (the Gemini API)",
+            "pattern": "^(openai|gemini)$",
+            "title": "Api",
+            "type": "string"
+          },
+          "base_url": {
+            "default": "",
+            "description": "Provider base URL (https). Blank = the format's own address",
+            "title": "Base Url",
+            "type": "string"
+          },
+          "api_key": {
+            "default": "",
+            "description": "Provider API key (write-only, kept in Vault). Blank = keep the saved key",
+            "title": "Api Key",
+            "type": "string"
+          },
+          "clear_key": {
+            "default": false,
+            "description": "Remove the saved key of this function",
+            "title": "Clear Key",
+            "type": "boolean"
+          },
+          "model": {
+            "default": "",
+            "description": "Model id for this function",
+            "title": "Model",
+            "type": "string"
+          },
+          "custom_model": {
+            "default": "",
+            "description": "A model id typed by hand; overrides 'model' when given",
+            "title": "Custom Model",
+            "type": "string"
+          },
+          "voices": {
+            "description": "tts only: the voices users may choose. Empty = the format's own list",
+            "items": {
+              "type": "string"
+            },
+            "title": "Voices",
+            "type": "array"
+          },
+          "default_voice": {
+            "default": "",
+            "description": "tts only: the voice used when a user has chosen none",
+            "title": "Default Voice",
+            "type": "string"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "tts only: the speaking style sent to the provider",
+            "title": "Style"
+          }
+        },
+        "required": [
+          "function"
+        ],
+        "title": "SaveVoiceProviderParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "action": {
+            "default": "saved",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "_Receipt",
+        "type": "object"
+      },
+      "event": "voice_provider_saved",
       "background": false,
       "long_running": false,
       "scopes": [],
