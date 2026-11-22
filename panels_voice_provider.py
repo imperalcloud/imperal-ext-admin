@@ -3,11 +3,13 @@
 """Admin · Voice · provider cards.
 
 One card per voice function (speech to text, text to speech, the spoken-form
-model): the wire format, the base URL, the API key, the model and - for the
-voice - its voices and style. The gateway keeps the settings in one database
-row and each key in its secret store behind Vault; this page is the only way
-a voice key gets in. The page never receives a key back, only whether one is
-set.
+model): the wire format, the base URL, the model and - for the voice - its
+voices and style. The gateway keeps these settings in one database row.
+
+The API key is not on this page. It is this extension's app secret
+``voice_api_key`` (declared in handlers_voice.py with the SDK), kept in Imperal
+Vault and typed in the Secrets manager; the page shows whether it is set and
+links there. A function may have its own key in ``voice_<function>_api_key``.
 
 The model list is the provider's own, read live by the gateway with the saved
 key (GET /v1/internal/billing/voice-config/models). With no key, or when the
@@ -79,7 +81,7 @@ def _model_fields(sec: dict, listing: dict) -> list:
     current = sec.get("model") or ""
     models = [m for m in (listing.get("models") or []) if isinstance(m, str)]
     if not models:
-        why = listing.get("error") or ("save a key first to see the provider's own models"
+        why = listing.get("error") or ("set the voice key to see the provider's own models"
                                        if not sec.get("key_set") else "the provider listed no models")
         return [
             ui.Text(f"Model - type its id ({why}).", variant="caption"),
@@ -95,20 +97,46 @@ def _model_fields(sec: dict, listing: dict) -> list:
     ]
 
 
-def _function_card(fn: str, sec: dict, listing: dict) -> object:
+_KEY_LINE = {
+    "own": "Key: this function's own secret ({secret}).",
+    "shared": "Key: the voice key (voice_api_key).",
+    "none": "NO KEY: set the voice key first - this function does not work without it.",
+}
+
+
+def _secrets_link(owner: str, secret: str) -> object:
+    return ui.Navigate(path=f"/ext/{owner}/secrets#{secret}")
+
+
+def _key_card(cfg: dict) -> object:
+    """Where the voice key is and the way to set it."""
+    owner = cfg.get("secret_owner") or "admin"
+    shared = cfg.get("shared_key_secret") or "voice_api_key"
+    is_set = bool(cfg.get("shared_key_set"))
+    return ui.Card(
+        title=f"Voice API key  ·  {'set' if is_set else 'NOT SET'}",
+        content=ui.Stack(direction="v", gap=1, children=[
+            ui.Text(f"One key for every voice function: the secret '{shared}' of the Admin extension, "
+                    "kept in Imperal Vault. It is typed in the Secrets manager and is never shown again.",
+                    variant="caption"),
+            ui.Button(label="Change the voice key" if is_set else "Set the voice key",
+                      variant="secondary" if is_set else "primary",
+                      on_click=_secrets_link(owner, shared)),
+        ]),
+    )
+
+
+def _function_card(fn: str, sec: dict, listing: dict, owner: str = "admin") -> object:
     api = sec.get("api") or "openai"
-    key_line = ("A key is set. Leave the field blank to keep it; type a new one to replace it."
-                if sec.get("key_set") else
-                "No key is set - this function does not work until one is saved.")
+    source = sec.get("key_source") or ("shared" if sec.get("key_set") else "none")
+    own_secret = sec.get("key_secret") or f"voice_{fn}_api_key"
     children: list = [
         ui.Text(_WHAT[fn], variant="caption"),
+        ui.Text(_KEY_LINE[source].format(secret=own_secret), variant="caption"),
         ui.Text("Provider format", variant="caption"),
         ui.Select(options=API_OPTIONS, value=api, param_name="api"),
-        ui.Text(f"Base URL ({_BASE_HINT.get(api, '')}). Changing the format or the address "
-                "removes the saved key: type the key of the new provider.", variant="caption"),
+        ui.Text(f"Base URL ({_BASE_HINT.get(api, '')}).", variant="caption"),
         ui.Input(param_name="base_url", value=sec.get("base_url") or "", placeholder="https://..."),
-        ui.Text(f"API key - stored in Vault, never shown again. {key_line}", variant="caption"),
-        ui.Password(param_name="api_key", placeholder="blank = keep the saved key"),
     ]
     children += _model_fields(sec, listing)
     if fn == "tts":
@@ -129,12 +157,16 @@ def _function_card(fn: str, sec: dict, listing: dict) -> object:
     state = "key set" if sec.get("key_set") else "NO KEY"
     return ui.Card(
         title=f"{_TITLES[fn]}  ·  {api} / {sec.get('model') or 'no model'}  ·  {state}",
-        content=ui.Form(
-            action="save_voice_provider",
-            submit_label=f"Save {_TITLES[fn].split(' - ')[0]}",
-            defaults={"function": fn},
-            children=children,
-        ),
+        content=ui.Stack(direction="v", gap=1, children=[
+            ui.Form(
+                action="save_voice_provider",
+                submit_label=f"Save {_TITLES[fn].split(' - ')[0]}",
+                defaults={"function": fn},
+                children=children,
+            ),
+            ui.Button(label=f"Another key for this function only ({own_secret})", variant="ghost",
+                      on_click=_secrets_link(owner, own_secret)),
+        ]),
     )
 
 
@@ -169,11 +201,12 @@ async def build_voice_provider(ctx, run_test: str = "") -> list:
     out: list = []
     if run_test:
         out += _check_alerts(await _post(f"{CONFIG_PATH}/test", {}, acting, timeout=120.0))
+    out.append(_key_card(cfg))
     out.append(ui.Text(
-        "Each voice function has its own provider. Keys are entered only here and are kept in Vault; "
-        "the gateway reads no voice key from anywhere else.", variant="caption"))
+        "Each voice function has its own provider and model. All of them use the voice key above "
+        "unless a function has a key of its own.", variant="caption"))
     for fn, listing in zip(FUNCTIONS, listings):
-        out.append(_function_card(fn, cfg.get(fn) or {}, listing or {}))
+        out.append(_function_card(fn, cfg.get(fn) or {}, listing or {}, cfg.get("secret_owner") or "admin"))
     out.append(ui.Button(
         label="Check voice now (one real call per function)", variant="ghost",
         on_click=ui.Call("__panel__tools", section="voice", run_test="1"),

@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "6.8.1",
   "app_id": "admin",
-  "version": "5.19.0",
+  "version": "5.20.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -16747,7 +16747,7 @@
     },
     {
       "name": "save_voice_provider",
-      "description": "Save the provider of one voice function (speech to text, text to speech, or the spoken-form model): its format (OpenAI-compatible or Gemini), base URL, API key, model and - for text to speech - voices and style.",
+      "description": "Save the provider of one voice function (speech to text, text to speech, or the spoken-form model): its format (OpenAI-compatible or Gemini), base URL, model and - for text to speech - voices and style. The API key is not set here: it is the secret voice_api_key in this extension's Secrets.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -16774,18 +16774,6 @@
             "description": "Provider base URL (https). Blank = the format's own address",
             "title": "Base Url",
             "type": "string"
-          },
-          "api_key": {
-            "default": "",
-            "description": "Provider API key (write-only, kept in Vault). Blank = keep the saved key",
-            "title": "Api Key",
-            "type": "string"
-          },
-          "clear_key": {
-            "default": false,
-            "description": "Remove the saved key of this function",
-            "title": "Clear Key",
-            "type": "boolean"
           },
           "model": {
             "default": "",
@@ -25400,7 +25388,52 @@
       "signature": "(ctx)"
     }
   },
+  "secrets": [
+    {
+      "name": "voice_api_key",
+      "description": "API key of the voice provider - used by every voice function (speech to text, text to speech, the spoken-form model).",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "voice_stt_api_key",
+      "description": "Optional: another API key for speech to text only. Empty = the voice key.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "voice_tts_api_key",
+      "description": "Optional: another API key for text to speech only. Empty = the voice key.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "voice_speechify_api_key",
+      "description": "Optional: another API key for the spoken-form model only. Empty = the voice key.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    }
+  ],
   "panels": [
+    {
+      "panel_id": "secrets",
+      "slot": "right",
+      "title": "Secrets",
+      "tree": {},
+      "icon": "KeyRound",
+      "refresh": "manual",
+      "center_overlay": false,
+      "stale_while_revalidate": true,
+      "cache_ttl": 60
+    },
     {
       "panel_id": "sidebar",
       "slot": "left",

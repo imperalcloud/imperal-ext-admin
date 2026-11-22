@@ -15,7 +15,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from app import (
-    chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN,
+    ext, chat, ActionResult, AUTH_GW, AUTH_SERVICE_TOKEN,
     _verify_write_reflected, _gw_request, _admin_put, _admin_put_checked,
     _acting,
 )
@@ -59,7 +59,25 @@ async def fn_save_voice_costs(ctx, params: SaveVoiceCostsParams) -> ActionResult
     )
 
 
-# ── Voice provider (per function: format, address, key, model, voices) ───
+# ── Voice provider keys: app-scope secrets, kept in Imperal Vault ────────
+#
+# Declared here with the SDK, typed by an admin in this extension's Secrets
+# manager (/ext/admin/secrets), read by the gateway's voice service from the
+# same store. The names are a contract with auth-gateway app/voice/config.py.
+
+VOICE_SHARED_SECRET = "voice_api_key"
+VOICE_SECRETS: dict[str, str] = {
+    VOICE_SHARED_SECRET: "API key of the voice provider - used by every voice function "
+                         "(speech to text, text to speech, the spoken-form model).",
+    "voice_stt_api_key": "Optional: another API key for speech to text only. Empty = the voice key.",
+    "voice_tts_api_key": "Optional: another API key for text to speech only. Empty = the voice key.",
+    "voice_speechify_api_key": "Optional: another API key for the spoken-form model only. Empty = the voice key.",
+}
+for _name, _description in VOICE_SECRETS.items():
+    ext.secret(name=_name, description=_description, scope="app", max_bytes=400)(lambda: None)
+
+
+# ── Voice provider (per function: format, address, model, voices) ────────
 
 class SaveVoiceProviderParams(BaseModel):
     function: str = Field(..., pattern="^(stt|tts|speechify)$",
@@ -67,8 +85,6 @@ class SaveVoiceProviderParams(BaseModel):
     api: str = Field(default="openai", pattern="^(openai|gemini)$",
                      description="Provider format: 'openai' (any OpenAI-compatible API) or 'gemini' (the Gemini API)")
     base_url: str = Field(default="", description="Provider base URL (https). Blank = the format's own address")
-    api_key: str = Field(default="", description="Provider API key (write-only, kept in Vault). Blank = keep the saved key")
-    clear_key: bool = Field(default=False, description="Remove the saved key of this function")
     model: str = Field(default="", description="Model id for this function")
     custom_model: str = Field(default="", description="A model id typed by hand; overrides 'model' when given")
     voices: list[str] = Field(default_factory=list, description="tts only: the voices users may choose. Empty = the format's own list")
@@ -79,9 +95,10 @@ class SaveVoiceProviderParams(BaseModel):
 @chat.function("save_voice_provider", action_type="write", effects=["update:voice_provider"],
                event="voice_provider_saved", data_model=_Receipt,
                description="Save the provider of one voice function (speech to text, text to speech, or the spoken-form model): "
-                           "its format (OpenAI-compatible or Gemini), base URL, API key, model and - for text to speech - voices and style.")
+                           "its format (OpenAI-compatible or Gemini), base URL, model and - for text to speech - voices and style. "
+                           "The API key is not set here: it is the secret voice_api_key in this extension's Secrets.")
 async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> ActionResult:
-    """Save the provider of one voice function. The key goes to the gateway, which keeps it in Vault; it is never echoed."""
+    """Save the provider settings of one voice function. Keys are this extension's secrets, never a parameter here."""
     if not AUTH_GW or not AUTH_SERVICE_TOKEN:
         return ActionResult.error("missing AUTH_GW or AUTH_SERVICE_TOKEN")
     fn = params.function
@@ -90,10 +107,6 @@ async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> Action
         "base_url": params.base_url.strip(),
         "model": (params.custom_model or params.model).strip(),
     }
-    if params.api_key.strip() and "\u2022" not in params.api_key:
-        section["api_key"] = params.api_key.strip()
-    if params.clear_key:
-        section["clear_key"] = True
     if fn == "tts":
         section["voices"] = [v.strip() for v in params.voices if v and v.strip()]
         if params.default_voice.strip() in section["voices"] or not section["voices"]:
@@ -106,8 +119,6 @@ async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> Action
         return ActionResult.error(f"save HTTP error: {type(e).__name__}: {e}")
     if resp.status_code == 403:
         return ActionResult.error("admin role required to change the voice provider")
-    if resp.status_code == 503:
-        return ActionResult.error("the key store (Vault) is unavailable - nothing was saved")
     if resp.status_code != 200:
         return ActionResult.error(f"save failed: status={resp.status_code} body={resp.text[:300]}")
     try:
@@ -118,7 +129,8 @@ async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> Action
         return ActionResult.error(
             f"the gateway did not reflect the save: asked {section['api']}/{section['model']}, "
             f"got {saved.get('api')}/{saved.get('model')}")
-    key_state = "key set" if saved.get("key_set") else "NO KEY - the function will not work until a key is saved"
+    key_state = ("key set" if saved.get("key_set") else
+                 "NO KEY - set the secret voice_api_key in Admin > Secrets, the function does not work without it")
     return ActionResult.success(
         data={"function": fn, "api": saved.get("api"), "model": saved.get("model"),
               "base_url": saved.get("base_url"), "key_set": bool(saved.get("key_set")), "action": "saved"},
