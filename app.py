@@ -242,21 +242,27 @@ def _aslist(r) -> list:
 
 
 def _panel_acting(ctx) -> str:
-    """Best-effort acting-user id for the gateway audit trail.
+    """The admin viewing a panel, for the gateway's X-Acting-User and for doors
+    that answer by who asks.
 
-    Was duplicated verbatim in panels_billing_analytics.py and
-    panels_credits.py (9 identical lines each) -- single source of truth
-    now. panels_user_profile.py keeps its own slightly different variant
-    on purpose (try/except around attribute access rather than a dict
-    fallback), so it is left untouched here.
+    Until 2026-11-23 this looked at ``ctx.user_id``, ``ctx.imperal_id`` and at
+    ``ctx.user`` only when it was a dict. The kernel hands a panel a
+    ``UserContext`` object (``ctx.user.imperal_id``), so this returned "" on
+    every real render: the Dashboard said "the viewing admin's id is not known
+    to this panel", and Billing Analytics, Credits and the Users billing index
+    asked the gateway as nobody.
     """
+    user = getattr(ctx, "user", None)
+    if isinstance(user, dict):
+        found = user.get("imperal_id") or user.get("user_id")
+    else:
+        found = getattr(user, "imperal_id", "")
+    if found:
+        return str(found)
     for attr in ("user_id", "imperal_id"):
         val = getattr(ctx, attr, "") or ""
         if val:
             return str(val)
-    user = getattr(ctx, "user", None)
-    if isinstance(user, dict):
-        return str(user.get("imperal_id") or user.get("user_id") or "")
     return ""
 
 
@@ -420,7 +426,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.26.0",
+    version="5.26.1",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)

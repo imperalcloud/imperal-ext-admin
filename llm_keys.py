@@ -14,6 +14,7 @@ model listing or a Test button, through ctx.secrets.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from app import ext
@@ -72,11 +73,10 @@ async def keys_set(ctx) -> dict[str, bool] | None:
     secrets = getattr(ctx, "secrets", None)
     if secrets is None:
         return None
-    out: dict[str, bool] = {}
     try:
-        for p in PROVIDERS:
-            out[p] = bool(await secrets.is_set(secret_name(p)))
+        # side by side: eight reads one after another were eight round trips in a row
+        answers = await asyncio.gather(*[secrets.is_set(secret_name(p)) for p in PROVIDERS])
     except Exception as e:
         log.warning("llm keys: the secret store did not answer: %s: %s", type(e).__name__, e)
         return None
-    return out
+    return {p: bool(a) for p, a in zip(PROVIDERS, answers)}

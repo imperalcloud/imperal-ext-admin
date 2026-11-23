@@ -225,6 +225,40 @@ def _build_role_expanded(
 # ── Main builder ──────────────────────────────────────────────────────
 
 
+GUEST_ROLE = "guest"
+GUEST_SCOPE = "guest"
+
+
+def _guest_item() -> object:
+    """The guest role in the list. It is a role of the platform and no row of
+    the roles table: the gateway gives it to a visitor who has no account
+    (app/chat/router.py seeds role "guest", scopes ["guest"]) and the kernel
+    holds every such caller to it (core/guest_guard.py). It was missing from
+    this page because the page listed database rows only."""
+    return ui.ListItem(
+        id=GUEST_ROLE,
+        title="Guest",
+        subtitle=GUEST_ROLE,
+        badge=ui.Badge("built-in", color="gray"),
+        meta="visitors without an account \u00b7 1 scope",
+        expandable=True,
+        expanded_content=[
+            ui.Text(
+                "The role of a visitor who has no account. The platform gives it by itself; "
+                "it is not a row of the roles table, so it cannot be assigned to an account, "
+                "renamed or deleted, and it has no settings of its own on this page.",
+                variant="body"),
+            ui.Text(f"Scope: {GUEST_SCOPE} - the only one a guest holds.", variant="caption"),
+            ui.Text(
+                "What a guest may use is decided per extension: Extensions -> an extension -> "
+                "Access, the guest switch and the list of functions open to guests.",
+                variant="caption"),
+            ui.Button(label="Open Extensions", variant="ghost", size="sm",
+                      on_click=ui.Call("__panel__tools", section="extensions", active="extensions")),
+        ],
+    )
+
+
 async def build_roles(ctx, **kwargs):
     """Roles management: searchable list with expandable role cards."""
     roles, users, all_scopes = await asyncio.gather(
@@ -294,6 +328,9 @@ async def build_roles(ctx, **kwargs):
             expanded_content=_build_role_expanded(
                 role, role_users, all_scopes),
         ))
+
+    if not any(r.get("name") == GUEST_ROLE for r in roles):
+        items.append(_guest_item())
 
     return ui.Stack(children=[
         ui.Header("Roles", level=3,
