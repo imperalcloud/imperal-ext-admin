@@ -83,58 +83,24 @@ def _env_providers() -> list[str]:
 # ── Inline test ───────────────────────────────────────────────────────
 
 async def _run_test(cfg: dict, target: str) -> dict:
-    """Run connection or compatibility test, return {ok, message}."""
+    """Make the call the pressed Test button names; ``{ok, message}``.
+
+    target: "main" | "main_compat" | "failover" | "failover_compat". The slot's
+    provider, model, base URL and key are the stored ones - what the kernel
+    would use - so the test answers "does the saved configuration work"."""
+    from llm_probe import probe, resolve_key      # local: keeps the panel import light
+    failover = "failover" in target
+    prefix = "failover_" if failover else ""
+    provider = str(cfg.get(f"{prefix}provider") or ("" if failover else "anthropic"))
     try:
-        is_compat = "compat" in target
-        is_failover = "failover" in target
-        if is_failover:
-            provider = cfg.get("failover_provider", "")
-            model = cfg.get("failover_model", "")
-            base_url = cfg.get("failover_base_url", "")
-            api_key = cfg.get("failover_api_key", "")
-        else:
-            provider = cfg.get("provider", "anthropic")
-            model = cfg.get("model", "")
-            base_url = cfg.get("base_url", "")
-            api_key = cfg.get("api_key", "")
-        if not provider:
-            return {"ok": False, "message": "No provider configured"}
-
-        # Resolve API key
-        key_map = {
-            "anthropic": "ANTHROPIC_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "google": "GOOGLE_API_KEY",
-        }
-        env_key = key_map.get(provider)
-        resolved_key = api_key or (os.getenv(env_key) if env_key else "")
-        if not resolved_key and provider in ("qwen", "kimi", "zhipu", "openrouter"):
-            if not is_failover and cfg.get("provider") == provider:
-                resolved_key = str(cfg.get("api_key") or "")
-            elif is_failover:
-                resolved_key = str(cfg.get("failover_api_key") or "")
-            if not resolved_key and provider == "qwen":
-                resolved_key = str(cfg.get("qwen_api_key") or "")
-
-        if not resolved_key and provider != "custom":
-            return {
-                "ok": False,
-                "message": (
-                    f"No API key for {provider} — enter it in the "
-                    + ("Failover API Key" if is_failover else "API Key")
-                    + " field"
-                ),
-            }
-
-        # Real live check
-        if is_compat:
-            return {
-                "ok": True,
-                "message": f"{provider}/{model} — Tool-Use & Function Calling compatibility verified OK",
-            }
-        return {"ok": True, "message": f"{provider}/{model} — connection & auth verified OK"}
+        return await probe(
+            provider, str(cfg.get(f"{prefix}model") or ""),
+            resolve_key(cfg, provider, failover),
+            str(cfg.get(f"{prefix}base_url") or ""),
+            tools="compat" in target,
+        )
     except Exception as e:
-        return {"ok": False, "message": str(e)}
+        return {"ok": False, "message": f"The test itself failed: {type(e).__name__}: {e}"}
 
 
 # ── Override cards ────────────────────────────────────────────────────
@@ -380,7 +346,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
                         color="cyan"),
             ], columns=3),
             ui.Stats(children=[
-                ui.Stat(label="BYOLLM Users",
+                ui.Stat(label="BYOLLM Calls",
                         value=str(usage.get("byollm_users", 0)),
                         color="purple"),
                 ui.Stat(label="Avg Latency",

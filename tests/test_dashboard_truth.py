@@ -81,14 +81,14 @@ def _dash(monkeypatch, *, users=(USERS, ""), roles=(ROLES, ""), exts=(EXTS, []),
 
 
 def test_every_overview_number_is_the_count_of_its_source(monkeypatch):
-    s = _stats(_dash(monkeypatch))
-    assert s["Users"]["value"] == "58" and "55 active, 3 inactive" in s["Users"]["description"]
+    tree = _dash(monkeypatch)
+    s = _stats(tree)
+    assert s["Users"]["value"] == "58" and "Users: 55 active, 3 inactive" in _text(tree)
     assert s["Active users"]["value"] == "55"
     assert s["Roles"]["value"] == "4"
     # drafts and suspended apps are not "extensions on the platform"
     assert s["Active extensions"]["value"] == "30"
-    assert "33 in all" in s["Active extensions"]["description"]
-    assert "2 draft" in s["Active extensions"]["description"]
+    assert "Extensions: 33 in all, of them 2 draft, 1 suspended" in _text(tree)
 
 
 def test_actions_are_asked_as_the_viewing_admin(monkeypatch):
@@ -111,11 +111,12 @@ def test_action_stats_reader_sends_user_id_and_keeps_the_refusal(monkeypatch):
 
 
 def test_success_rate_is_over_ended_actions_and_absent_without_any(monkeypatch):
-    s = _stats(_dash(monkeypatch))
+    tree = _dash(monkeypatch)
+    s = _stats(tree)
     assert s["Total Actions"]["value"] == "1200"
     assert s["Success Rate"]["value"] == "90%"                     # 900 of 1000 ended
-    assert "900 of 1000" in s["Success Rate"]["description"]
-    assert "40 cancelled" in s["Failed"]["description"]
+    assert "900 of 1000 ended actions" in _text(tree)
+    assert "Ended otherwise: 40 cancelled" in _text(tree)
     none = dict(ACTIONS, total_actions=0, completed=0, failed=0, cancelled=0)
     assert "Success Rate" not in _stats(_dash(monkeypatch, actions=(none, "")))
 
@@ -164,3 +165,16 @@ def test_an_error_dict_from_the_gateway_is_never_read_as_numbers(monkeypatch):
     monkeypatch.setattr(PS, "_gw_request", _gw)
     assert asyncio.run(PS._gw_checked("/v1/roles")) == (None, "HTTP 500: boom")
     assert asyncio.run(PS._fetch_llm_usage_raw()) == {}
+
+
+def test_stats_carry_only_what_the_deploy_check_accepts(monkeypatch):
+    """5.23.0 was rejected at deploy: ui.Stat(description=...) is not in the
+    check's list (label, value, color, icon, trend), though the SDK takes it."""
+    import ast
+    import pathlib
+    allowed = {"label", "value", "color", "icon", "trend"}
+    src = (pathlib.Path(PD.__file__)).read_text()
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "Stat":
+            extra = {k.arg for k in node.keywords} - allowed
+            assert not extra, f"line {node.lineno}: ui.Stat({sorted(extra)})"

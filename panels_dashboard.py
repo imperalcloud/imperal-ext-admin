@@ -128,14 +128,18 @@ async def build_dashboard(ctx):
 def _append_overview_card(children: list, users, users_why, roles, roles_why,
                           extensions, ext_problems) -> None:
     """Who and what is on the platform. A count whose source failed is absent."""
+    # The detail of a number goes in a caption line under the grid: the deploy
+    # check accepts only label, value, color, icon and trend on ui.Stat
+    # (5.23.0 was rejected for ui.Stat(description=...), 2026-11-23).
     stats: list = []
+    notes: list[str] = []
     if not users_why:
         active = sum(1 for u in users if u.get("is_active", True))
         stats += [
-            ui.Stat(label="Users", value=str(len(users)), color="blue",
-                    description=f"{active} active, {len(users) - active} inactive"),
+            ui.Stat(label="Users", value=str(len(users)), color="blue"),
             ui.Stat(label="Active users", value=str(active), color="green"),
         ]
+        notes.append(f"Users: {active} active, {len(users) - active} inactive")
     if not roles_why:
         stats.append(ui.Stat(label="Roles", value=str(len(roles)), color="purple"))
     if not ext_problems:
@@ -144,10 +148,13 @@ def _append_overview_card(children: list, users, users_why, roles, roles_why,
             by_status[str(e.get("status") or "unknown")] = by_status.get(str(e.get("status") or "unknown"), 0) + 1
         rest = ", ".join(f"{n} {s.replace('_', ' ')}" for s, n in sorted(by_status.items()) if s != "active")
         stats.append(ui.Stat(
-            label="Active extensions", value=str(by_status.get("active", 0)), color="cyan",
-            description=f"{len(extensions)} in all" + (f": {rest}" if rest else "")))
+            label="Active extensions", value=str(by_status.get("active", 0)), color="cyan"))
+        notes.append(f"Extensions: {len(extensions)} in all" + (f", of them {rest}" if rest else ""))
     if stats:
-        children.append(ui.Card(title="Overview", content=ui.Stats(children=stats, columns=2)))
+        children.append(ui.Card(title="Overview", content=ui.Stack(children=[
+            ui.Stats(children=stats, columns=2),
+            *[ui.Text(n, variant="caption") for n in notes],
+        ])))
 
 
 def _append_situational_card(children: list, extensions: list, billing: dict) -> None:
@@ -287,23 +294,28 @@ def _append_actions_card(children: list, actions: dict) -> None:
              ("cancelled", "partial_failure", "fabrication", "integrity_failure")}
     ended = completed + failed + sum(other.values())
     stats = [
-        ui.Stat(label="Total Actions", value=str(total),
-                description=str(actions.get("month") or "")),
+        ui.Stat(label="Total Actions", value=str(total)),
         ui.Stat(label="Completed", value=str(completed), color="green"),
-        ui.Stat(label="Failed", value=str(failed), color="red" if failed else "gray",
-                description=", ".join(f"{n} {k.replace('_', ' ')}" for k, n in other.items() if n)),
+        ui.Stat(label="Failed", value=str(failed), color="red" if failed else "gray"),
     ]
+    notes = [f"Month {actions['month']}"] if actions.get("month") else []
+    ended_otherwise = ", ".join(f"{n} {k.replace('_', ' ')}" for k, n in other.items() if n)
+    if ended_otherwise:
+        notes.append(f"Ended otherwise: {ended_otherwise}")
     if ended:
         # of the actions that ended; with none ended there is no rate to show
         rate = round(completed / ended * 100)
         stats.append(ui.Stat(
             label="Success Rate", value=f"{rate}%",
-            color="green" if rate >= 90 else "yellow" if rate >= 70 else "red",
-            description=f"{completed} of {ended} ended actions"))
+            color="green" if rate >= 90 else "yellow" if rate >= 70 else "red"))
+        notes.append(f"Success rate: {completed} of {ended} ended actions")
 
     children.append(ui.Card(
         title="Platform Actions This Month",
-        content=ui.Stats(children=stats, columns=2),
+        content=ui.Stack(children=[
+            ui.Stats(children=stats, columns=2),
+            *[ui.Text(n, variant="caption") for n in notes],
+        ]),
     ))
 
 
