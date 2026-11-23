@@ -148,21 +148,17 @@ def test_no_revenue_card_on_dashboard_when_billing_is_down(monkeypatch):
     async def _nothing(*_a, **_k):
         return {}
 
-    async def _users(*_a, **_k):
-        return [{"is_active": True}]
-
-    async def _empty_list(*_a, **_k):
-        return []
-
-    async def _empty_dict(*_a, **_k):
-        return {}
+    def _ret(value):
+        async def _f(*_a, **_k):
+            return value
+        return _f
 
     monkeypatch.setattr(PD, "_fetch_analytics", _nothing)
-    monkeypatch.setattr(PD, "_fetch_users", _users)
-    monkeypatch.setattr(PD, "_fetch_roles", _empty_list)
-    monkeypatch.setattr(PD, "_fetch_extensions", _empty_list)
-    monkeypatch.setattr(PD, "_fetch_llm_usage", _empty_dict)
-    monkeypatch.setattr(PD, "_fetch_action_stats", _empty_dict)
+    monkeypatch.setattr(PD, "_fetch_users_checked", _ret(([{"is_active": True}], "")))
+    monkeypatch.setattr(PD, "_gw_checked", _ret(({}, "")))
+    monkeypatch.setattr(PD, "_fetch_extensions_checked", _ret(([], [])))
+    monkeypatch.setattr(PD, "_fetch_action_stats_checked", _ret(({}, "")))
+    monkeypatch.setattr(PD, "_check_health", _ret("Operational"))
 
     tree = asyncio.run(PD.build_dashboard(_Ctx())).to_dict()
     titles = [n["props"].get("title") for n in _walk(tree)

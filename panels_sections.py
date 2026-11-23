@@ -146,25 +146,57 @@ async def _fetch_plans() -> list[dict]:
     return await _cached("plans", _fetch_plans_raw)
 
 
+async def _gw_checked(path: str) -> tuple[object, str]:
+    """One gateway read AND the reason when it failed: ``(payload, "")`` or
+    ``(None, reason)``. ``_gw_request`` answers a failure as a dict with an
+    "error" key, which is truthy and has no numbers in it: a screen that only
+    asks "is it empty?" then draws zeros (the Dashboard did, 2026-11-23)."""
+    try:
+        r = await _gw_request("GET", path)
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
+    if isinstance(r, dict) and r.get("error"):
+        return None, str(r["error"])
+    return r, ""
+
+
 async def _fetch_extensions_raw() -> list[dict]:
+    return (await _extensions_merged())[0]
+
+
+async def _fetch_extensions_checked() -> tuple[list[dict], list[str]]:
+    """Every app and the stores that could not be read (empty = all were)."""
+    return await _extensions_merged()
+
+
+async def _extensions_merged() -> tuple[list[dict], list[str]]:
     """Cross-store view of every app: merge the Registry (`/v1/apps`), the
     Marketplace store (`developer_apps` via `/v1/admin/apps`), and the on-disk
     `/opt/extensions/<id>` tree. Each returned app carries a ``stores`` list so
-    the panel can show exactly WHERE it lives — these three stores can drift."""
+    the panel can show exactly WHERE it lives — these three stores can drift.
+    The second value names each store that could not be read."""
     reg_list: list = []
     dev_list: list = []
+    problems: list[str] = []
     try:
         r = await _registry_get("/v1/apps?status=active")
         if r.status_code == 200 and isinstance(r.json(), list):
             reg_list = r.json()
+        else:
+            problems.append(f"registry: HTTP {r.status_code}")
     except Exception as e:
         log.warning("Panel: registry fetch failed: %s", e)
+        problems.append(f"registry: {type(e).__name__}: {e}")
     try:
         d = await _gw_request("GET", "/v1/admin/apps")
         if isinstance(d, list):
             dev_list = d
+        else:
+            problems.append("marketplace: " + str(
+                d.get("error") if isinstance(d, dict) else "the gateway did not answer with a list"))
     except Exception as e:
         log.warning("Panel: developer_apps fetch failed: %s", e)
+        problems.append(f"marketplace: {type(e).__name__}: {e}")
 
     merged: dict[str, dict] = {}
     for a in reg_list:
@@ -203,7 +235,7 @@ async def _fetch_extensions_raw() -> list[dict]:
         # apps that aren't in developer_apps.
         m["status"] = (m.get("marketplace_status") or m.get("registry_status")
                        or m.get("status") or "unknown")
-    return sorted(merged.values(), key=lambda x: x.get("app_id", ""))
+    return sorted(merged.values(), key=lambda x: x.get("app_id", "")), problems
 
 
 async def _fetch_extensions() -> list[dict]:
@@ -251,7 +283,8 @@ async def _fetch_llm_usage_raw() -> dict:
     """Fetch LLM usage from Auth GW, transform to UI-compatible names."""
     try:
         raw = await _gw_request("GET", "/v1/internal/config/llm/usage")
-        if not isinstance(raw, dict):
+        # a failure arrives as {"error": ...}: no numbers, so no zeros either
+        if not isinstance(raw, dict) or raw.get("error"):
             return {}
         calls = int(raw.get("calls", 0))
         latency = int(raw.get("total_latency_ms", 0))
@@ -271,15 +304,22 @@ async def _fetch_llm_usage() -> dict:
     return await _cached("llm_usage", _fetch_llm_usage_raw)
 
 
-async def _fetch_action_stats_raw() -> dict:
-    try:
-        return await _gw_request("GET", "/v1/internal/actions/stats?admin=true")
-    except Exception:
-        return {}
-
-
-async def _fetch_action_stats() -> dict:
-    return await _cached("action_stats", _fetch_action_stats_raw)
+async def _fetch_action_stats_checked(acting: str) -> tuple[dict, str]:
+    """This month's actions of the whole platform, or the reason there are none
+    to show. The gateway's door requires ``user_id`` (app/actions/stats_router.py,
+    ``user_id: str = Query(...)``) and gives the platform-wide view only when
+    that user is an admin. Until 2026-11-23 this asked without ``user_id``: the
+    refusal came back as an error dict and the Dashboard drew 0 actions and a
+    0% success rate from it."""
+    if not acting:
+        return {}, "the viewing admin's id is not known to this panel"
+    payload, why = await _gw_checked(
+        f"/v1/internal/actions/stats?admin=true&user_id={acting}")
+    if why:
+        return {}, why
+    if not isinstance(payload, dict):
+        return {}, "the gateway did not answer with the counters"
+    return payload, ""
 
 
 async def _check_health_raw(name: str, url: str) -> str:

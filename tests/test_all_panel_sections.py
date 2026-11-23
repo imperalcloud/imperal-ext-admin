@@ -89,7 +89,7 @@ async def test_every_admin_panel_section_renders_cleanly():
         patch("panels_sections._fetch_roles", new=AsyncMock(return_value=[])),
         patch("panels_sections._fetch_extensions", new=AsyncMock(return_value=[])),
         patch("panels_sections._fetch_llm_usage", new=AsyncMock(return_value={})),
-        patch("panels_sections._fetch_action_stats", new=AsyncMock(return_value={})),
+        patch("panels_sections._fetch_action_stats_checked", new=AsyncMock(return_value=({}, "not asked in this test"))),
         patch("app._resolve_app_id", new=AsyncMock(return_value="notes")),
         patch("panels_ext_settings._resolve_app_id", new=AsyncMock(return_value="notes")),
         patch("panels_ext_access_policy._resolve_app_id", new=AsyncMock(return_value="notes")),
