@@ -164,7 +164,11 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                 _inferred = provider_for_model(_model_val)
                 if _inferred:
                     updates[_provider_key] = _inferred
-            elif not str(getattr(params, _model_key, "") or "").strip():
+            elif _model_key in params.model_fields_set and not str(
+                    getattr(params, _model_key, "") or "").strip():
+                # ONLY when this save carried the field: each section of the
+                # page saves on its own since 2026-11-23, and a save of one
+                # section must leave every other section's models alone.
                 # "Same as default" (empty) submission → CLEAR the stored
                 # override so this purpose inherits the global model. The generic
                 # updates loop skips empty values, so without this an override
@@ -185,6 +189,8 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                    "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _slot = dict(_purpose_map.get(_p) or {})
             for _k in ("temperature", "top_p", "presence_penalty", "frequency_penalty"):
+                if f"purpose_{_p}_{_k}" not in params.model_fields_set:
+                    continue      # this save did not carry the field: untouched
                 _raw = getattr(params, f"purpose_{_p}_{_k}", "")
                 _val_str = (str(_raw) if _raw is not None else "").strip()
                 if not _val_str:
@@ -319,6 +325,8 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             except Exception as _tb_err:
                 log.warning("tenant-defaults PATCH failed: %s", _tb_err)
 
+        # the key is write-only: it is saved, never echoed back in the receipt
+        current = {k: ("***" if "api_key" in k and v else v) for k, v in current.items()}
         return ActionResult.success(
             data={
                 "saved": list(updates.keys()),

@@ -82,6 +82,25 @@ def _env_providers() -> list[str]:
 
 # ── Inline test ───────────────────────────────────────────────────────
 
+# A test result is kept for a short while: the panel re-renders with its last
+# parameters after every save, and each render must not call the provider again.
+_TEST_KEEP_S = 120.0
+_test_seen: dict[tuple, tuple[float, dict]] = {}
+
+
+async def _run_test_once(cfg: dict, target: str) -> dict:
+    import time
+    prefix = "failover_" if "failover" in target else ""
+    key = (target, cfg.get(f"{prefix}provider"), cfg.get(f"{prefix}model"), cfg.get(f"{prefix}base_url"))
+    hit = _test_seen.get(key)
+    if hit and time.monotonic() - hit[0] < _TEST_KEEP_S:
+        return hit[1]
+    result = await _run_test(cfg, target)
+    _test_seen.clear()
+    _test_seen[key] = (time.monotonic(), result)
+    return result
+
+
 async def _run_test(cfg: dict, target: str) -> dict:
     """Make the call the pressed Test button names; ``{ok, message}``.
 
@@ -194,7 +213,10 @@ def _build_add_override_form(
 
 # ── Main builder ──────────────────────────────────────────────────────
 
-async def build_llm(ctx, run_test: str = "", **kwargs):
+EXTRA_VIEWS = (("extension-overrides", "Extension overrides"), ("usage-today", "Usage today"))
+
+
+async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
     """Build LLM Config panel. run_test='main'|'failover' triggers inline test."""
     cfg, usage, extensions, tenant_defaults, model_catalog = await asyncio.gather(
         _fetch_llm_config(),
@@ -252,7 +274,7 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
 
     # Inline test result (shown when user clicked Test)
     if run_test:
-        result = await _run_test(cfg, run_test)
+        result = await _run_test_once(cfg, run_test)
         label = "Failover" if "failover" in run_test else "Default Provider"
         test_type = "Tool-Use Compatibility" if "compat" in run_test else "Connection"
         children.append(ui.Alert(
@@ -323,9 +345,12 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
             # save looked like it silently reverted. See build_llm_form's
             # purpose_max_tokens_config docstring.
             purpose_max_tokens_config=cfg,
+            view=str(llm_view or ""),
+            extra_views=EXTRA_VIEWS,
         ),
-        ui.Divider(),
-        ui.Section(
+    ])
+    if llm_view == "extension-overrides":
+        children.append(ui.Section(
             title=f"Extension Overrides ({override_count})",
             collapsible=True,
             children=[
@@ -333,9 +358,9 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
                 ui.Divider(),
                 *_build_add_override_form(ext_overrides, extensions, model_catalog),
             ],
-        ),
-        ui.Divider(),
-        ui.Section(title="Platform Usage Today", children=[
+        ))
+    if llm_view == "usage-today":
+        children.append(ui.Section(title="Platform Usage Today", children=[
             ui.Stats(children=[
                 ui.Stat(label="Total Calls",
                         value=str(usage.get("total_calls", 0)), color="blue"),
@@ -358,7 +383,6 @@ async def build_llm(ctx, run_test: str = "", **kwargs):
                         color="yellow" if usage.get("failover_events", 0) > 0
                         else "gray"),
             ], columns=3),
-        ]),
-    ])
+        ]))
 
     return ui.Stack(children=children)

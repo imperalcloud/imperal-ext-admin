@@ -134,6 +134,16 @@ _GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 def provider_for_model(model: str) -> str:
     """Infer the provider from a model id by prefix. '' if unknown."""
     m = (model or "").lower()
+    if m.startswith("models/"):          # Google's own listing spells ids this way
+        m = m[len("models/"):]
+    # "vendor/model" is the OpenRouter id shape and is decided FIRST. The table
+    # below was read top-down, so "qwen/qwen3.5-plus" met ("qwen", "qwen") and
+    # "moonshotai/kimi-k3" met ("moonshot", "kimi") before any "vendor/" row:
+    # an OpenRouter model was paired with the direct provider's key and
+    # address. Vendors the table does not name (x-ai/, minimax/ ...) got no
+    # provider at all. Found 2026-11-23.
+    if "/" in m:
+        return "openrouter"
     for prefix, prov in _PROVIDER_PREFIXES:
         if m.startswith(prefix):
             return prov
@@ -321,7 +331,7 @@ async def _fetch_openrouter(key: str, base_url: str = "") -> list[str]:
         r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
         r.raise_for_status()
         data = r.json().get("data", [])
-        return _filter_openrouter([m.get("id", "") for m in data])
+        return _pick_openrouter(data)
 
 
 _OPENROUTER_TOP_VENDORS = (
@@ -340,7 +350,42 @@ _OPENROUTER_EXCLUDE = (
 _OPENROUTER_DATE_PAT = re.compile(r"-\d{8}$|-\d{4}-\d{2}-\d{2}$")
 
 
-def _filter_openrouter(ids: list[str]) -> list[str]:
+# Measured on the public list 2026-11-23: 477 models, 415 of them accept tools.
+# The name filter below keeps 219, of which 12 cannot use tools at all (music
+# and small instruct models) - and the old cut took the first 25 of an
+# alphabetical sort, so 194 models, whole vendors among them, were never
+# offered. The pick is now by what a model can DO, newest first, with a share
+# for every vendor.
+OPENROUTER_PER_VENDOR = 8
+
+
+def _pick_openrouter(models: list[dict]) -> list[str]:
+    """The OpenRouter models offered for system use: chat models that accept
+    tools (the kernel drives every purpose through tool calls), named by the
+    rules of ``_filter_openrouter``, the newest OPENROUTER_PER_VENDOR of each
+    vendor, vendors in priority order."""
+    def _capable(m: dict) -> bool:
+        arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
+        out, params = arch.get("output_modalities"), m.get("supported_parameters")
+        # a field the provider did not send is not held against the model
+        return (not isinstance(out, list) or "text" in out) and (
+            not isinstance(params, list) or "tools" in params)
+
+    by_id = {str(m.get("id") or ""): m for m in models if isinstance(m, dict)}
+    named = _filter_openrouter(list(by_id), cut=False)
+    per_vendor: dict[str, list[str]] = {}
+    for mid in named:
+        if _capable(by_id[mid]):
+            per_vendor.setdefault(mid.split("/", 1)[0], []).append(mid)
+    picked: list[str] = []
+    for vendor in dict.fromkeys(mid.split("/", 1)[0] for mid in named):   # priority order
+        newest = sorted(per_vendor.get(vendor, []),
+                        key=lambda i: -(by_id[i].get("created") or 0))
+        picked += newest[:OPENROUTER_PER_VENDOR]
+    return picked
+
+
+def _filter_openrouter(ids: list[str], cut: bool = True) -> list[str]:
     """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~25).
 
     Prioritizes Google Gemini, Z-AI GLM, Qwen, and DeepSeek at the top of the dropdown!
@@ -370,7 +415,7 @@ def _filter_openrouter(ids: list[str]) -> list[str]:
         return (len(priority_prefixes), low)
 
     sorted_unique = sorted(set(out), key=sort_key)
-    return sorted_unique[:25]
+    return sorted_unique[:25] if cut else sorted_unique
 
 
 def _filter_kimi(ids: list[str]) -> list[str]:

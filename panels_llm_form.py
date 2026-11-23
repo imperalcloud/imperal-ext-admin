@@ -173,6 +173,11 @@ def build_llm_form(
     # Live model catalogue fetched from the provider APIs (panels_llm_models.
     # fetch_model_catalog). None → resilience fallback. No hardcoded model list.
     model_catalog: dict | None = None,
+    # Which section to draw: "*" = all of them (direct callers and tests), or
+    # one view id of ``llm_views``. The page (panels_llm.build_llm) always
+    # asks for one. extra_views = (id, label) pairs the page itself draws.
+    view: str = "*",
+    extra_views: tuple = (),
     # I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE (2026-07-31): the 6 coding-thread
     # compaction knobs live in imperal:config:llm (cfg), NOT tenant_defaults —
     # panels_llm.py reads them straight off cfg and passes them here.
@@ -613,11 +618,11 @@ def build_llm_form(
         ),
     ]
 
-    return ui.Form(
-        action="save_llm_config",
-        submit_label="Save LLM Config",
-        defaults=defaults,
-        children=[
+    # One section = one form = one Save (2026-11-23). Before, the whole page
+    # was ONE form with 141 inputs and one button: every save rewrote every
+    # setting, so changing a model also re-sent every budget and flag as it
+    # was drawn when the page loaded.
+    return _sections_as_forms(defaults, [
             # ── 0 · Automations map (read-only) ───────────────────
             # Placed FIRST deliberately: it is the "you are here" for the
             # whole tab. An admin who came to tune automations reads this,
@@ -892,5 +897,82 @@ def build_llm_form(
                     variant="caption",
                 ),
             ]),
-        ],
-    )
+    ], view, tuple(extra_views))
+
+
+def _param_names(node) -> set[str]:
+    """Every param_name an input under *node* submits."""
+    names: set[str] = set()
+    props = getattr(node, "props", None)
+    if isinstance(props, dict):
+        if props.get("param_name"):
+            names.add(str(props["param_name"]))
+        for value in props.values():
+            for child in (value if isinstance(value, (list, tuple)) else [value]):
+                names |= _param_names(child)
+    return names
+
+
+def _plain_title(title: str) -> str:
+    """A section title without its leading emoji, for the Save button."""
+    return "".join(ch for ch in str(title) if ch.isascii()).strip() or "section"
+
+
+def _view_id(title: str) -> str:
+    """'🔌 Provider & Connection' -> 'provider-connection'."""
+    words = "".join(ch.lower() if ch.isalnum() and ch.isascii() else " " for ch in str(title)).split()
+    return "-".join(words) or "section"
+
+
+MAP_VIEW = "automations-map"
+
+
+def _sections_as_forms(defaults: dict, nodes: list, view: str = "*", extra_views: tuple = ()):
+    """Each Section that has inputs becomes its own form with its own Save,
+    and the page shows ONE of them at a time.
+
+    A form carries as ``defaults`` only the values of ITS OWN inputs, so a save
+    sends that section and nothing else; save_llm_config touches only the
+    fields a save carried. A node without inputs (the read-only automations
+    map) is its own view.
+
+    One at a time, measured 2026-11-23: the model list is repeated in 22
+    selects; with 25 models the whole page was 158 KB and with 60 it was
+    228 KB, against the kernel's 256 KB reply cap. That is why the list was
+    cut to 25. One section per screen carries a few selects, so the list can
+    be the real one.
+    """
+    views: list[tuple[str, str, object]] = []          # (id, label, node)
+    for node in nodes:
+        names = _param_names(node)
+        if getattr(node, "type", "") != "Section" or not names:
+            views.append((MAP_VIEW, "Automations map", node))
+            continue
+        title = _plain_title(node.props.get("title", ""))
+        own = {k: defaults[k] for k in names if k in defaults}
+        node.props["children"] = [ui.Form(
+            action="save_llm_config",
+            submit_label=f"Save {title}",
+            defaults=own,
+            children=list(node.props.get("children") or []),
+        )]
+        node.props.pop("collapsible", None)            # the only thing on screen is not folded
+        views.append((_view_id(title), title, node))
+    views.sort(key=lambda v: v[0] == MAP_VIEW)         # the read-only map goes last
+
+    if view == "*":
+        return ui.Stack(children=[v[2] for v in views])
+
+    ids = [v[0] for v in views] + [e[0] for e in extra_views]
+    current = view if view in ids else ids[0]
+    nav = ui.Stack(children=[
+        ui.Button(
+            label=label,
+            variant="primary" if vid == current else "ghost",
+            # run_test="" so a test asked for on one view is not made again
+            # by every later render
+            on_click=ui.Call("__panel__tools", section="llm", llm_view=vid, run_test=""),
+        )
+        for vid, label in [(v[0], v[1]) for v in views] + [tuple(e) for e in extra_views]
+    ], direction="h", gap=1, wrap=True)
+    return ui.Stack(children=[nav] + [v[2] for v in views if v[0] == current])
