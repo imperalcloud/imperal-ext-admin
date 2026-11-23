@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "6.8.1",
   "app_id": "admin",
-  "version": "5.20.0",
+  "version": "5.21.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -16780,6 +16780,19 @@
             "description": "Model id for this function",
             "title": "Model",
             "type": "string"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "speechify only: false switches the spoken-form rewrite off - replies are then spoken as written. Left out = unchanged",
+            "title": "Enabled"
           },
           "custom_model": {
             "default": "",

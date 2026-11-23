@@ -86,6 +86,7 @@ class SaveVoiceProviderParams(BaseModel):
                      description="Provider format: 'openai' (any OpenAI-compatible API) or 'gemini' (the Gemini API)")
     base_url: str = Field(default="", description="Provider base URL (https). Blank = the format's own address")
     model: str = Field(default="", description="Model id for this function")
+    enabled: bool | None = Field(default=None, description="speechify only: false switches the spoken-form rewrite off - replies are then spoken as written. Left out = unchanged")
     custom_model: str = Field(default="", description="A model id typed by hand; overrides 'model' when given")
     voices: list[str] = Field(default_factory=list, description="tts only: the voices users may choose. Empty = the format's own list")
     default_voice: str = Field(default="", description="tts only: the voice used when a user has chosen none")
@@ -107,6 +108,8 @@ async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> Action
         "base_url": params.base_url.strip(),
         "model": (params.custom_model or params.model).strip(),
     }
+    if fn == "speechify" and params.enabled is not None:
+        section["enabled"] = bool(params.enabled)
     if fn == "tts":
         section["voices"] = [v.strip() for v in params.voices if v and v.strip()]
         if params.default_voice.strip() in section["voices"] or not section["voices"]:
@@ -129,6 +132,12 @@ async def fn_save_voice_provider(ctx, params: SaveVoiceProviderParams) -> Action
         return ActionResult.error(
             f"the gateway did not reflect the save: asked {section['api']}/{section['model']}, "
             f"got {saved.get('api')}/{saved.get('model')}")
+    if fn == "speechify" and saved.get("enabled") is False:
+        return ActionResult.success(
+            data={"function": fn, "enabled": False, "action": "saved"},
+            summary="Spoken-form rewrite switched OFF: replies are spoken as written, no model is called for this step.",
+            refresh_panels=["tools"],
+        )
     key_state = ("key set" if saved.get("key_set") else
                  "NO KEY - set the secret voice_api_key in Admin > Secrets, the function does not work without it")
     return ActionResult.success(

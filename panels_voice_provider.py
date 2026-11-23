@@ -130,8 +130,18 @@ def _function_card(fn: str, sec: dict, listing: dict, owner: str = "admin") -> o
     api = sec.get("api") or "openai"
     source = sec.get("key_source") or ("shared" if sec.get("key_set") else "none")
     own_secret = sec.get("key_secret") or f"voice_{fn}_api_key"
+    off = fn == "speechify" and sec.get("enabled") is False
     children: list = [
         ui.Text(_WHAT[fn], variant="caption"),
+    ]
+    if fn == "speechify":
+        children += [
+            ui.Text("This step is optional. Off = replies are spoken exactly as written: nothing is "
+                    "called and nothing is paid for it, and the reply starts sooner. Leave it on when "
+                    "answers with tables, code, links or long numbers must sound natural.", variant="caption"),
+            ui.Toggle(label="Rewrite replies for speaking", value=not off, param_name="enabled"),
+        ]
+    children += [
         ui.Text(_KEY_LINE[source].format(secret=own_secret), variant="caption"),
         ui.Text("Provider format", variant="caption"),
         ui.Select(options=API_OPTIONS, value=api, param_name="api"),
@@ -154,7 +164,7 @@ def _function_card(fn: str, sec: dict, listing: dict, owner: str = "admin") -> o
             ui.TextArea(param_name="style", value=sec.get("style") or "",
                         placeholder="e.g. warm, clear, confident"),
         ]
-    state = "key set" if sec.get("key_set") else "NO KEY"
+    state = "OFF" if off else ("key set" if sec.get("key_set") else "NO KEY")
     return ui.Card(
         title=f"{_TITLES[fn]}  ·  {api} / {sec.get('model') or 'no model'}  ·  {state}",
         content=ui.Stack(direction="v", gap=1, children=[

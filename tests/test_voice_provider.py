@@ -112,6 +112,26 @@ async def test_a_saved_function_with_no_key_says_so(monkeypatch, ctx):
     assert "NO KEY" in _plain(out) and "voice_api_key" in _plain(out)
 
 
+@pytest.mark.asyncio
+async def test_the_spoken_form_rewrite_can_be_switched_off(monkeypatch, ctx):
+    put, calls = _put_spy(_Resp(body={"speechify": {"api": "openai", "model": "google/gemini-3.6-flash",
+                                                    "enabled": False, "key_set": True}}))
+    monkeypatch.setattr(hv, "_admin_put", put)
+    out = await hv.fn_save_voice_provider(ctx, SaveVoiceProviderParams(
+        function="speechify", model="google/gemini-3.6-flash", enabled=False))
+    assert out.status == "success", getattr(out, "error", None)
+    assert calls[0]["body"]["speechify"]["enabled"] is False
+    assert "OFF" in _plain(out) and "as written" in _plain(out)
+
+
+@pytest.mark.asyncio
+async def test_the_switch_is_sent_only_for_the_spoken_form_function(monkeypatch, ctx):
+    put, calls = _put_spy(_Resp(body={"stt": {"api": "openai", "model": "whisper-1", "key_set": True}}))
+    monkeypatch.setattr(hv, "_admin_put", put)
+    await hv.fn_save_voice_provider(ctx, SaveVoiceProviderParams(function="stt", model="whisper-1", enabled=False))
+    assert "enabled" not in calls[0]["body"]["stt"]
+
+
 def test_only_the_three_functions_and_two_formats_are_accepted():
     for bad in ({"function": "sing"}, {"function": "stt", "api": "elevenlabs"}):
         with pytest.raises(Exception):
@@ -155,6 +175,15 @@ async def test_page_reads_settings_and_live_models_as_the_admin_and_only_for_fun
     assert "/ext/admin/secrets#voice_tts_api_key" in text
     assert "api_key\"" not in text.replace("voice_api_key", "").replace("_api_key)", "")
     assert "this function's own secret (voice_tts_api_key)" in text
+    assert "Rewrite replies for speaking" in text            # the optional step has its switch
+
+
+@pytest.mark.asyncio
+async def test_page_shows_the_rewrite_as_off_when_it_is(monkeypatch, ctx, spy):
+    cfg = {**_CFG, "speechify": {**_CFG["speechify"], "enabled": False}}
+    monkeypatch.setattr(pvp, "_gw_request", spy(responses={("GET", PATH): cfg}, default={"models": []}))
+    text = _plain(await pvp.build_voice_provider(ctx))
+    assert "Spoken-form model" in text and "OFF" in text
     assert "Kore" in text and "Puck" in text
 
 
