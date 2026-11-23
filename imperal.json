@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "6.8.1",
+  "sdk_version": "6.9.0",
   "app_id": "admin",
-  "version": "5.26.1",
+  "version": "5.27.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -3615,6 +3615,226 @@
           }
         },
         "title": "UpdateRoleParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Receipt entity for role create/update/delete writes (kind='role').\n\nReused by create_role / update_role / delete_role return shapes — keeps the\nexisting receipt keys verbatim (``role`` payload, ``role_id``, ``deleted``,\n``cascaded_count``) so panels and the $REF resolver read the same data.\nPrefer this over inventing a per-verb receipt.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "role": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role"
+          },
+          "role_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "deleted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Deleted"
+          },
+          "cascaded_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cascaded Count"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "RoleActionReceipt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "role_updated",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_admin_chat"
+    },
+    {
+      "name": "save_guest_policy",
+      "description": "Set the guest role's settings: how many messages a guest, a network address and all guests may send, how long a guest session lives and how many credits guests may spend.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:role"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Set the guest role's settings. A field left blank keeps its value.",
+        "properties": {
+          "chat_per_min": {
+            "default": "",
+            "description": "Messages a guest may send in a minute",
+            "title": "Chat Per Min",
+            "type": "string"
+          },
+          "chat_per_day": {
+            "default": "",
+            "description": "Messages a guest may send in a day",
+            "title": "Chat Per Day",
+            "type": "string"
+          },
+          "ip_per_min": {
+            "default": "",
+            "description": "Requests one network address may make in a minute",
+            "title": "Ip Per Min",
+            "type": "string"
+          },
+          "ip_per_day": {
+            "default": "",
+            "description": "Messages one network address may send in a day",
+            "title": "Ip Per Day",
+            "type": "string"
+          },
+          "global_per_day": {
+            "default": "",
+            "description": "Messages all guests together may send in a day",
+            "title": "Global Per Day",
+            "type": "string"
+          },
+          "sessions_per_ip_day": {
+            "default": "",
+            "description": "New guest sessions one network address may open in a day",
+            "title": "Sessions Per Ip Day",
+            "type": "string"
+          },
+          "session_ttl_seconds": {
+            "default": "",
+            "description": "How long a guest session lives, in seconds",
+            "title": "Session Ttl Seconds",
+            "type": "string"
+          },
+          "pool_daily_cap": {
+            "default": "",
+            "description": "Credits all guests together may spend in a day",
+            "title": "Pool Daily Cap",
+            "type": "string"
+          },
+          "per_guest_daily_cap": {
+            "default": "",
+            "description": "Credits one guest may spend in a day",
+            "title": "Per Guest Daily Cap",
+            "type": "string"
+          },
+          "per_ip_daily_cap": {
+            "default": "",
+            "description": "Credits one network address may spend in a day",
+            "title": "Per Ip Daily Cap",
+            "type": "string"
+          }
+        },
+        "title": "SaveGuestPolicyParams",
         "type": "object"
       },
       "return_schema": {

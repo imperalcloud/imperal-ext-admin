@@ -11,6 +11,7 @@ import logging
 
 from imperal_sdk import ui
 
+from app import _acting, _gw_request
 from panels_sections import _fetch_users, _fetch_roles, _fetch_scope_names
 
 log = logging.getLogger("admin")
@@ -226,43 +227,78 @@ def _build_role_expanded(
 
 
 GUEST_ROLE = "guest"
-GUEST_SCOPE = "guest"
+GUEST_POLICY_PATH = "/v1/internal/guest/policy"
 
 
-def _guest_item() -> object:
-    """The guest role in the list. It is a role of the platform and no row of
-    the roles table: the gateway gives it to a visitor who has no account
-    (app/chat/router.py seeds role "guest", scopes ["guest"]) and the kernel
-    holds every such caller to it (core/guest_guard.py). It was missing from
-    this page because the page listed database rows only."""
+async def _fetch_guest_policy(ctx) -> tuple[dict, str]:
+    """The guest role as the gateway holds it, or the reason it could not be read."""
+    try:
+        r = await _gw_request("GET", GUEST_POLICY_PATH, acting=_acting(ctx))
+    except Exception as e:
+        return {}, f"{type(e).__name__}: {e}"
+    if not isinstance(r, dict) or r.get("error") or not isinstance(r.get("fields"), list):
+        return {}, str((r or {}).get("error") if isinstance(r, dict) else "") or "the gateway gave no settings"
+    return r, ""
+
+
+def _guest_item(policy: dict, why: str) -> object:
+    """The guest role: a visitor without an account. It is a role of the platform and no row of the roles
+    table, so it cannot be assigned, renamed or deleted; its settings are the platform's guest policy (one
+    value of the platform configuration in the database), drawn here from what the gateway answers -- the
+    list of settings, their labels, bounds and values are the gateway's, none is written in this file."""
+    fields = [f for f in (policy.get("fields") or []) if isinstance(f, dict) and f.get("key")]
+    scopes = [str(x) for x in (policy.get("scopes") or [])]
+    nodes: list = [
+        ui.Text(
+            "The role of a visitor who has no account - the guest chat on the site runs under it. "
+            "The platform gives it by itself: it cannot be assigned to an account, renamed or deleted.",
+            variant="body"),
+    ]
+    if why:
+        nodes.append(ui.Alert(title="The guest settings could not be read", message=why, type="error"))
+    else:
+        nodes.append(ui.Text(f"Scopes: {', '.join(scopes) or 'none'}", variant="caption"))
+        children: list = []
+        for f in fields:
+            where = "the kernel" if f.get("enforced_by") == "kernel" else "the gateway"
+            children += [
+                ui.Text(f"{f.get('label')} ({f.get('unit')}, {f.get('min')} - {f.get('max')}; held by {where})",
+                        variant="caption"),
+                ui.Input(param_name=str(f["key"]), value=str(f.get("value", "")), placeholder=str(f.get("value", ""))),
+            ]
+        nodes.append(ui.Section(title="Limits of the guest chat", children=[
+            ui.Form(
+                action="save_guest_policy",
+                submit_label="Save guest settings",
+                defaults={str(f["key"]): str(f.get("value", "")) for f in fields},
+                children=children,
+            ),
+            ui.Text(
+                "A change is in force within about a minute: every process reads the settings again "
+                "on its own.", variant="caption"),
+        ]))
+    nodes += [
+        ui.Text(
+            "Which extensions a guest may use, and which functions of each, is chosen on its own page.",
+            variant="caption"),
+        ui.Button(label="Extensions open to guests", variant="secondary", size="sm",
+                  on_click=ui.Call("__panel__tools", section="guest_access", guest_app="")),
+    ]
     return ui.ListItem(
         id=GUEST_ROLE,
         title="Guest",
         subtitle=GUEST_ROLE,
         badge=ui.Badge("built-in", color="gray"),
-        meta="visitors without an account \u00b7 1 scope",
+        meta=("settings unavailable" if why else f"visitors without an account \u00b7 {len(fields)} settings"),
         expandable=True,
-        expanded_content=[
-            ui.Text(
-                "The role of a visitor who has no account. The platform gives it by itself; "
-                "it is not a row of the roles table, so it cannot be assigned to an account, "
-                "renamed or deleted, and it has no settings of its own on this page.",
-                variant="body"),
-            ui.Text(f"Scope: {GUEST_SCOPE} - the only one a guest holds.", variant="caption"),
-            ui.Text(
-                "What a guest may use is decided per extension: Extensions -> an extension -> "
-                "Access, the guest switch and the list of functions open to guests.",
-                variant="caption"),
-            ui.Button(label="Open Extensions", variant="ghost", size="sm",
-                      on_click=ui.Call("__panel__tools", section="extensions", active="extensions")),
-        ],
+        expanded_content=nodes,
     )
 
 
 async def build_roles(ctx, **kwargs):
     """Roles management: searchable list with expandable role cards."""
-    roles, users, all_scopes = await asyncio.gather(
-        _fetch_roles(), _fetch_users(), _fetch_scope_names(),
+    roles, users, all_scopes, (guest_policy, guest_why) = await asyncio.gather(
+        _fetch_roles(), _fetch_users(), _fetch_scope_names(), _fetch_guest_policy(ctx),
     )
 
     create_form = ui.Accordion(sections=[{
@@ -330,7 +366,7 @@ async def build_roles(ctx, **kwargs):
         ))
 
     if not any(r.get("name") == GUEST_ROLE for r in roles):
-        items.append(_guest_item())
+        items.append(_guest_item(guest_policy, guest_why))
 
     return ui.Stack(children=[
         ui.Header("Roles", level=3,

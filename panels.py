@@ -32,6 +32,7 @@ from panels_system import build_system
 from panels_llm import build_llm
 from panels_extensions import build_extensions
 from panels_roles import build_roles
+from panels_guest_access import build_guest_access
 from panels_scopes import build_scopes
 from panels_audit import build_audit
 from panels_billing_analytics import build_billing_analytics
@@ -142,6 +143,7 @@ _BUILDERS = {
     "user_profile":      build_user_profile,
     "extensions":        build_extensions,
     "roles":             build_roles,
+    "guest_access":      build_guest_access,
     "scopes":            build_scopes,
     "audit":             build_audit,
     "billing_analytics": build_billing_analytics,

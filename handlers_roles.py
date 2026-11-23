@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _gw_request, _resolve_role_by_name, EmptyParams
+from app import chat, ActionResult, _acting, _gw_request, _resolve_role_by_name, EmptyParams
 from models_records import (
     RoleListResponse, RoleActionReceipt, ScopeListResponse, ScopeRecord,
 )
@@ -146,6 +146,52 @@ async def fn_update_role(ctx, params: UpdateRoleParams) -> ActionResult:
         data={"role": result, "cascaded_count": cascaded},
         summary=f"Role updated" + (f", cascaded to {cascaded} users" if cascaded else ""),
     refresh_panels=["tools"],
+    )
+
+
+# ─── The guest role's settings ────────────────────────────────────────── #
+
+GUEST_POLICY_PATH = "/v1/internal/guest/policy"
+# The settings of the guest policy. The gateway (app/chat/guest_policy.py) owns the list, the labels and the
+# bounds and checks every value; these are only the names a form may send.
+GUEST_POLICY_KEYS = (
+    "chat_per_min", "chat_per_day", "ip_per_min", "ip_per_day", "global_per_day", "sessions_per_ip_day",
+    "session_ttl_seconds", "pool_daily_cap", "per_guest_daily_cap", "per_ip_daily_cap",
+)
+
+
+class SaveGuestPolicyParams(BaseModel):
+    """Set the guest role's settings. A field left blank keeps its value."""
+    chat_per_min: str        = Field(default="", description="Messages a guest may send in a minute")
+    chat_per_day: str        = Field(default="", description="Messages a guest may send in a day")
+    ip_per_min: str          = Field(default="", description="Requests one network address may make in a minute")
+    ip_per_day: str          = Field(default="", description="Messages one network address may send in a day")
+    global_per_day: str      = Field(default="", description="Messages all guests together may send in a day")
+    sessions_per_ip_day: str = Field(default="", description="New guest sessions one network address may open in a day")
+    session_ttl_seconds: str = Field(default="", description="How long a guest session lives, in seconds")
+    pool_daily_cap: str      = Field(default="", description="Credits all guests together may spend in a day")
+    per_guest_daily_cap: str = Field(default="", description="Credits one guest may spend in a day")
+    per_ip_daily_cap: str    = Field(default="", description="Credits one network address may spend in a day")
+
+
+@chat.function("save_guest_policy", action_type="write", effects=["update:role"], event="role_updated",
+               data_model=RoleActionReceipt,
+               description="Set the guest role's settings: how many messages a guest, a network address and all "
+                           "guests may send, how long a guest session lives and how many credits guests may spend.")
+async def fn_save_guest_policy(ctx, params: SaveGuestPolicyParams) -> ActionResult:
+    """Send the fields that were filled to the gateway's guest policy; it checks each against its bounds."""
+    values = {k: str(getattr(params, k) or "").strip() for k in GUEST_POLICY_KEYS}
+    values = {k: v for k, v in values.items() if v}
+    if not values:
+        return ActionResult.error("Nothing to save: every field was blank.")
+    result = await _gw_request("PUT", GUEST_POLICY_PATH, {"values": values}, acting=_acting(ctx))
+    if isinstance(result, dict) and result.get("error"):
+        return ActionResult.error(str(result["error"]))
+    saved = (result or {}).get("values") if isinstance(result, dict) else None
+    return ActionResult.success(
+        data={"role": {"name": "guest", "settings": saved or values}, "role_id": "guest"},
+        summary=f"Guest settings saved ({len(values)} changed or confirmed)",
+        refresh_panels=["tools"],
     )
 
 
