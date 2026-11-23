@@ -64,7 +64,30 @@ class _AuthServiceTokenProxy(str):
 AUTH_SERVICE_TOKEN = _AuthServiceTokenProxy()
 
 
+# The panels keep fetched lists for a few seconds. A write must never be
+# followed by the old picture, so every write through the gateway doors below
+# tells the listeners (panels_sections registers its cache drop here). Before
+# 2026-11-23 only the LLM and system handlers dropped the cache: after a user
+# was edited the list showed the old role or status for up to 10 seconds.
+_after_write: list = []
+
+
+def _wrote() -> None:
+    for listener in _after_write:
+        try:
+            listener()
+        except Exception:
+            pass
+
+
 async def _gw_request(method, path, data=None, acting=None, ctx=None):
+    result = await _gw_request_raw(method, path, data, acting, ctx)
+    if method.upper() != "GET" and not (isinstance(result, dict) and result.get("error")):
+        _wrote()
+    return result
+
+
+async def _gw_request_raw(method, path, data=None, acting=None, ctx=None):
     token = _get_service_token()
     if not token and ctx:
         token = getattr(ctx, "_service_token", "") or (
@@ -153,7 +176,10 @@ async def _admin_put(path: str, body: dict, acting: str = "", timeout: float = 5
     if acting:
         headers["X-Acting-User"] = acting
     async with shared_http(timeout=timeout) as client:
-        return await client.put(f"{AUTH_GW.rstrip('/')}{path}", json=body, headers=headers)
+        resp = await client.put(f"{AUTH_GW.rstrip('/')}{path}", json=body, headers=headers)
+    if resp.status_code < 400:
+        _wrote()
+    return resp
 
 
 async def _admin_put_checked(path: str, body: dict, acting: str = "", timeout: float = 5.0,
@@ -394,7 +420,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.21.1",
+    version="5.22.0",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)

@@ -62,6 +62,21 @@ class GatewaySpy:
         return " | ".join(f"{c['method']} {c['path']}" for c in self.calls) or "(no calls)"
 
 
+@pytest.fixture(autouse=True)
+def _service_token_of_the_tests(monkeypatch):
+    """Every test runs with a token that is NOT a real one.
+
+    Found 2026-11-23: nine voice tests passed on the worker only because its
+    shell carried the production AUTH_SERVICE_TOKEN (the handlers refuse to
+    work without a token) and failed in a clean shell. A test must neither
+    need the production token nor be able to use it: a call that escapes its
+    stub now reaches the gateway with a token it refuses.
+    """
+    monkeypatch.setenv("AUTH_SERVICE_TOKEN", "test-token-not-a-real-one")
+    monkeypatch.delenv("IMPERAL_SERVICE_TOKEN", raising=False)
+    monkeypatch.delenv("SERVICE_TOKEN", raising=False)
+
+
 @pytest.fixture
 def ctx():
     """MockContext whose ``_tenant_id(ctx)`` resolves to 'default'."""

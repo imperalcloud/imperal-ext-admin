@@ -1,13 +1,26 @@
-"""Admin · User management panel builder.
+"""Admin · Users: a list to FIND a person, a profile to change one.
 
-Shows a filtered, searchable list of users with expandable cards.
-Per-user extensions fetched from Auth GW for accurate badges.
-Full profile editing available via section switch (panels_user_profile.py).
+Rebuilt 2026-11-23 on the owner's report ("there it is a mess: must be
+convenient, must not lag, must show everything right"). What was measured in
+the old screen and what replaces it:
+
+  * One render made up to 57 gateway calls: users, roles, scopes, extensions,
+    plans, the billing index and then ONE call per row for that user's
+    extensions. Now three: users, roles, the billing index.
+  * Every row carried a full edit card (about 6.5 KB each), built for all 50
+    rows of the page whether opened or not. Now a row is four strings and a
+    click that opens the profile.
+  * The card's scope editor showed the first 10 scopes and saved the field
+    whole: one edit of a user with more than 10 scopes deleted the rest.
+    There is no editing here any more; the profile edits the full set.
+  * A gateway failure read as "No users found". Now the failure is shown as a
+    failure, with the gateway's own words.
+
+Everything that changes a user lives in panels_user_profile.py.
 """
 from __future__ import annotations
 
 import asyncio
-
 import logging
 
 from imperal_sdk import ui
@@ -17,82 +30,44 @@ from render_cap import build_capped_list
 from panels_billing_analytics import (
     fetch_user_billing_index, _panel_acting, _money, _when,
 )
-from panels_sections import (
-    _fetch_users,
-    _fetch_roles,
-    _fetch_plans,
-    _fetch_extensions,
-    _fetch_user_extensions,
-    _fetch_scope_names,
-)
+from panels_sections import _fetch_users_checked, _fetch_roles
 
 log = logging.getLogger("admin")
 
-_LIMIT_KEYS = ["monthly_action_limit", "max_concurrent_tasks", "context_window"]
+PAGE = 50
+
+SORTS = [
+    {"value": "", "label": "Newest first"},
+    {"value": "email", "label": "Email A-Z"},
+    {"value": "last_login", "label": "Last login"},
+]
 
 
-# ── Local data fetchers ───────────────────────────────────────────────
+def _uid(u: dict) -> str:
+    return str(u.get("imperal_id") or u.get("id") or "")
 
 
+def _name(u: dict) -> str:
+    a = u.get("attributes")
+    a = a if isinstance(a, dict) else {}
+    return str(u.get("display_name") or a.get("display_name")
+               or u.get("full_name") or a.get("full_name") or "").strip()
 
 
+def _plan(u: dict, ub: dict) -> str:
+    """The plan a row names. ONE rule: the subscription row of the billing
+    index when the user has one, else the plan the user record carries, else
+    nothing is claimed. The old row fell back to an invented "free"."""
+    return str(ub.get("plan") or u.get("plan") or "no plan on record")
 
-# ── Helpers ───────────────────────────────────────────────────────────
 
-
-def _build_billing_rows(billing: dict | None) -> list:
-    """Billing at a glance: plan, how it settles, and the NEXT DUE DATE.
-
-    Owner ask 2026-08-13 — seeing the next charge date should not require
-    opening a second screen.
-
-    Two honesty rules carried over from the analytics section:
-      * "will be charged" is card-on-file, never a plan name, so a card-mode
-        row without a card is called out in red instead of looking healthy;
-      * an absent billing index renders NOTHING rather than a confident
-        "free / no date", which would be indistinguishable from fact.
-    """
-    if not billing:
-        return []
-
-    stamp, rel, colour = _when(billing.get("due_at"))
-    mode = billing.get("mode") or "card"
-    has_card = bool(billing.get("has_card"))
-    status = billing.get("status") or "—"
-
-    if mode == "card" and not has_card:
-        settles = "by card — NO CARD ON FILE"
-        settle_colour = "red"
-    elif mode == "card":
-        settles = "by card"
-        settle_colour = "green"
-    elif mode == "manual":
-        settles = "manually / invoice"
-        settle_colour = "blue"
-    else:
-        settles = "free (owner-set)"
-        settle_colour = "gray"
-
-    badges = [
-        ui.Badge(label=f"{billing.get('plan') or '—'} · {status}",
-                 color="green" if status == "active" else "gray"),
-        ui.Badge(label=settles, color=settle_colour),
-    ]
-    if billing.get("cancelling"):
-        badges.append(ui.Badge(label="cancels at period end", color="yellow"))
-    if int(billing.get("failures") or 0):
-        badges.append(ui.Badge(label=f"{billing['failures']} failed attempts",
-                               color="red"))
-
-    return [
-        ui.Section(title="Billing", children=[
-            ui.KeyValue(items=[
-                {"key": "Next due", "value": f"{stamp}  ({rel})"},
-                {"key": "Amount", "value": _money(billing.get("amount_cents"))},
-            ], columns=2),
-            ui.Stack(badges, direction="h", gap=1, wrap=True),
-        ]),
-    ]
+def _sorted(users: list[dict], sort: str) -> list[dict]:
+    if sort == "email":
+        return sorted(users, key=lambda u: str(u.get("email") or "").lower())
+    if sort == "last_login":
+        # never-logged-in users last
+        return sorted(users, key=lambda u: str(u.get("last_login") or ""), reverse=True)
+    return users          # the gateway's own order: newest account first
 
 
 def _build_orphan_rows(orphans: list[dict], q: str = "") -> list:
@@ -154,280 +129,85 @@ def _build_orphan_rows(orphans: list[dict], q: str = "") -> list:
     ]
 
 
-def _build_limit_badges(attrs: dict) -> list:
-    """Return limit override badge rows only when overrides exist."""
-    items = []
-    if attrs.get("monthly_action_limit"):
-        items.append(f"Actions: {attrs['monthly_action_limit']}/mo")
-    if attrs.get("max_concurrent_tasks"):
-        items.append(f"Tasks: {attrs['max_concurrent_tasks']}")
-    if attrs.get("context_window"):
-        items.append(f"History: {attrs['context_window']} msgs")
-    if not items:
-        return []
-    return [
-        ui.Divider(),
-        ui.Text("Limit Overrides", variant="caption"),
-        ui.Stack(
-            [ui.Badge(label=t, color="yellow") for t in items],
-            direction="h", gap=1, wrap=True,
-        ),
-    ]
-
-
-def _build_ext_badges(extensions: list[dict], user_exts: list[dict]) -> list:
-    """Extension access badges using per-user data from Auth GW.
-
-    Colors: blue=enabled, red=disabled, gray=role_default.
-    """
-    if not extensions:
-        return []
-    # Build lookup: app_id -> user extension record
-    ue_map = {e.get("app_id"): e for e in user_exts}
-    badges = []
-    for ext in extensions:
-        app_id = ext.get("app_id", "")
-        name = ext.get("display_name", app_id)
-        ue = ue_map.get(app_id)
-        if ue is None:
-            continue  # user has no access record for this ext
-        enabled = ue.get("enabled", True)
-        has_access = ue.get("has_access", True)
-        policy = ue.get("access_policy_type", "")
-        if not has_access or not enabled:
-            badges.append(ui.Badge(label=f"{name} (off)", color="red"))
-        elif policy == "role_default" or ue.get("source") == "role_default":
-            badges.append(ui.Badge(label=f"{name} (role)", color="gray"))
+def _row(u: dict, ub: dict) -> ui.ListItem:
+    """One user: who, which plan and role, when money next moves. A click
+    opens the profile; nothing is edited from the list."""
+    uid = _uid(u)
+    is_active = u.get("is_active", True)
+    parts = [_name(u), uid, _plan(u, ub), str(u.get("role") or "no role")]
+    # meta = when money next moves. Silence beats a guess: with no billing
+    # row the slot stays empty rather than implying "never".
+    if ub:
+        _, rel, _ = _when(ub.get("due_at"))
+        if ub.get("mode") == "card" and not ub.get("has_card"):
+            meta = f"{rel} · NO CARD"
+        elif ub.get("mode") in ("manual", "free"):
+            meta = f"{rel} · {ub.get('mode')}"
         else:
-            badges.append(ui.Badge(label=name, color="blue"))
-    if not badges:
-        return []
-    return [
-        ui.Divider(),
-        ui.Text("Extensions", variant="caption"),
-        ui.Stack(badges, direction="h", gap=1, wrap=True),
-    ]
+            meta = f"{rel} · {_money(ub.get('amount_cents'))}"
+    else:
+        meta = ""
+    return ui.ListItem(
+        id=uid,
+        title=str(u.get("email") or "(no email)"),
+        subtitle=" · ".join(p for p in parts if p),
+        meta=meta,
+        badge=ui.Badge("active" if is_active else "inactive",
+                       color="green" if is_active else "red"),
+        on_click=ui.Call("__panel__tools", section="user_profile", user_id=uid),
+    )
 
 
-def _build_user_expanded(user: dict, role_options: list[dict],
-                         all_scopes: list[str],
-                         extensions: list[dict],
-                         user_exts: list[dict],
-                         plan_options: list[dict],
-                         billing: dict | None = None) -> list:
-    """Build expanded_content for a single user ListItem.
+async def build_users(ctx, role_filter: str = "", status_filter: str = "",
+                      q: str = "", sort: str = "", **kwargs):
+    """The user list: search, filters, pages. Three gateway reads per render.
 
-    ``billing`` is this user's row from the billing index (plan, status,
-    settlement mode, card-on-file, next due date). It is optional because a
-    billing outage must degrade this card to what it showed before rather
-    than break the user list.
+    ``q`` searches every identifying field (id, email, all name variants,
+    company, tax id, phone, city, country, role) with the haystack of the
+    find_users tool, so the panel and the chat answer the same. The gateway's
+    own ``search`` covers email and id only (read 2026-11-23), which is why
+    the match is made here over the whole list and not asked of the gateway.
     """
-    uid = user.get("imperal_id", user.get("id", ""))
-    role = user.get("role", "user")
-    is_active = user.get("is_active", True)
-    scopes = user.get("scopes", [])
-    attrs = user.get("attributes", {})
-    tenant = user.get("tenant_id", "default")
-    auth_method = user.get("auth_method", "password")
-    last_login = user.get("last_login", "Never")
-    # Display-only MIRROR. The value that actually governs the 2-step gate lives
-    # in unified_config.user_settings (served to the kernel by the Auth GW);
-    # set_user_confirmation writes there and mirrors here for this caption.
-    # Rendering the effective value would cost one gateway call PER USER row
-    # (the /v1/users list carries no confirmation field), so an absent mirror is
-    # labelled as the role default rather than asserted to be off.
-    _conf_mirror = attrs.get("confirmation_enabled")
-    confirmation = (
-        "role default" if _conf_mirror is None
-        else f"{'on' if _conf_mirror else 'off'} (mirror)"
+    (users, error), roles, billing_index = await asyncio.gather(
+        _fetch_users_checked(), _fetch_roles(),
+        fetch_user_billing_index(_panel_acting(ctx)),
     )
-    # Current subscription plan (from the user record if present, else "free").
-    current_plan = (
-        user.get("plan")
-        or (user.get("subscription") or {}).get("plan")
-        or attrs.get("plan")
-        or "free"
-    )
-    # Per-user Webbee Code access override: attribute "" (inherit) | "allow" | "deny".
-    coding_access = attrs.get("coding_access") or "inherit"
-    # Per-user Connections (SSH/MCP) access override: same tri-state.
-    connections_access = attrs.get("connections_access") or "inherit"
-    # Per-user File Reader access override: same tri-state.
-    file_reader_access = attrs.get("file_reader_access") or "inherit"
-
-    rows: list = [
-        ui.Section(title="Identity", children=[
-            ui.KeyValue(items=[
-                {"key": "Email", "value": user.get("email", "—")},
-                {"key": "Imperal ID", "value": uid},
-                {"key": "Tenant", "value": tenant},
-                {"key": "Auth Method", "value": auth_method},
-                {"key": "Last Login", "value": str(last_login) or "Never"},
-                {"key": "Registered", "value": str(user.get("created_at") or "—")[:16]},
-            ], columns=2),
-        ]),
-        *_build_billing_rows(billing),
-        ui.Section(title="Role & Status", children=[
-            ui.Stack([
-                ui.Select(
-                    options=role_options, value=role,
-                    param_name="role",
-                    on_change=ui.Call("update_user", user_id=uid),
-                ),
-                ui.Toggle(
-                    label="Active", value=is_active,
-                    param_name="is_active",
-                    on_change=ui.Call("update_user", user_id=uid),
-                ),
-            ], direction="h", gap=3),
-            ui.Text("Billing plan", variant="caption"),
-            ui.Select(
-                # Guard against an empty plan fetch so the current value always
-                # has a matching option to render.
-                options=plan_options or [{"value": current_plan, "label": current_plan}],
-                value=current_plan,
-                param_name="plan_ref",
-                on_change=ui.Call("set_user_plan", user_id=uid),
+    if error:
+        return ui.Stack(children=[
+            ui.Header("Users", level=3),
+            ui.Alert(
+                title="The user list could not be read",
+                message=f"The gateway answered: {error}. Nothing is shown "
+                        "because nothing is known - this is not an empty tenant.",
+                type="error",
             ),
-        ]),
-        ui.Text(f"User Scopes ({len(scopes)})", variant="caption"),
-        ui.TagInput(
-            values=scopes[:10], suggestions=all_scopes,
-            param_name="scopes", placeholder="Add scope...",
-            grouped_by=":",
-            on_change=ui.Call("update_user", user_id=uid),
-        ),
-    ]
+        ])
 
-    rows.extend(_build_limit_badges(attrs))
-    rows.extend(_build_ext_badges(extensions, user_exts))
-
-    rows += [
-        ui.Divider(),
-        ui.Text("Webbee Code", variant="caption"),
-        ui.Select(
-            options=[
-                {"value": "inherit", "label": "Plan default"},
-                {"value": "allow", "label": "Allow"},
-                {"value": "deny", "label": "Deny"},
-            ],
-            value=coding_access,
-            param_name="access",
-            on_change=ui.Call("set_user_coding_access", user_id=uid),
-        ),
-        ui.Divider(),
-        ui.Text("Connections (SSH / MCP targets)", variant="caption"),
-        ui.Select(
-            options=[
-                {"value": "inherit", "label": "Plan default"},
-                {"value": "allow", "label": "Allow"},
-                {"value": "deny", "label": "Deny"},
-            ],
-            value=connections_access,
-            param_name="access",
-            on_change=ui.Call("set_user_connections_access", user_id=uid),
-        ),
-        ui.Divider(),
-        ui.Text("File Reader (document ingestion)", variant="caption"),
-        ui.Select(
-            options=[
-                {"value": "inherit", "label": "Plan default"},
-                {"value": "allow", "label": "Allow"},
-                {"value": "deny", "label": "Deny"},
-            ],
-            value=file_reader_access,
-            param_name="access",
-            on_change=ui.Call("set_user_file_reader_access", user_id=uid),
-        ),
-    ]
-
-    rows += [
-        ui.Divider(),
-        ui.Text(f"Confirmation (2-step): {confirmation}", variant="caption"),
-        ui.Stack([
-            ui.Button(
-                "Edit Profile",
-                variant="secondary",
-                on_click=ui.Call("__panel__tools",
-                                section="user_profile", user_id=uid),
-            ),
-            ui.Button(
-                "Deactivate" if is_active else "Activate",
-                variant="danger" if is_active else "primary",
-                on_click=ui.Call(
-                    "deactivate_user" if is_active else "update_user",
-                    user_id=uid,
-                    **({"is_active": True} if not is_active else {
-                        "confirm": (f"Deactivate {user.get('email', uid)}? "
-                                    "They lose access immediately. You can "
-                                    "Activate them again any time."),
-                    }),
-                ),
-            ),
-            ui.Button(
-                "Delete",
-                variant="danger",
-                on_click=ui.Call(
-                    "hard_delete_user", user_id=uid,
-                    confirm=(f"Permanently delete {user.get('email', uid)}? "
-                             "This erases the account, its balance, roles and "
-                             "history for good — there is nothing to restore "
-                             "afterwards. If you just want to lock them out, "
-                             "use Deactivate instead."),
-                ),
-            ),
-        ], direction="h", gap=2),
-    ]
-    return rows
-
-
-# ── Main builder ──────────────────────────────────────────────────────
-
-
-async def build_users(ctx, role_filter: str = "",
-                      status_filter: str = "", q: str = "", **kwargs):
-    """User management: expandable cards with inline editing + filters.
-
-    ``q`` searches EVERY identifying field server-side (id, email, all name
-    variants, nickname, company, tax id, phone, city, country, role) by
-    reusing the same haystack the find_users tool uses. The list's built-in
-    ``searchable`` flag only filters the strings already rendered on screen,
-    so before this an operator could not find a person by imperal_id or
-    company at all — the value simply was not on the row.
-    """
-    users, roles, all_scopes, extensions, plans, billing_index = await asyncio.gather(
-        _fetch_users(), _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
-        _fetch_plans(), fetch_user_billing_index(_panel_acting(ctx)),
-    )
+    billing_known = isinstance(billing_index, dict) and "users" in billing_index
     billing_map = (billing_index or {}).get("users") or {}
     orphans = (billing_index or {}).get("orphaned_subscriptions") or []
 
-    if not users:
-        return ui.Stack(children=[
-            ui.Header("User Management", level=3),
-            ui.Empty(message="No users found.", icon="Users"),
-        ])
+    q = str(q or "")
+    needle = q.strip().lower()
+    role_filter, status_filter, sort = str(role_filter or ""), str(status_filter or ""), str(sort or "")
 
-    role_options = [
-        {"value": r.get("name", ""),
-         "label": r.get("display_name", r.get("name", ""))}
-        for r in roles
-    ]
-    # Plan selector options — value = plan NAME (user-plan accepts name OR id, and
-    # the user record carries the plan name), label = plan name.
-    plan_options = [
-        {"value": p.get("name", ""), "label": p.get("name", "")}
-        for p in plans if p.get("name")
-    ]
+    # counts over ALL users, before any filter
+    active_n = sum(1 for u in users if u.get("is_active", True))
+    by_role: dict[str, int] = {}
+    for u in users:
+        by_role[str(u.get("role") or "")] = by_role.get(str(u.get("role") or ""), 0) + 1
 
-    # Apply filters
+    role_labels = {r.get("name", ""): r.get("display_name") or r.get("name", "") for r in roles}
+    # a role that users hold but the role list does not name is still offered
+    for name in by_role:
+        role_labels.setdefault(name, name or "(no role)")
+    role_options = [{"value": name, "label": f"{label} ({by_role.get(name, 0)})"}
+                    for name, label in role_labels.items() if name]
+
     filtered = users
-    if q.strip():
+    if needle:
         # local import: panels never import handlers at module scope.
-        # Reusing the tool's own haystack keeps panel search and chat search
-        # answering identically — two implementations would drift.
         from handlers_user_search import _identity_haystack
-        needle = q.strip().lower()
         filtered = [u for u in filtered if needle in _identity_haystack(u)]
     if role_filter:
         filtered = [u for u in filtered if u.get("role") == role_filter]
@@ -435,177 +215,125 @@ async def build_users(ctx, role_filter: str = "",
         filtered = [u for u in filtered if u.get("is_active", True)]
     elif status_filter == "inactive":
         filtered = [u for u in filtered if not u.get("is_active", True)]
+    filtered = _sorted(filtered, sort)
 
-    # Real server-side pagination (2026-08-29): the owner wants to be able
-    # to page through EVERY user, 100% of them, not have the rest silently
-    # dropped after a fixed cap. total_filtered is the TRUE count across
-    # the whole filtered set, computed BEFORE slicing, so paging all the
-    # way through always reaches every last one. Each page is its own
-    # server round-trip (Prev/Next below re-call __panel__tools with a new
-    # offset) -- this replaces the earlier fixed 200-row cutoff, which
-    # simply hid anything past row 200 with no way to reach it.
-    _PAGE = 50
-    total_filtered = len(filtered)
+    total = len(filtered)
     try:
         offset = max(0, int(kwargs.get("user_offset", 0)))
     except (TypeError, ValueError):
         offset = 0
-    # Clamp to the real list bounds only -- NOT rounded down to a multiple
-    # of _PAGE. Rounding to a PAGE-multiple only works if every page always
-    # renders exactly _PAGE rows, which the byte-safety net below explicitly
-    # does not guarantee (a page can render fewer if rows are heavy) -- that
-    # mismatch made the last few users unreachable no matter how far you paged.
-    offset = min(offset, max(0, total_filtered - 1)) if total_filtered else 0
-    page_slice = filtered[offset:offset + _PAGE]
+    # clamp to the list, not to a multiple of PAGE: a page may render fewer
+    # rows than PAGE (the byte net below), and Next advances by what was shown
+    offset = min(offset, max(0, total - 1)) if total else 0
+    page_slice = filtered[offset:offset + PAGE]
 
-    # Fetch per-user extensions in parallel — bounded by the page size
-    # itself (50) now, not a separate arbitrary sub-cap.
-    _uids = [u.get("imperal_id", u.get("id", "")) for u in page_slice]
-    _ext_results = await asyncio.gather(*[_fetch_user_extensions(uid) for uid in _uids])
-    user_ext_map: dict[str, list[dict]] = dict(zip(_uids, _ext_results))
+    def _go(**over) -> ui.Call:
+        """A re-render of this list with the current search, filters and
+        order, changed only by *over*."""
+        state = {"section": "management", "q": q, "role_filter": role_filter,
+                 "status_filter": status_filter, "sort": sort, "user_offset": 0}
+        state.update(over)
+        return ui.Call("__panel__tools", **state)
 
     # Search box — a Form because ui.Input has no on_change; submitting
-    # re-renders this section server-side with the query applied.
+    # re-renders this section with the query applied.
     search_bar = ui.Form(
         action="__panel__tools",
         submit_label="Search",
+        defaults={"section": "management", "role_filter": role_filter,
+                  "status_filter": status_filter, "sort": sort, "user_offset": 0},
         children=[
             ui.Input(
                 placeholder="Search by email, ID, name, company, phone, city…",
                 param_name="q", value=q,
             ),
-            ui.Select(
-                options=[{"value": "management", "label": "Users"}],
-                value="management", param_name="section",
-            ),
         ],
     )
 
-    # Filter bar
     filter_bar = ui.Stack([
         ui.Select(
-            options=[{"value": "", "label": "All Roles"}] + role_options,
+            options=[{"value": "", "label": f"All roles ({len(users)})"}] + role_options,
             value=role_filter, param_name="role_filter",
-            on_change=ui.Call("__panel__tools", section="management",
-                             status_filter=status_filter, q=q, user_offset=0),
+            on_change=ui.Call("__panel__tools", section="management", q=q,
+                              status_filter=status_filter, sort=sort, user_offset=0),
         ),
         ui.Select(
             options=[
-                {"value": "", "label": "All Status"},
-                {"value": "active", "label": "Active"},
-                {"value": "inactive", "label": "Inactive"},
+                {"value": "", "label": f"Any status ({len(users)})"},
+                {"value": "active", "label": f"Active ({active_n})"},
+                {"value": "inactive", "label": f"Inactive ({len(users) - active_n})"},
             ],
             value=status_filter, param_name="status_filter",
-            on_change=ui.Call("__panel__tools", section="management",
-                             role_filter=role_filter, q=q, user_offset=0),
+            on_change=ui.Call("__panel__tools", section="management", q=q,
+                              role_filter=role_filter, sort=sort, user_offset=0),
+        ),
+        ui.Select(
+            options=SORTS, value=sort, param_name="sort",
+            on_change=ui.Call("__panel__tools", section="management", q=q,
+                              role_filter=role_filter, status_filter=status_filter,
+                              user_offset=0),
         ),
     ], direction="h", gap=2)
 
-    # Build user list items
-    #
-    # The COLLAPSED row carries the four things an operator looks for before
-    # opening anything: email (title), imperal_id + plan + role (subtitle),
-    # and the next due date (meta). Previously the row showed email and role
-    # only, so finding someone by id meant expanding cards one at a time.
-    def _build_one(u: dict) -> ui.ListItem:
-        uid = u.get("imperal_id", u.get("id", ""))
-        is_active = u.get("is_active", True)
-        ub = billing_map.get(uid) or {}
+    # Byte net: rows are light now, but one page must never reach the
+    # kernel's 256 KB reply cap whatever a row holds. See render_cap.py.
+    user_items, shown, _ = build_capped_list(
+        page_slice, lambda u: _row(u, billing_map.get(_uid(u)) or {}))
+    page_short = shown < len(page_slice)
 
-        plan_txt = ub.get("plan") or u.get("plan") or "free"
-        subtitle = f"{uid} · {plan_txt} · {u.get('role', 'user')}"
+    if total:
+        count = f"{offset + 1}–{offset + shown} of {total}"
+        count += " users" if total == len(users) else f" matching, {len(users)} users in all"
+    else:
+        count = f"Nobody matches, {len(users)} users in all" if users else "This tenant has no users yet"
+    if needle:
+        count += f" · search “{q.strip()}”"
 
-        # meta = when money next moves. Silence beats a guess: with no
-        # billing row the slot stays empty rather than implying "never".
-        if ub:
-            stamp, rel, _ = _when(ub.get("due_at"))
-            if ub.get("mode") == "card" and not ub.get("has_card"):
-                meta = f"{rel} · NO CARD"
-            elif ub.get("mode") in ("manual", "free"):
-                meta = f"{rel} · {ub.get('mode')}"
-            else:
-                meta = f"{rel} · {_money(ub.get('amount_cents'))}"
-        else:
-            meta = ""
+    pager = []
+    if offset > 0:
+        pager.append(ui.Button(label="← Previous", variant="ghost",
+                               on_click=_go(user_offset=max(0, offset - PAGE))))
+    # advance by what THIS page showed, so a page the byte net cut short
+    # never hides its remainder
+    if offset + shown < total:
+        pager.append(ui.Button(label="Next →", variant="ghost",
+                               on_click=_go(user_offset=offset + shown)))
 
-        return ui.ListItem(
-            id=uid,
-            title=u.get("email", "?"),
-            subtitle=subtitle,
-            meta=meta,
-            badge=ui.Badge(
-                "active" if is_active else "inactive",
-                color="green" if is_active else "red",
-            ),
-            expandable=True,
-            expanded_content=_build_user_expanded(
-                u, role_options, all_scopes, extensions,
-                user_ext_map.get(uid, []), plan_options, ub,
-            ),
-        )
-
-    # Byte-aware safety net (2026-08-29): a single 50-row PAGE should never
-    # get near the kernel's hard 256KB reply cap, but if some unusually
-    # heavy rows ever did, stop adding them rather than tripping the cap —
-    # same measuring approach as before, just applied to one page instead
-    # of the whole filtered set now that paging (not a cutoff) is how the
-    # operator reaches every one of the total_filtered users. See render_cap.py.
-    user_items, rendered_in_page, _ = build_capped_list(page_slice, _build_one)
-    page_short = rendered_in_page < len(page_slice)
-
-    range_start = offset + 1 if total_filtered else 0
-    range_end = offset + rendered_in_page
-    count = (f"{range_start}\u2013{range_end} of {total_filtered} users"
-             if role_filter or status_filter or q.strip()
-             else f"{range_start}\u2013{range_end} of {len(users)} users")
-    if q.strip():
-        count += f" · matching “{q.strip()}”"
-
-    def _pager():
-        btns = []
-        if offset > 0:
-            btns.append(ui.Button(label="\u2190 Previous 50", variant="ghost",
-                        on_click=ui.Call("__panel__tools", section="management",
-                                         role_filter=role_filter, status_filter=status_filter, q=q,
-                                         user_offset=max(0, offset - _PAGE))))
-        # Advance by rendered_in_page (what THIS page actually showed), not a
-        # fixed _PAGE -- if the byte-safety net ever trimmed a page short,
-        # advancing by a fixed amount would silently skip the untrimmed
-        # remainder forever. Advancing by the real count guarantees every
-        # row is reachable by paging forward, which is the whole point.
-        if offset + rendered_in_page < total_filtered:
-            btns.append(ui.Button(label="Next 50 \u2192", variant="ghost",
-                        on_click=ui.Call("__panel__tools", section="management",
-                                         role_filter=role_filter, status_filter=status_filter, q=q,
-                                         user_offset=offset + rendered_in_page)))
-        return ui.Stack(children=btns, direction="h", gap=2) if btns else None
-
-    return ui.Stack(children=[
-        ui.Header("User Management", level=3),
+    children: list = [
+        ui.Header("Users", level=3),
         search_bar,
         filter_bar,
         ui.Text(count, variant="caption"),
-        *([ui.Alert(
-            title="This page came in heavier than usual",
-            message=(f"{rendered_in_page} of this page's {len(page_slice)} users "
-                     "are shown below — the rest were unusually large. Page "
-                     "forward/back still reaches everyone else."),
+    ]
+    if not billing_known:
+        children.append(ui.Alert(
+            message="Billing data could not be read: plans come from the user "
+                    "records and no due dates are shown.",
             type="warning",
-        )] if page_short else []),
-        *_build_orphan_rows(orphans, q),
-        ui.Accordion(sections=[{
-            "id": "create",
-            "title": "Create New User",
-            "children": [
-                ui.Form(action="create_user", submit_label="Create User",
-                        children=[
-                    ui.Input(placeholder="Email address", param_name="email"),
-                    ui.Input(placeholder="Password", param_name="password"),
-                    ui.Select(options=role_options, value="user",
-                              param_name="role", placeholder="Select role"),
-                ]),
-            ],
-        }]),
-        ui.List(items=user_items, searchable=True),
-        *([_pager()] if _pager() else []),
-    ])
+        ))
+    if page_short:
+        children.append(ui.Alert(
+            title="This page came in heavier than usual",
+            message=(f"{shown} of this page's {len(page_slice)} users are shown "
+                     "below. Next reaches the rest."),
+            type="warning",
+        ))
+    children += _build_orphan_rows(orphans, q)
+    children.append(ui.Accordion(sections=[{
+        "id": "create",
+        "title": "Create a user",
+        "children": [
+            ui.Form(action="create_user", submit_label="Create user", children=[
+                ui.Input(placeholder="Email address", param_name="email"),
+                ui.Input(placeholder="Password", param_name="password"),
+                ui.Select(
+                    options=[{"value": n, "label": l} for n, l in role_labels.items() if n],
+                    value="user", param_name="role", placeholder="Select role"),
+            ]),
+        ],
+    }]))
+    if user_items:
+        children.append(ui.List(items=user_items))
+    if pager:
+        children.append(ui.Stack(children=pager, direction="h", gap=2))
+    return ui.Stack(children=children)

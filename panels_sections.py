@@ -16,7 +16,7 @@ from imperal_sdk._shared_http import shared_http
 from imperal_sdk import ui
 
 from app import _gw_users_all
-from app import _gw_request, _registry_get, AUTH_GW, REGISTRY_URL
+from app import _gw_request, _registry_get, AUTH_GW, REGISTRY_URL, _after_write
 
 log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -50,6 +50,10 @@ async def _cached(key: str, factory):
 def _invalidate_panel_cache():
     """Call after write actions to force fresh data on next render."""
     _cache.clear()
+
+
+# every write through the gateway doors of app.py drops this cache
+_after_write.append(_invalidate_panel_cache)
 
 
 
@@ -88,6 +92,31 @@ async def _fetch_users_raw() -> list[dict]:
 
 async def _fetch_users() -> list[dict]:
     return await _cached("users", _fetch_users_raw)
+
+
+async def _fetch_users_checked() -> tuple[list[dict], str]:
+    """Every user AND the reason when the list could not be read.
+
+    ``_fetch_users`` answers [] both for "the tenant has no users" and for
+    "the gateway did not answer", so a screen built on it shows an outage as
+    a fact ("No users found"). A screen that must tell the two apart reads
+    here: ``(users, "")`` or ``([], reason)``.
+    """
+    now = time.monotonic()
+    hit = _cache.get("users")
+    if hit and now - hit[0] < _CACHE_TTL:
+        return hit[1], ""
+    try:
+        raw = await _gw_users_all(_gw_request)
+    except Exception as e:
+        log.warning("Panel: fetch users failed: %s", e)
+        return [], f"{type(e).__name__}: {e}"
+    if isinstance(raw, dict):
+        return [], str(raw.get("error") or "the gateway did not answer with a list")
+    users = [u for u in raw if isinstance(u, dict)]
+    if users:
+        _cache["users"] = (now, users)
+    return users, ""
 
 
 async def _fetch_roles_raw() -> list[dict]:

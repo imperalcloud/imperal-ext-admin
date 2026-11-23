@@ -88,13 +88,9 @@ def _many_extensions(n: int, *, heavy: bool = False) -> list[dict]:
 
 
 def _mock_users(monkeypatch, users):
-    monkeypatch.setattr(PU, "_fetch_users", _aret(users))
+    monkeypatch.setattr(PU, "_fetch_users_checked", _aret((users, "")))
     monkeypatch.setattr(PU, "_fetch_roles",
                         _aret([{"name": "user", "display_name": "User"}]))
-    monkeypatch.setattr(PU, "_fetch_scope_names", _aret([]))
-    monkeypatch.setattr(PU, "_fetch_extensions", _aret([]))
-    monkeypatch.setattr(PU, "_fetch_plans", _aret([{"name": "free"}]))
-    monkeypatch.setattr(PU, "_fetch_user_extensions", _aret([]))
     monkeypatch.setattr(PU, "fetch_user_billing_index", _aret({}))
 
 

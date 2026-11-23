@@ -11,10 +11,10 @@ import logging
 
 from imperal_sdk import ui
 
-from app import _gw_request
+from app import _gw_request, _tenant_id
 from panels_sections import (
     _fetch_roles, _fetch_extensions, _fetch_user_extensions,
-    _fetch_scope_names, _cached,
+    _fetch_scope_names, _fetch_plans, _cached,
 )
 from panels_user_profile_info import build_info_sections
 
@@ -119,6 +119,36 @@ async def _fetch_credits(user_id: str, acting: str) -> dict:
         return {}
 
 
+async def _fetch_confirmation(user_id: str, tenant: str) -> dict | None:
+    """The user's 2-step confirmation settings from the store the kernel reads
+    (unified_config user_settings, see handlers_system.fn_set_user_confirmation).
+    None = they could not be read; the profile then says so and offers no
+    switch, because a switch drawn from a guess would save the guess."""
+    try:
+        r = await _gw_request(
+            "GET", f"/v1/internal/users/{user_id}/settings?tenant_id={tenant}")
+    except Exception:
+        return None
+    if not isinstance(r, dict) or r.get("error"):
+        return None
+    settings = r.get("settings", r)
+    return settings if isinstance(settings, dict) else None
+
+
+_ACCESS_OPTIONS = [
+    {"value": "inherit", "label": "Plan default"},
+    {"value": "allow", "label": "Allow"},
+    {"value": "deny", "label": "Deny"},
+]
+
+# (title, the tool that saves it, the attribute that holds it)
+_ACCESS_FEATURES = [
+    ("Webbee Code", "set_user_coding_access", "coding_access"),
+    ("Connections (SSH / MCP targets)", "set_user_connections_access", "connections_access"),
+    ("File Reader (document ingestion)", "set_user_file_reader_access", "file_reader_access"),
+]
+
+
 def _role_default(roles, role_name, field, fallback) -> str:
     r = next((r for r in roles if r.get("name") == role_name), None)
     if r and r.get(field) is not None:
@@ -133,17 +163,30 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     async def _get_user():
         return await _gw_request("GET", f"/v1/users/{user_id}")
 
-    user = await _cached(f"user:{user_id}", _get_user)
+    back = ui.Button(
+        "\u2190 Back to Users", variant="ghost",
+        on_click=ui.Call("__panel__tools", section="management", user_id=""),
+    )
+    try:
+        user = await _cached(f"user:{user_id}", _get_user)
+    except Exception as e:
+        user = {"error": f"{type(e).__name__}: {e}"}
     if not isinstance(user, dict) or "error" in user:
-        return ui.Alert(message=f"User {user_id} not found", type="error")
+        # the gateway's own words: "not found" and "the gateway is down" are
+        # different facts and were both shown as "not found"
+        why = user.get("error") if isinstance(user, dict) else "the gateway did not answer with a user"
+        return ui.Stack(children=[back, ui.Alert(
+            title=f"User {user_id} could not be read", message=str(why), type="error")])
 
     _acting = _panel_acting(ctx)
-    roles, all_scopes, extensions, user_exts, effective, billing, dev_profile, bmode, credits = await asyncio.gather(
+    (roles, all_scopes, extensions, user_exts, effective, billing, dev_profile, bmode,
+     credits, plans, confirmation) = await asyncio.gather(
         _fetch_roles(), _fetch_scope_names(), _fetch_extensions(),
         _fetch_user_extensions(user_id), _fetch_effective_scopes(user_id),
         _fetch_user_billing(user_id), _fetch_developer_profile(user_id),
         _fetch_billing_mode(user_id, _acting),
         _fetch_credits(user_id, _acting),
+        _fetch_plans(), _fetch_confirmation(user_id, _tenant_id(ctx)),
     )
     sub_data, bal_data = billing
 
@@ -160,10 +203,7 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     ]
 
     nodes: list = [
-        ui.Button(
-            "\u2190 Back to Users", variant="ghost",
-            on_click=ui.Call("__panel__tools", section="management", user_id=""),
-        ),
+        back,
         ui.Header(email, level=3, subtitle=user_id),
 
         # ── Role & Status ─────────────────────────────────────────
@@ -265,6 +305,31 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
         ],
     ))
     nodes.append(ui.Section(title="Developer", children=dev_children))
+
+    # ── Plan ───────────────────────────────────────────────────────
+    # Moved here from the user list 2026-11-23: there the plan changed the
+    # moment a select moved, with no Save and no second look.
+    current_plan = str(sub_data.get("plan") or user.get("plan") or "")
+    plan_options = [{"value": p.get("name", ""), "label": p.get("name", "")}
+                    for p in plans if isinstance(p, dict) and p.get("name")]
+    if current_plan and current_plan not in {o["value"] for o in plan_options}:
+        plan_options.insert(0, {"value": current_plan, "label": current_plan})
+    if plan_options:
+        plan_children: list = [ui.Form(
+            action="set_user_plan",
+            submit_label="Save Plan",
+            defaults={"user_id": user_id},
+            children=[
+                ui.Text(f"Current plan: {current_plan or 'none on record'}", variant="caption"),
+                ui.Select(options=plan_options, value=current_plan or plan_options[0]["value"],
+                          param_name="plan_ref"),
+            ],
+        )]
+    else:
+        plan_children = [ui.Alert(
+            message="The plan list could not be read, so the plan cannot be changed from here right now.",
+            type="warning")]
+    nodes.append(ui.Section(title="Plan", children=plan_children))
 
     # ── Billing Settlement (owner control: HOW and WHEN they pay) ──
     # Added 2026-08-13. The two billing-mode tools existed but had NO panel at
@@ -420,6 +485,54 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
         ],
     ))
 
+    # ── Feature access (per-user override of the plan) ─────────────
+    nodes.append(ui.Section(
+        title="Feature access",
+        children=[
+            ui.Text("Each feature follows the plan unless it is allowed or denied here.",
+                    variant="caption"),
+            *[ui.Form(
+                action=tool,
+                submit_label=f"Save {title.split(' (')[0]}",
+                defaults={"user_id": user_id},
+                children=[
+                    ui.Text(title, variant="caption"),
+                    ui.Select(options=_ACCESS_OPTIONS, value=attrs.get(attr) or "inherit",
+                              param_name="access"),
+                ],
+            ) for title, tool, attr in _ACCESS_FEATURES],
+        ],
+    ))
+
+    # ── Confirmation (2-step) ──────────────────────────────────────
+    # The value shown is the one the kernel acts on, not the attribute mirror
+    # the old list card printed.
+    if confirmation is None:
+        conf_children: list = [ui.Alert(
+            message="The confirmation settings could not be read, so no switch is offered.",
+            type="warning")]
+    else:
+        _conf = confirmation.get("confirmation_enabled")
+        conf_children = [
+            ui.Text(
+                "Not set for this user: the role's policy applies." if _conf is None
+                else f"Set for this user: {'on' if _conf else 'off'}.",
+                variant="caption"),
+            ui.Form(
+                action="set_user_confirmation",
+                submit_label="Save Confirmation",
+                defaults={"user_id": user_id},
+                children=[
+                    ui.Toggle(label="Ask before a change is made", value=bool(_conf),
+                              param_name="enabled"),
+                    ui.Toggle(label="Do not ask for read-only actions",
+                              value=bool(confirmation.get("confirmation_skip_read")),
+                              param_name="skip_read"),
+                ],
+            ),
+        ]
+    nodes.append(ui.Section(title="Confirmation (2-step)", children=conf_children))
+
     # ── Custom Attributes (ABAC) ───────────────────────────────────
     # Hide keys already shown in the organized sections above + the limit/
     # confirmation keys that have their own controls — the catch-all then lists
@@ -427,6 +540,7 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
     _surfaced = {
         "monthly_action_limit", "max_concurrent_tasks", "context_window",
         "confirmation_enabled", "confirmation_skip_read",
+        "coding_access", "connections_access", "file_reader_access",
         "account_type", "billing", "company", "display_name", "full_name",
         "email_verified", "email_verified_at", "stripe_customer_id", "auto_topup",
         # shown in the Developer section above
@@ -508,15 +622,16 @@ async def build_user_profile(ctx, user_id: str = "", **kwargs):
             ),
             ui.Stack([
                 ui.Button(
-                    "Deactivate User" if is_active else "User Already Inactive",
-                    variant="danger",
-                    disabled=not is_active,
+                    "Deactivate User", variant="danger",
                     on_click=ui.Call(
                         "deactivate_user", user_id=user_id,
                         confirm="Deactivate this user? They lose access "
                                 "immediately. You can Activate them again "
                                 "any time.",
-                    ) if is_active else None,
+                    ),
+                ) if is_active else ui.Button(
+                    "Activate User", variant="primary",
+                    on_click=ui.Call("update_user", user_id=user_id, is_active=True),
                 ),
                 ui.Button(
                     "Permanent Delete User",

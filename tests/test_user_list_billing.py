@@ -81,15 +81,10 @@ def _aret(value):
 
 def _render(monkeypatch, *, q: str = "", index: dict | None = INDEX) -> dict:
     """Render the real builder with every fetch stubbed — no network."""
-    monkeypatch.setattr(PU, "_fetch_users", _aret(USERS))
+    monkeypatch.setattr(PU, "_fetch_users_checked", _aret((USERS, "")))
     monkeypatch.setattr(PU, "_fetch_roles",
                         _aret([{"name": "user", "display_name": "User"},
                                {"name": "admin", "display_name": "Admin"}]))
-    monkeypatch.setattr(PU, "_fetch_scope_names", _aret([]))
-    monkeypatch.setattr(PU, "_fetch_extensions", _aret([]))
-    monkeypatch.setattr(PU, "_fetch_plans",
-                        _aret([{"name": "pro"}, {"name": "enterprise"}]))
-    monkeypatch.setattr(PU, "_fetch_user_extensions", _aret([]))
     monkeypatch.setattr(PU, "fetch_user_billing_index", _aret(index))
     return asyncio.run(PU.build_users(None, q=q)).to_dict()
 
