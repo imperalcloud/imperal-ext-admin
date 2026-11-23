@@ -104,63 +104,87 @@ def test_anthropic_is_asked_in_its_own_format(monkeypatch):
     assert calls[0]["headers"]["x-api-key"] == "k" and "input_schema" in calls[0]["json"]["tools"][0]
 
 
-def test_a_wrapped_key_that_cannot_be_unwrapped_is_not_sent(monkeypatch):
-    monkeypatch.delenv("IMPERAL_ENCRYPTION_KEY", raising=False)
-    monkeypatch.delenv("IMAP_ENCRYPTION_KEY", raising=False)
-    assert LP.unwrap_key("gAAAAAwrapped") == ""
-    assert LP.unwrap_key("sk-plain") == "sk-plain"
+class _Secrets:
+    """The extension's secret client: name -> value, None when not typed."""
+
+    def __init__(self, values=None):
+        self.values, self.asked = dict(values or {}), []
+
+    async def get(self, name):
+        self.asked.append(name)
+        return self.values.get(name)
 
 
-def test_the_buttons_test_the_stored_slot(monkeypatch):
+class _Ctx:
+    def __init__(self, values=None):
+        self.secrets = _Secrets(values)
+
+
+def _probe_calls(monkeypatch):
     seen = []
 
     async def _fake(provider, model, key, base_url="", tools=False):
         seen.append((provider, model, key, base_url, tools))
         return {"ok": True, "message": "x"}
     monkeypatch.setattr(LP, "probe", _fake)
+    return seen
 
-    async def _stored():
-        return {"api_key": "k1", "failover_api_key": "k2"}
-    monkeypatch.setattr(LP, "stored_keys", _stored)
-    # what the panel draws from: the gateway masks the main key
-    cfg = {"provider": "openrouter", "model": "a/b", "api_key": "sk-or-\u2022\u2022\u2022abc", "base_url": "https://or/v1",
-           "failover_provider": "openai", "failover_model": "gpt-x", "failover_api_key": "k2"}
-    asyncio.run(PL._run_test(cfg, "main"))
-    asyncio.run(PL._run_test(cfg, "failover_compat"))
-    assert seen == [("openrouter", "a/b", "k1", "https://or/v1", False),
+
+def test_the_buttons_test_the_saved_slot_with_the_providers_secret(monkeypatch):
+    seen = _probe_calls(monkeypatch)
+    ctx = _Ctx({"llm_openrouter_api_key": "k1", "llm_openai_api_key": "k2"})
+    # a config row written before 2026-11-23 may still carry key slots: not read
+    cfg = {"provider": "openrouter", "model": "a/b", "api_key": "sk-old", "base_url": "https://openrouter.ai/api/v1",
+           "failover_provider": "openai", "failover_model": "gpt-x", "failover_api_key": "sk-old2"}
+    asyncio.run(PL._run_test(ctx, cfg, "main"))
+    asyncio.run(PL._run_test(ctx, cfg, "failover_compat"))
+    assert seen == [("openrouter", "a/b", "k1", "https://openrouter.ai/api/v1", False),
                     ("openai", "gpt-x", "k2", "", True)]
+    assert ctx.secrets.asked == ["llm_openrouter_api_key", "llm_openai_api_key"]
 
 
-def test_the_platform_env_key_goes_only_to_the_providers_own_address(monkeypatch):
-    """A typed Base URL of another host must never receive the platform's key."""
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-platform")
-    assert LP.resolve_key({}, "openai", False) == "sk-platform"
-    assert LP.resolve_key({}, "openai", False, "https://api.openai.com/v1/") == "sk-platform"
-    assert LP.resolve_key({}, "openai", False, "https://evil.example/v1") == ""
-    # the slot's own stored key is the admin's choice for that address
-    assert LP.resolve_key({"api_key": "sk-slot"}, "openai", False, "https://evil.example/v1") == "sk-slot"
+def test_a_provider_key_goes_only_to_the_providers_own_address(monkeypatch):
+    """A Base URL of another host must never receive the provider's key."""
+    assert LP.may_send_key_to("openai", "")
+    assert LP.may_send_key_to("openai", "https://api.openai.com/v1/")
+    assert not LP.may_send_key_to("openai", "https://evil.example/v1")
+    assert LP.may_send_key_to("custom", "http://10.0.0.5:11434/v1"), "custom: the address the admin saved"
 
-    seen = []
+    seen = _probe_calls(monkeypatch)
+    ctx = _Ctx({"llm_openai_api_key": "sk-platform"})
+    out = asyncio.run(PL._run_test(ctx, {"provider": "openai", "model": "m", "base_url": "https://evil.example/v1"}, "main"))
+    assert not out["ok"] and "Nothing was called" in out["message"]
+    assert seen == [] and ctx.secrets.asked == [], "the key was not even read"
 
-    async def _fake(provider, model, key, base_url="", tools=False):
-        seen.append((key, base_url))
-        return {"ok": False, "message": "x"}
-    monkeypatch.setattr(LP, "probe", _fake)
 
-    async def _none():
-        return {}
-    monkeypatch.setattr(LP, "stored_keys", _none)
-    asyncio.run(PL._run_test({"provider": "openai", "model": "m", "base_url": "https://evil.example/v1"}, "main"))
-    assert seen == [("", "https://evil.example/v1")]
+def test_a_provider_without_a_secret_is_not_called_and_env_is_not_a_source(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-from-env")
+    seen = _probe_calls(monkeypatch)
+    out = asyncio.run(PL._run_test(_Ctx(), {"provider": "openai", "model": "m"}, "main"))
+    assert not out["ok"] and "llm_openai_api_key" in out["message"] and seen == []
+
+
+def test_custom_runs_with_its_secret_or_with_none(monkeypatch):
+    seen = _probe_calls(monkeypatch)
+    cfg = {"provider": "custom", "model": "llama", "base_url": "http://10.0.0.5:11434/v1"}
+    asyncio.run(PL._run_test(_Ctx(), cfg, "main"))
+    asyncio.run(PL._run_test(_Ctx({"llm_openai_compatible_api_key": "kc"}), cfg, "main"))
+    assert [c[2] for c in seen] == ["", "kc"]
+
+
+def test_a_secret_store_failure_is_said_not_guessed(monkeypatch):
+    seen = _probe_calls(monkeypatch)
+
+    class _Down:
+        async def get(self, name):
+            raise RuntimeError("vault away")
+    ctx = _Ctx()
+    ctx.secrets = _Down()
+    out = asyncio.run(PL._run_test(ctx, {"provider": "openai", "model": "m"}, "main"))
+    assert not out["ok"] and "vault away" in out["message"] and seen == []
 
 
 def test_a_base_url_that_is_not_http_is_not_called(monkeypatch):
     calls = _http(monkeypatch, OK)
     out = _probe(provider="custom", model="m", key="k", base_url="file:///etc/passwd")
     assert not out["ok"] and "nothing was called" in out["message"] and calls == []
-
-
-def test_a_masked_key_is_never_sent_as_a_key():
-    """The gateway's config read masks api_key; the mask is not a key."""
-    assert LP.unwrap_key("sk-or-\u2022\u2022\u2022abc") == ""
-    assert LP.resolve_key({"api_key": "sk-or-\u2022\u2022\u2022abc"}, "openrouter", False) == ""

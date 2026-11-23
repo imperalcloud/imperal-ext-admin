@@ -362,5 +362,5 @@ def test_context_caps_render_from_cfg_not_stale_tenant_defaults():
 def test_submitted_blank_clears_a_stored_value():
     """thinking_budget could be set but never removed: a blank was 'keep'."""
     src = open(__import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__file__)), "handlers_llm.py")).read()
-    assert 'elif field in params.model_fields_set and "api_key" not in field:' in src
+    assert 'elif field in params.model_fields_set:' in src
     assert "for _field in _cleared:\n            current.pop(_field, None)" in src

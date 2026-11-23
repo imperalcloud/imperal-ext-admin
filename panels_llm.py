@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 from imperal_sdk import ui
 from app import _gw_request
@@ -58,26 +57,16 @@ async def _fetch_tenant_defaults() -> dict:
     return await _cached("tenant_defaults", _fetch_tenant_defaults_raw)
 
 
-def _env_providers() -> list[str]:
-    avail = []
-    if os.getenv("ANTHROPIC_API_KEY"):
-        avail.append("anthropic")
-    if os.getenv("OPENAI_API_KEY"):
-        avail.append("openai")
-    if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
-        avail.append("google")
+def _keyed_providers(keys: dict | None) -> list[str] | None:
+    """The providers whose key is typed in Secrets; the form marks every other
+    one "(no API key)". "custom" is always in: a local endpoint may need no
+    key. None when the secret store did not answer - then nothing is marked,
+    because "unknown" is not "no key"."""
+    if keys is None:
+        return None
+    avail = [p for p, is_set in keys.items() if is_set and p != "openai_compatible"]
     avail.append("custom")
-    # Qwen's key is PANEL-entered (LLM Config Store, not env) — always offered,
-    # and deliberately WITHOUT the "(no API key)" marker the env-backed
-    # providers get: the admin types that key in this very form, so calling it
-    # unavailable would be misleading. The kernel resolver still skips the
-    # config until a key actually exists, so an early pick degrades safely.
-    avail.append("qwen")
-    # Kimi (Moonshot) + GLM (Zhipu z.ai): first-class system providers whose
-    # keys are PANEL-entered exactly like qwen's (2026-08-30) — always offered.
-    avail.append("kimi")
-    avail.append("zhipu")
-    return avail or ["anthropic", "custom"]
+    return avail
 
 
 # ── Inline test ───────────────────────────────────────────────────────
@@ -88,41 +77,79 @@ _TEST_KEEP_S = 120.0
 _test_seen: dict[tuple, tuple[float, dict]] = {}
 
 
-async def _run_test_once(cfg: dict, target: str) -> dict:
+async def _run_test_once(ctx, cfg: dict, target: str) -> dict:
     import time
     prefix = "failover_" if "failover" in target else ""
     key = (target, cfg.get(f"{prefix}provider"), cfg.get(f"{prefix}model"), cfg.get(f"{prefix}base_url"))
     hit = _test_seen.get(key)
     if hit and time.monotonic() - hit[0] < _TEST_KEEP_S:
         return hit[1]
-    result = await _run_test(cfg, target)
+    result = await _run_test(ctx, cfg, target)
     _test_seen.clear()
     _test_seen[key] = (time.monotonic(), result)
     return result
 
 
-async def _run_test(cfg: dict, target: str) -> dict:
+async def _run_test(ctx, cfg: dict, target: str) -> dict:
     """Make the call the pressed Test button names; ``{ok, message}``.
 
     target: "main" | "main_compat" | "failover" | "failover_compat". The slot's
-    provider, model, base URL and key are the stored ones - what the kernel
-    would use - so the test answers "does the saved configuration work"."""
-    from llm_probe import probe, resolve_key, stored_keys   # local: keeps the panel import light
+    provider, model and base URL are the saved ones and the key is the
+    provider's secret - what the kernel would use - so the test answers "does
+    the saved configuration work"."""
+    from llm_keys import secret_name
+    from llm_probe import key_for_test, may_send_key_to, probe   # local: keeps the panel import light
     failover = "failover" in target
     prefix = "failover_" if failover else ""
     provider = str(cfg.get(f"{prefix}provider") or ("" if failover else "anthropic"))
     base_url = str(cfg.get(f"{prefix}base_url") or "")
     try:
-        # keys from the store itself: the drawn config carries a masked key
-        keys = await stored_keys()
+        if provider and not may_send_key_to(provider, base_url):
+            return {"ok": False, "message": (
+                f"Nothing was called: the {provider} key is sent only to {provider}'s own address, "
+                f"and this slot's Base URL is another one ({base_url}). Clear the Base URL, or "
+                "choose the provider Custom for an address of your own.")}
+        key = await key_for_test(ctx, provider, base_url)
+        if not key and provider and provider != "custom":
+            return {"ok": False, "message": (
+                f"No API key for {provider}: set the secret {secret_name(provider)} in Admin > Secrets. "
+                "Nothing was called.")}
         return await probe(
-            provider, str(cfg.get(f"{prefix}model") or ""),
-            resolve_key(keys, provider, failover, base_url),
-            base_url,
+            provider, str(cfg.get(f"{prefix}model") or ""), key, base_url,
             tools="compat" in target,
         )
     except Exception as e:
         return {"ok": False, "message": f"The test itself failed: {type(e).__name__}: {e}"}
+
+
+def _build_keys_view(keys: dict | None) -> list:
+    """Every provider, whether its key is typed, and the way to type it."""
+    from llm_keys import PROVIDERS, secret_name, secrets_path
+    nodes: list = [ui.Text(
+        "One API key per provider. A key is a secret of the Admin extension, kept in Imperal Vault: "
+        "it is typed in the Secrets manager and is never shown again. Every model of a provider, "
+        "in any task, runs on that provider's key; a provider without a key is not called.",
+        variant="caption",
+    )]
+    if keys is None:
+        nodes.append(ui.Alert(
+            title="Key status unknown",
+            message="The secret store did not answer, so this page cannot say which keys are set.",
+            type="warning",
+        ))
+    for prov, label in PROVIDERS.items():
+        state = "unknown" if keys is None else ("set" if keys.get(prov) else "NOT SET")
+        is_set = bool(keys and keys.get(prov))
+        nodes.append(ui.Stack([
+            ui.Stack([
+                ui.Text(f"{label}  ·  {state}", variant="body"),
+                ui.Text(secret_name(prov), variant="caption"),
+            ]),
+            ui.Button(label="Change the key" if is_set else "Set the key",
+                      variant="secondary" if is_set else "primary", size="sm",
+                      on_click=ui.Navigate(path=secrets_path(prov))),
+        ], direction="h", justify="between", align="center"))
+    return nodes
 
 
 # ── Override cards ────────────────────────────────────────────────────
@@ -215,17 +242,20 @@ def _build_add_override_form(
 
 # ── Main builder ──────────────────────────────────────────────────────
 
-EXTRA_VIEWS = (("extension-overrides", "Extension overrides"), ("usage-today", "Usage today"))
+EXTRA_VIEWS = (("provider-keys", "Provider keys"), ("extension-overrides", "Extension overrides"),
+               ("usage-today", "Usage today"))
 
 
 async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
     """Build LLM Config panel. run_test='main'|'failover' triggers inline test."""
-    cfg, usage, extensions, tenant_defaults, model_catalog = await asyncio.gather(
-        _fetch_llm_config(),
+    from llm_keys import keys_set
+    cfg = await _fetch_llm_config()
+    usage, extensions, tenant_defaults, model_catalog, llm_keys_set = await asyncio.gather(
         _fetch_llm_usage(),
         _fetch_extensions(),
         _fetch_tenant_defaults(),
-        fetch_model_catalog(),
+        fetch_model_catalog(ctx, cfg),
+        keys_set(ctx),
     )
 
     provider = cfg.get("provider", "anthropic")
@@ -267,7 +297,7 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
     fo_base_url = cfg.get("failover_base_url", "")
     base_url = cfg.get("base_url", "")
     ext_overrides = cfg.get("extension_overrides", {})
-    available = _env_providers()
+    available = _keyed_providers(llm_keys_set)
     override_count = len(ext_overrides)
 
     children: list = [
@@ -276,7 +306,7 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
 
     # Inline test result (shown when user clicked Test)
     if run_test:
-        result = await _run_test_once(cfg, run_test)
+        result = await _run_test_once(ctx, cfg, run_test)
         label = "Failover" if "failover" in run_test else "Default Provider"
         test_type = "Tool-Use Compatibility" if "compat" in run_test else "Connection"
         children.append(ui.Alert(
@@ -349,8 +379,11 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
             purpose_max_tokens_config=cfg,
             view=str(llm_view or ""),
             extra_views=EXTRA_VIEWS,
+            keys_set=llm_keys_set,
         ),
     ])
+    if llm_view == "provider-keys":
+        children.append(ui.Section(title="Provider keys", children=_build_keys_view(llm_keys_set)))
     if llm_view == "extension-overrides":
         children.append(ui.Section(
             title=f"Extension Overrides ({override_count})",

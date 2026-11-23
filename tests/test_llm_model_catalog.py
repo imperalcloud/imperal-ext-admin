@@ -42,13 +42,14 @@ def no_redis(monkeypatch):
     monkeypatch.setattr(plm, "_redis", _none)
 
 
-def _set_keys(monkeypatch, *, anthropic="ak-test", openai="ok-test"):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", anthropic or "")
-    monkeypatch.setenv("OPENAI_API_KEY", openai or "")
-    if not anthropic:
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    if not openai:
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+def _set_keys(monkeypatch, *, anthropic="ak-test", openai="ok-test", **more):
+    """The provider keys the catalogue gets. They come from this extension's
+    secrets (llm_keys.py), never from the environment or the config store."""
+    keys = {p: k for p, k in {"anthropic": anthropic, "openai": openai, **more}.items() if k}
+
+    async def _keys(ctx):
+        return dict(keys)
+    monkeypatch.setattr(plm, "_provider_keys", _keys)
 
 
 def _stub_fetches(monkeypatch, *, anthropic=None, openai=None):
@@ -284,16 +285,16 @@ def test_kimi_and_zhipu_filters_keep_only_their_own_family():
 
 
 @pytest.mark.asyncio
-async def test_qwen_catalogue_from_panel_entered_key(monkeypatch):
-    """Qwen's key lives in the LLM Config Store (panel-entered), not env."""
-    store = json.dumps({"provider": "openai", "qwen_api_key": "sk-qw-test"})
+async def test_qwen_catalogue_from_its_secret(monkeypatch):
+    """Qwen's key is its secret; a key slot left in the config store is not read."""
+    store = json.dumps({"provider": "openai", "qwen_api_key": "sk-old-slot"})
     fake = _FakeRedis()
     fake.store["imperal:config:llm"] = store
 
     async def _fake_redis():
         return fake
     monkeypatch.setattr(plm, "_redis", _fake_redis)
-    _set_keys(monkeypatch)
+    _set_keys(monkeypatch, qwen="sk-qw-test")
     _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
 
     async def fake_qwen(key, base_url=""):
@@ -336,12 +337,8 @@ async def test_qwen_offered_without_key_but_never_fetched(monkeypatch):
 @pytest.mark.asyncio
 async def test_qwen_fetch_failure_backfills_fallback(monkeypatch, no_redis):
     """Same degraded-backfill protection as anthropic/openai."""
-    _set_keys(monkeypatch)
+    _set_keys(monkeypatch, qwen="sk-qw-test")
     _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def fake_key():
-        return "sk-qw-test", ""
-    monkeypatch.setattr(plm, "_qwen_key_from_store", fake_key)
 
     async def boom(key, base_url=""):
         raise TimeoutError()
@@ -379,10 +376,10 @@ def test_google_filter_strips_models_prefix():
 
 
 @pytest.mark.asyncio
-async def test_google_catalogue_from_env_key(monkeypatch, no_redis):
-    """Google is env-keyed (GOOGLE_API_KEY/GEMINI_API_KEY), like anthropic/openai."""
-    _set_keys(monkeypatch)
-    monkeypatch.setenv("GOOGLE_API_KEY", "goog-test")
+async def test_google_catalogue_from_its_secret(monkeypatch, no_redis):
+    """Google is listed live with its secret; an environment key is not read."""
+    _set_keys(monkeypatch, google="goog-test")
+    monkeypatch.setenv("GOOGLE_API_KEY", "goog-from-env")
     _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
 
     async def fake_google(key):
@@ -404,8 +401,7 @@ async def test_google_absent_without_key(monkeypatch, no_redis):
     fetched NOR silently backfilled from the static fallback.
     """
     _set_keys(monkeypatch)
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "goog-from-env")   # not a source of keys
     _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
 
     async def explode(key):
@@ -419,8 +415,7 @@ async def test_google_absent_without_key(monkeypatch, no_redis):
 @pytest.mark.asyncio
 async def test_google_fetch_failure_backfills_fallback(monkeypatch, no_redis):
     """Same degraded-backfill protection as anthropic/openai/qwen."""
-    _set_keys(monkeypatch)
-    monkeypatch.setenv("GOOGLE_API_KEY", "goog-test")
+    _set_keys(monkeypatch, google="goog-test")
     _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
 
     async def boom(key):

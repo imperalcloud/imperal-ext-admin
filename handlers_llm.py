@@ -18,6 +18,7 @@ log = logging.getLogger("admin")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 from models_llm_config import DEAD_LLM_KEYS, SaveLlmConfigParams  # extracted; keeps file under 300 lines
+import llm_keys  # noqa: F401  declares the provider-key secrets (llm_<provider>_api_key)
 
 
 # SDL: save_llm_config returns a config-save receipt whose runtime keys are
@@ -113,11 +114,11 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             val = getattr(params, field)
             if val is not None and val != "":
                 updates[field] = val
-            elif field in params.model_fields_set and "api_key" not in field:
+            elif field in params.model_fields_set:
                 # The form renders the stored value, so a submitted blank is the
-                # admin clearing it ("inherit"): drop it. Secrets keep the
-                # write-only convention (blank = keep). Without this a value
+                # admin clearing it ("inherit"): drop it. Without this a value
                 # such as thinking_budget could be set but never removed.
+                # (No key is a field here: keys are secrets, see llm_keys.py.)
                 _cleared.append(field)
         # Sprint 2 hotfix (2026-04-28): per-purpose Model Select is cross-provider.
         # If admin picks e.g. claude-sonnet for execution while the global provider
@@ -325,8 +326,9 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             except Exception as _tb_err:
                 log.warning("tenant-defaults PATCH failed: %s", _tb_err)
 
-        # the key is write-only: it is saved, never echoed back in the receipt
-        current = {k: ("***" if "api_key" in k and v else v) for k, v in current.items()}
+        # no key is saved here and none comes back; a row written before
+        # 2026-11-23 may still carry one, and a receipt never shows it
+        current = {k: v for k, v in current.items() if "api_key" not in k}
         return ActionResult.success(
             data={
                 "saved": list(updates.keys()),

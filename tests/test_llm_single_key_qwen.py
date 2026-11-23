@@ -97,22 +97,23 @@ def test_form_renders_no_kimi_or_zhipu_key_control():
     assert "zhipu_api_key" not in controls
 
 
-def test_form_renders_exactly_one_key_input_per_pair():
-    """One shared key for the default pair, one for the failover pair."""
+def test_form_renders_no_key_input_at_all():
+    """2026-11-23: a key is a secret of this extension (llm_keys.py), typed in
+    the Secrets manager; no field of the LLM Config page accepts one."""
     controls = _controls(_form())
-    assert len(controls.get("api_key", [])) == 1
-    assert len(controls.get("failover_api_key", [])) == 1
+    assert not [name for name in controls if "api_key" in name]
+    assert not [name for name in SaveLlmConfigParams.model_fields if "api_key" in name]
 
 
 # ── 2. The kernel's read side still accepts what an OLD store holds ────────
 
-def test_legacy_slot_still_read_by_the_catalogue():
-    """A store saved by the retired field must keep working, not go dark."""
-    src = inspect.getsource(plm._qwen_key_from_store)
-    assert "qwen_api_key" in src, (
-        "_qwen_key_from_store must keep reading the legacy dedicated slot "
-        "first, so an existing Qwen key never disappears from the panel."
-    )
+def test_the_catalogue_reads_no_key_from_the_config_store():
+    """Key slots of the config store (api_key, qwen_api_key, ...) are gone as
+    a source: the catalogue's keys come from this extension's secrets."""
+    assert not hasattr(plm, "_qwen_key_from_store") and not hasattr(plm, "_store_key_for")
+    src = inspect.getsource(plm)
+    assert '.get("imperal:config:llm")' not in src, "the config row is not read here at all"
+    assert "_API_KEY\"" not in src, "no provider key from the environment either"
 
 
 # ── 3. Qwen is selectable BEFORE its key exists (single-save setup) ────────
@@ -138,15 +139,13 @@ async def test_qwen_offered_without_any_key(monkeypatch, no_redis_catalog):
     (When NOTHING can be fetched the pre-existing total-failure path serves the
     entire static catalogue, which is a different, older guarantee.)
     """
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "ak-test")
+    async def _keys(ctx):
+        return {"anthropic": "ak-test"}
+    monkeypatch.setattr(plm, "_provider_keys", _keys)
 
     async def fake_anthropic(key):
         return ["claude-opus-4-6"]
     monkeypatch.setattr(plm, "_fetch_anthropic", fake_anthropic)
-
-    async def no_key():
-        return "", ""
-    monkeypatch.setattr(plm, "_qwen_key_from_store", no_key)
 
     async def explode(*a, **kw):
         raise AssertionError("no live fetch may run without a key")
@@ -191,8 +190,7 @@ def test_failover_provider_is_inferred_from_its_model():
 def test_failover_pair_keys_survive_a_blank_model():
     """A blank failover model means 'no failover' -> the pair is cleared."""
     fields = SaveLlmConfigParams.model_fields
-    for name in ("failover_model", "failover_provider", "failover_api_key",
-                 "failover_enabled"):
+    for name in ("failover_model", "failover_provider", "failover_enabled"):
         assert name in fields, f"{name} must stay writable from the panel"
 
 

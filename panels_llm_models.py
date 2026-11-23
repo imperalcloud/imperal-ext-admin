@@ -83,8 +83,7 @@ FALLBACK_CATALOG: dict[str, list[str]] = {
     "openai": ["gpt-5.6", "gpt-5.6-sol", "sol-1", "fable-5.1", "gpt-5", "gpt-5-mini", "gpt-4o", "o4", "o3", "o3-mini"],
     "qwen": ["qwen3.8-max", "qwen3.8-flash", "qwen3.7-max", "qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
     "deepseek": ["deepseek-v4", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-v3", "deepseek-r1"],
-    # Provider dropdown has always offered "google" (_env_providers in
-    # panels_llm.py, gated on GOOGLE_API_KEY/GEMINI_API_KEY) and the kernel
+    # Provider dropdown has always offered "google" (panels_llm.py) and the kernel
     # fully resolves it (llm/provider.py _GOOGLE_BASE_URL + param-support
     # set) -- but the catalogue had no fetcher and no fallback list, so
     # picking Google always left the Model Select empty. Static ids here are
@@ -430,91 +429,21 @@ def _filter_zhipu(ids: list[str]) -> list[str]:
     return sorted({i for i in ids if i.lower().startswith("glm")})
 
 
-async def _qwen_key_from_store() -> tuple[str, str]:
-    """(key, base_url) for Qwen from the LLM Config Store, or ("", "").
-
-    The Qwen key is entered in the PANEL (never env), so the catalogue
-    reads it from Redis with the SAME precedence the kernel's
-    config_from_store uses: a dedicated qwen_api_key slot first (legacy
-    stores — the panel's separate Qwen field was retired 2026-08-28), then
-    the shared api_key slot iff the configured provider IS qwen (the one
-    API Key input now serves whichever provider is selected). Fernet-wrapped
-    values are unwrapped with the same env keys the kernel uses; a missing
-    crypto key degrades to "" (qwen simply has no LIVE models to list — the
-    static backfill in fetch_model_catalog still offers it), never raises.
-    """
-    r = await _redis()
-    if r is None:
-        return "", ""
-    try:
-        raw = await r.get("imperal:config:llm") or "{}"
-        cfg = json.loads(raw)
-    except Exception:
-        return "", ""
-    finally:
+async def _provider_keys(ctx) -> dict[str, str]:
+    """provider -> key, for a live model listing. Keys come only from this
+    extension's secrets (llm_keys.py: Imperal Vault); a provider whose key is
+    not typed, or cannot be read right now, has none and is listed from the
+    static fallback."""
+    from llm_keys import PROVIDERS, key_for
+    keys: dict[str, str] = {}
+    if ctx is None:
+        return keys
+    for prov in PROVIDERS:
         try:
-            await r.aclose()
-        except Exception:
-            pass
-    key = str(cfg.get("qwen_api_key") or "")
-    if not key and cfg.get("provider") == "qwen":
-        key = str(cfg.get("api_key") or "")
-    if not key:
-        return "", ""
-    if key.startswith("gAAAAA"):  # Fernet-wrapped — mirror kernel llm/secrets.py
-        try:
-            from cryptography.fernet import Fernet
-            fkey = os.getenv("IMPERAL_ENCRYPTION_KEY", "") or os.getenv("IMAP_ENCRYPTION_KEY", "")
-            if fkey:
-                key = Fernet(fkey.encode()).decrypt(key.encode()).decode()
-        except Exception:
-            return "", ""
-    base = str(cfg.get("base_url") or "") if cfg.get("provider") == "qwen" else ""
-    return key, base
-
-
-async def _store_key_for(provider: str) -> str:
-    """The panel-entered key for a first-class provider, or "".
-
-    kimi/zhipu keys are entered in the PANEL (never env), exactly like qwen's.
-    Precedence mirrors the kernel's config_from_store: the shared ``api_key``
-    slot iff the configured provider IS this one (the one API Key input serves
-    whichever provider is selected), then the failover ``failover_api_key``
-    slot iff the configured failover provider IS this one. Fernet-wrapped
-    values are unwrapped with the same env keys the kernel uses; a missing
-    crypto key degrades to "" (the provider simply has no LIVE models to list
-    — the static backfill in fetch_model_catalog still offers it), never
-    raises.
-    """
-    r = await _redis()
-    if r is None:
-        return ""
-    try:
-        raw = await r.get("imperal:config:llm") or "{}"
-        cfg = json.loads(raw)
-    except Exception:
-        return ""
-    finally:
-        try:
-            await r.aclose()
-        except Exception:
-            pass
-    key = ""
-    if cfg.get("provider") == provider:
-        key = str(cfg.get("api_key") or "")
-    if not key and cfg.get("failover_provider") == provider:
-        key = str(cfg.get("failover_api_key") or "")
-    if not key:
-        return ""
-    if key.startswith("gAAAAA"):  # Fernet-wrapped — mirror kernel llm/secrets.py
-        try:
-            from cryptography.fernet import Fernet
-            fkey = os.getenv("IMPERAL_ENCRYPTION_KEY", "") or os.getenv("IMAP_ENCRYPTION_KEY", "")
-            if fkey:
-                key = Fernet(fkey.encode()).decrypt(key.encode()).decode()
-        except Exception:
-            return ""
-    return key
+            keys[prov] = await key_for(ctx, prov)
+        except Exception as e:
+            log.warning("model_catalog: %s key not read: %s: %s", prov, type(e).__name__, e)
+    return keys
 
 
 async def _redis():
@@ -529,8 +458,12 @@ async def _redis():
         return None
 
 
-async def fetch_model_catalog() -> dict[str, list[str]]:
-    """Return {provider: [model_id, ...]}.  cache → live → static fallback."""
+async def fetch_model_catalog(ctx=None, cfg: dict | None = None) -> dict[str, list[str]]:
+    """Return {provider: [model_id, ...]}.  cache → live → static fallback.
+
+    ``ctx`` gives the provider keys (this extension's secrets); ``cfg`` is the
+    saved LLM config, read only for Qwen's own address when Qwen is the
+    configured provider."""
     r = await _redis()
     # 1. Cache hit
     if r is not None:
@@ -544,7 +477,8 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
 
     # 2. Live fetch per provider (each best-effort, isolated failure)
     catalog: dict[str, list[str]] = {}
-    ak, ok = os.getenv("ANTHROPIC_API_KEY", ""), os.getenv("OPENAI_API_KEY", "")
+    keys = await _provider_keys(ctx)
+    ak, ok = keys.get("anthropic", ""), keys.get("openai", "")
     if ak:
         try:
             catalog["anthropic"] = await _fetch_anthropic(ak)
@@ -563,8 +497,8 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: openai fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
-    # Qwen: key is PANEL-entered (lives in the LLM Config Store, not env).
-    qk, qbase = await _qwen_key_from_store()
+    qk = keys.get("qwen", "")
+    qbase = str((cfg or {}).get("base_url") or "") if (cfg or {}).get("provider") == "qwen" else ""
     if qk:
         try:
             catalog["qwen"] = await _fetch_qwen(qk, qbase)
@@ -573,10 +507,9 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: qwen fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
-    # Kimi (Moonshot) + GLM (Zhipu z.ai): first-class system providers, keys
-    # PANEL-entered like qwen's (2026-08-30). Each fetcher hits the vendor's
-    # OWN endpoint, so the catalogue can only ever list that vendor's models.
-    kk = await _store_key_for("kimi")
+    # Kimi (Moonshot) + GLM (Zhipu z.ai): each fetcher hits the vendor's OWN
+    # endpoint, so the catalogue can only ever list that vendor's models.
+    kk = keys.get("kimi", "")
     if kk:
         try:
             catalog["kimi"] = await _fetch_kimi(kk)
@@ -585,7 +518,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: kimi fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
-    zk = await _store_key_for("zhipu")
+    zk = keys.get("zhipu", "")
     if zk:
         try:
             catalog["zhipu"] = await _fetch_zhipu(zk)
@@ -594,7 +527,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: zhipu fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
-    gk = os.getenv("GOOGLE_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
+    gk = keys.get("google", "")
     if gk:
         try:
             catalog["google"] = await _fetch_google(gk)
@@ -603,8 +536,7 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 "model_catalog: google fetch failed: %s: %s",
                 type(e).__name__, e or "(no detail)",
             )
-    # OpenRouter: key is PANEL-entered (lives in the LLM Config Store, not env).
-    ork = await _store_key_for("openrouter")
+    ork = keys.get("openrouter", "")
     if ork:
         try:
             catalog["openrouter"] = await _fetch_openrouter(ork)
@@ -641,9 +573,9 @@ async def fetch_model_catalog() -> dict[str, list[str]]:
                 prov, len(fb),
             )
 
-    # 2c. Panel-entered providers (qwen, kimi, zhipu, openrouter) are offered
-    # with unconditional fallback lists so the admin can pick them and their models
-    # in the SAME save that enters the key.
+    # 2c. qwen, kimi, zhipu and openrouter are offered with unconditional
+    # fallback lists, so the admin can pick them and their models before their
+    # key is typed in Secrets.
     for _p in ("qwen", "kimi", "zhipu", "openrouter"):
         if _p not in catalog:
             catalog[_p] = list(FALLBACK_CATALOG.get(_p, []))

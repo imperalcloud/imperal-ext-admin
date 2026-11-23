@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "6.8.1",
   "app_id": "admin",
-  "version": "5.24.1",
+  "version": "5.25.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -13615,12 +13615,6 @@
             "title": "Model",
             "type": "string"
           },
-          "api_key": {
-            "default": "",
-            "description": "API key (write-only, leave blank to keep)",
-            "title": "Api Key",
-            "type": "string"
-          },
           "base_url": {
             "default": "",
             "description": "Custom base URL for OpenAI-compatible providers",
@@ -13961,12 +13955,6 @@
             "default": "",
             "description": "Manual custom model id for failover when not in dropdown",
             "title": "Failover Custom Model",
-            "type": "string"
-          },
-          "failover_api_key": {
-            "default": "",
-            "description": "Failover API key (write-only)",
-            "title": "Failover Api Key",
             "type": "string"
           },
           "failover_base_url": {
@@ -25402,6 +25390,70 @@
     }
   },
   "secrets": [
+    {
+      "name": "llm_anthropic_api_key",
+      "description": "API key of Anthropic for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_openai_api_key",
+      "description": "API key of OpenAI for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_google_api_key",
+      "description": "API key of Google for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_openrouter_api_key",
+      "description": "API key of OpenRouter for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_qwen_api_key",
+      "description": "API key of Qwen for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_kimi_api_key",
+      "description": "API key of Kimi for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_zhipu_api_key",
+      "description": "API key of Zhipu for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
+    {
+      "name": "llm_openai_compatible_api_key",
+      "description": "API key of Custom (OpenAI-compatible) for the platform's LLM calls. Every model of this provider, in any task, uses it.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 400,
+      "scope": "app"
+    },
     {
       "name": "voice_api_key",
       "description": "API key of the voice provider - used by every voice function (speech to text, text to speech, the spoken-form model).",

@@ -126,6 +126,28 @@ _TOKEN_BUDGETS: list[tuple[str, str, str, str]] = [
 ]
 
 
+def _key_status(provider: str, keys_set: dict | None) -> list:
+    """Whether the selected provider has its key, and the way to type it. The
+    key itself is not a field of this page: it is a secret of this extension,
+    kept in Imperal Vault (llm_keys.py)."""
+    from llm_keys import PROVIDERS, provider_id, secret_name, secrets_path
+    pid = provider_id(provider)
+    if pid not in PROVIDERS:
+        return []
+    label = PROVIDERS[pid]
+    if keys_set is None:
+        state, is_set = "unknown (the secret store did not answer)", False
+    else:
+        is_set = bool(keys_set.get(pid))
+        state = "set" if is_set else "NOT SET - this provider is not called without it"
+    return [
+        ui.Text(f"API key of {label}: {state}. It is the secret {secret_name(pid)} in Admin > Secrets, "
+                "kept in Imperal Vault; one key serves every model of this provider.", variant="caption"),
+        ui.Button(label="Change the key" if is_set else "Set the key", variant="ghost",
+                  on_click=ui.Navigate(path=secrets_path(pid))),
+    ]
+
+
 def build_llm_form(
     provider: str,
     model: str,
@@ -178,6 +200,9 @@ def build_llm_form(
     # asks for one. extra_views = (id, label) pairs the page itself draws.
     view: str = "*",
     extra_views: tuple = (),
+    # provider -> whether its key is typed in Secrets (llm_keys.keys_set);
+    # None = the secret store did not answer.
+    keys_set: dict | None = None,
     # I-CODING-THREAD-COMPACTION-ADMIN-TUNABLE (2026-07-31): the 6 coding-thread
     # compaction knobs live in imperal:config:llm (cfg), NOT tenant_defaults —
     # panels_llm.py reads them straight off cfg and passes them here.
@@ -243,7 +268,6 @@ def build_llm_form(
         "model": model,
         "custom_model": model if is_custom_primary else "",
         "base_url": base_url,
-        "api_key": "",
         "code_model": code_model if code_model != model else "",
         # G2: fallback is an independent pair (not an inherit-from-default
         # override) — pass through verbatim; blank means "no fallback".
@@ -337,7 +361,6 @@ def build_llm_form(
         "failover_model": failover_model,
         "failover_custom_model": failover_model if is_custom_fo else "",
         "failover_base_url": failover_base_url,
-        "failover_api_key": "",
         # Token Budget Controls (admin-only kernel-internal knobs)
         "narration_history_limit": int(_td.get("narration_history_limit", 12)),
         "confirmation_card_tokens": int(_td.get("confirmation_card_tokens", 300)),
@@ -655,11 +678,7 @@ def build_llm_form(
                     placeholder="e.g. z-ai/glm-5.3 or custom-model-name",
                     param_name="custom_model", value=defaults.get("custom_model", ""),
                 ),
-                ui.Text("API Key — for the provider selected above", variant="caption"),
-                ui.Input(
-                    placeholder="sk-…  (leave blank to keep current)",
-                    param_name="api_key", value="",
-                ),
+                *_key_status(provider, keys_set),
                 ui.Text("Base URL (for Custom, OpenRouter or local OpenAI-compatible endpoints)", variant="caption"),
                 ui.Input(
                     placeholder="https://openrouter.ai/api/v1 or https://api.example.com/v1",
@@ -710,11 +729,7 @@ def build_llm_form(
                     placeholder="e.g. z-ai/glm-5.3 or custom-model-name",
                     param_name="failover_custom_model", value=defaults.get("failover_custom_model", ""),
                 ),
-                ui.Text("Failover API Key", variant="caption"),
-                ui.Input(
-                    placeholder="sk-…  (leave blank to keep current)",
-                    param_name="failover_api_key", value="",
-                ),
+                *_key_status(failover_provider, keys_set),
                 ui.Text("Failover Base URL (for Custom, OpenRouter or local endpoints)", variant="caption"),
                 ui.Input(
                     placeholder="https://openrouter.ai/api/v1 or https://api.example.com/v1",

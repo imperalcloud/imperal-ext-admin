@@ -15,7 +15,6 @@ The key never appears in a result: a provider that echoes it is masked.
 """
 from __future__ import annotations
 
-import os
 import time
 
 from imperal_sdk._shared_http import shared_http
@@ -37,56 +36,9 @@ _BASE_URLS = {
     "zhipu": _ZHIPU_BASE_URL,
     "openrouter": _OPENROUTER_BASE_URL,
 }
-_ENV_KEYS = {"anthropic": ("ANTHROPIC_API_KEY",), "openai": ("OPENAI_API_KEY",),
-             "google": ("GOOGLE_API_KEY", "GEMINI_API_KEY")}
-
 _ASK = "Reply with the single word: ok"
 _ASK_TOOL = "Call the ping tool now."
 _TOOL_DESC = "Answers pong. Call it when asked to ping."
-
-
-def unwrap_key(key: str) -> str:
-    """A stored key in the clear. Fernet-wrapped values (``gAAAAA...``) are
-    unwrapped with the same env keys the kernel uses; one that cannot be
-    unwrapped is "" - a wrapped string must never be sent as a key."""
-    key = str(key or "")
-    if "\u2022" in key:
-        # a MASK, not a key: the gateway's config read replaces the main key
-        # with its first and last characters around bullets (llm_crypto._mask_key)
-        return ""
-    if not key.startswith("gAAAAA"):
-        return key
-    try:
-        from cryptography.fernet import Fernet
-        fkey = os.getenv("IMPERAL_ENCRYPTION_KEY", "") or os.getenv("IMAP_ENCRYPTION_KEY", "")
-        return Fernet(fkey.encode()).decrypt(key.encode()).decode() if fkey else ""
-    except Exception:
-        return ""
-
-
-async def stored_keys() -> dict:
-    """The key fields of the LLM config as STORED, for a test call.
-
-    The config the panel draws from comes through the gateway's read door,
-    which masks ``api_key``; a test built on it would send the mask as the key
-    and report a false 401. The model catalogue already reads the store for
-    the same reason (panels_llm_models._store_key_for). {} when the store
-    cannot be read - the test then says there is no key, and calls nothing."""
-    import json
-    from panels_llm_models import _redis
-    r = await _redis()
-    if r is None:
-        return {}
-    try:
-        cfg = json.loads(await r.get("imperal:config:llm") or "{}")
-    except Exception:
-        return {}
-    finally:
-        try:
-            await r.aclose()
-        except Exception:
-            pass
-    return {k: v for k, v in cfg.items() if "api_key" in k} if isinstance(cfg, dict) else {}
 
 
 def _own_endpoint(provider: str, base_url: str) -> bool:
@@ -99,24 +51,25 @@ def _own_endpoint(provider: str, base_url: str) -> bool:
     return bool(own) and typed == own.rstrip("/")
 
 
-def resolve_key(cfg: dict, provider: str, failover: bool, base_url: str = "") -> str:
-    """The key for this slot: the slot's stored key, the legacy Qwen slot, then
-    the provider's environment variable.
+def may_send_key_to(provider: str, base_url: str) -> bool:
+    """Whether the provider's stored key may go to this address.
 
-    The environment key is the platform's own and is sent ONLY to the
-    provider's own address. With a typed Base URL that is some other host, a
-    test would otherwise hand the platform key to whatever address was typed
-    (security review 2026-11-23); such a slot is tested with its stored key or
-    not at all."""
-    key = unwrap_key(cfg.get("failover_api_key" if failover else "api_key"))
-    if not key and provider == "qwen":
-        key = unwrap_key(cfg.get("qwen_api_key"))
-    if not key and _own_endpoint(provider, base_url):
-        for name in _ENV_KEYS.get(provider, ()):
-            key = os.getenv(name, "")
-            if key:
-                break
-    return key
+    A provider with an address of its own gets its key only there: with some
+    other Base URL saved, a test would hand the platform key to whatever host
+    that is (security review 2026-11-23). "custom" has no address of its own -
+    its key belongs to the address the admin saved for it."""
+    if str(provider or "").strip().lower() in ("custom", "openai_compatible"):
+        return True
+    return _own_endpoint(provider, base_url)
+
+
+async def key_for_test(ctx, provider: str, base_url: str = "") -> str:
+    """The key a Test button runs with: the provider's secret (llm_keys.py:
+    Imperal Vault), and only toward an address it may be sent to."""
+    from llm_keys import key_for
+    if not may_send_key_to(provider, base_url):
+        return ""
+    return await key_for(ctx, provider)
 
 
 def _said(resp, key: str) -> str:
@@ -140,7 +93,7 @@ async def probe(provider: str, model: str, key: str, base_url: str = "",
     if not model:
         return {"ok": False, "message": f"No model is configured for {provider}."}
     if not key and provider != "custom":
-        return {"ok": False, "message": f"No API key is stored for {provider}; nothing was called."}
+        return {"ok": False, "message": f"No API key for {provider}; nothing was called."}
 
     ask = _ASK_TOOL if tools else _ASK
     if provider == "anthropic":

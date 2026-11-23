@@ -61,7 +61,6 @@ class SaveLlmConfigParams(BaseModel):
         return data
     provider: str = Field(default="", description="LLM provider")
     model: str = Field(default="", description="Default model")
-    api_key: str = Field(default="", description="API key (write-only, leave blank to keep)")
     base_url: str = Field(default="", description="Custom base URL for OpenAI-compatible providers")
     code_model: str = Field(default="", description="Coding brain (Webbee Code) model override — drives every terminal coding/marathon turn (purpose=code). Blank = inherit the reasoning tier (resolve/routing cascade).")
     code_provider: str = Field(default="", description="Coding brain provider override (auto-inferred from the model id when left blank)")
@@ -189,7 +188,6 @@ class SaveLlmConfigParams(BaseModel):
     failover_provider: str = Field(default="", description="Failover provider")
     failover_model: str = Field(default="", description="Failover model")
     failover_custom_model: str = Field(default="", description="Manual custom model id for failover when not in dropdown")
-    failover_api_key: str = Field(default="", description="Failover API key (write-only)")
     failover_base_url: str = Field(default="", description="Failover base URL (endpoint for custom or OpenAI-compatible failover provider)")
     custom_model: str = Field(default="", description="Manual custom model id for primary provider when not in dropdown")
     set_extension_override: str = Field(default="", description="Extension ID to set override for")

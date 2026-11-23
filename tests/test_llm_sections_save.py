@@ -145,7 +145,7 @@ def test_the_page_draws_one_section_and_a_way_to_every_other():
     first = _call_form(view="", extra_views=PL.EXTRA_VIEWS).to_dict()
     ids = _view_ids(first)
     assert ids[0] == "provider-connection" and "failover" in ids
-    assert ids[-2:] == [e[0] for e in PL.EXTRA_VIEWS] and MAP_VIEW in ids
+    assert ids[-len(PL.EXTRA_VIEWS):] == [e[0] for e in PL.EXTRA_VIEWS] and MAP_VIEW in ids
     assert len(_forms(first)) == 1 and _forms(first)[0]["submit_label"] == "Save Provider & Connection"
 
     everything = _inputs(_call_form().to_dict())
@@ -224,15 +224,15 @@ def test_any_vendor_slash_model_id_is_an_openrouter_model():
 def test_a_re_render_does_not_call_the_provider_again(monkeypatch):
     calls = []
 
-    async def _fake(cfg, target):
+    async def _fake(ctx, cfg, target):
         calls.append(target)
         return {"ok": True, "message": "x"}
     monkeypatch.setattr(PL, "_run_test", _fake)
     PL._test_seen.clear()
     cfg = {"provider": "openai", "model": "m"}
-    asyncio.run(PL._run_test_once(cfg, "main"))
-    asyncio.run(PL._run_test_once(cfg, "main"))                       # the panel re-rendered
+    asyncio.run(PL._run_test_once(None, cfg, "main"))
+    asyncio.run(PL._run_test_once(None, cfg, "main"))                 # the panel re-rendered
     assert calls == ["main"]
-    asyncio.run(PL._run_test_once({"provider": "openai", "model": "other"}, "main"))   # the slot changed
+    asyncio.run(PL._run_test_once(None, {"provider": "openai", "model": "other"}, "main"))   # the slot changed
     assert calls == ["main", "main"]
     PL._test_seen.clear()
