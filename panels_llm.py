@@ -249,12 +249,12 @@ EXTRA_VIEWS = (("provider-keys", "Provider keys"), ("extension-overrides", "Exte
 async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
     """Build LLM Config panel. run_test='main'|'failover' triggers inline test."""
     from llm_keys import keys_set
-    cfg = await _fetch_llm_config()
-    usage, extensions, tenant_defaults, model_catalog, llm_keys_set = await asyncio.gather(
+    cfg, usage, extensions, tenant_defaults, model_catalog, llm_keys_set = await asyncio.gather(
+        _fetch_llm_config(),
         _fetch_llm_usage(),
         _fetch_extensions(),
         _fetch_tenant_defaults(),
-        fetch_model_catalog(ctx, cfg),
+        fetch_model_catalog(ctx),
         keys_set(ctx),
     )
 

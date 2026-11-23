@@ -141,3 +141,27 @@ def test_no_extension_code_reads_an_llm_key_from_env_or_the_config_store():
             if needle in src:
                 bad.append(f"{path.name}: {needle}")
     assert not bad, bad
+
+
+def test_a_key_never_follows_a_saved_base_url_in_the_catalogue(monkeypatch):
+    """Every fetcher that takes a key is called for the provider's own address:
+    the catalogue takes no address from the config (security review 2026-11-23)."""
+    import inspect
+    assert list(inspect.signature(plm.fetch_model_catalog).parameters) == ["ctx"]
+
+    async def _none():
+        return None
+    monkeypatch.setattr(plm, "_redis", _none)
+    seen = []
+
+    async def _qwen(key, base_url=""):
+        seen.append(("qwen", base_url))
+        return ["qwen3-max"]
+
+    async def _openrouter(key, base_url=""):
+        seen.append(("openrouter", base_url))
+        return ["a/b"]
+    monkeypatch.setattr(plm, "_fetch_qwen", _qwen)
+    monkeypatch.setattr(plm, "_fetch_openrouter", _openrouter)
+    asyncio.run(plm.fetch_model_catalog(_Ctx({"llm_qwen_api_key": "kq", "llm_openrouter_api_key": "ko"})))
+    assert sorted(seen) == [("openrouter", ""), ("qwen", "")]

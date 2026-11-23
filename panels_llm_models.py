@@ -458,12 +458,12 @@ async def _redis():
         return None
 
 
-async def fetch_model_catalog(ctx=None, cfg: dict | None = None) -> dict[str, list[str]]:
+async def fetch_model_catalog(ctx=None) -> dict[str, list[str]]:
     """Return {provider: [model_id, ...]}.  cache → live → static fallback.
 
-    ``ctx`` gives the provider keys (this extension's secrets); ``cfg`` is the
-    saved LLM config, read only for Qwen's own address when Qwen is the
-    configured provider."""
+    ``ctx`` gives the provider keys (this extension's secrets). Every provider
+    is listed from its OWN address and from no other: a key never follows a
+    Base URL saved in the config (security review 2026-11-23)."""
     r = await _redis()
     # 1. Cache hit
     if r is not None:
@@ -498,10 +498,9 @@ async def fetch_model_catalog(ctx=None, cfg: dict | None = None) -> dict[str, li
                 type(e).__name__, e or "(no detail)",
             )
     qk = keys.get("qwen", "")
-    qbase = str((cfg or {}).get("base_url") or "") if (cfg or {}).get("provider") == "qwen" else ""
     if qk:
         try:
-            catalog["qwen"] = await _fetch_qwen(qk, qbase)
+            catalog["qwen"] = await _fetch_qwen(qk)
         except Exception as e:
             log.warning(
                 "model_catalog: qwen fetch failed: %s: %s",
