@@ -124,3 +124,28 @@ def test_the_buttons_test_the_stored_slot(monkeypatch):
     asyncio.run(PL._run_test(cfg, "failover_compat"))
     assert seen == [("openrouter", "a/b", "k1", "https://or/v1", False),
                     ("openai", "gpt-x", "k2", "", True)]
+
+
+def test_the_platform_env_key_goes_only_to_the_providers_own_address(monkeypatch):
+    """A typed Base URL of another host must never receive the platform's key."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-platform")
+    assert LP.resolve_key({}, "openai", False) == "sk-platform"
+    assert LP.resolve_key({}, "openai", False, "https://api.openai.com/v1/") == "sk-platform"
+    assert LP.resolve_key({}, "openai", False, "https://evil.example/v1") == ""
+    # the slot's own stored key is the admin's choice for that address
+    assert LP.resolve_key({"api_key": "sk-slot"}, "openai", False, "https://evil.example/v1") == "sk-slot"
+
+    seen = []
+
+    async def _fake(provider, model, key, base_url="", tools=False):
+        seen.append((key, base_url))
+        return {"ok": False, "message": "x"}
+    monkeypatch.setattr(LP, "probe", _fake)
+    asyncio.run(PL._run_test({"provider": "openai", "model": "m", "base_url": "https://evil.example/v1"}, "main"))
+    assert seen == [("", "https://evil.example/v1")]
+
+
+def test_a_base_url_that_is_not_http_is_not_called(monkeypatch):
+    calls = _http(monkeypatch, OK)
+    out = _probe(provider="custom", model="m", key="k", base_url="file:///etc/passwd")
+    assert not out["ok"] and "nothing was called" in out["message"] and calls == []

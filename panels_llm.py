@@ -92,11 +92,12 @@ async def _run_test(cfg: dict, target: str) -> dict:
     failover = "failover" in target
     prefix = "failover_" if failover else ""
     provider = str(cfg.get(f"{prefix}provider") or ("" if failover else "anthropic"))
+    base_url = str(cfg.get(f"{prefix}base_url") or "")
     try:
         return await probe(
             provider, str(cfg.get(f"{prefix}model") or ""),
-            resolve_key(cfg, provider, failover),
-            str(cfg.get(f"{prefix}base_url") or ""),
+            resolve_key(cfg, provider, failover, base_url),
+            base_url,
             tools="compat" in target,
         )
     except Exception as e:

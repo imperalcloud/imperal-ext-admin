@@ -60,13 +60,29 @@ def unwrap_key(key: str) -> str:
         return ""
 
 
-def resolve_key(cfg: dict, provider: str, failover: bool) -> str:
-    """The key the kernel would use for this slot: the slot's stored key, the
-    legacy Qwen slot, then the provider's environment variable."""
+def _own_endpoint(provider: str, base_url: str) -> bool:
+    """True when the request goes to the provider's own address: no Base URL
+    typed, or the typed one is that address."""
+    typed = str(base_url or "").strip().rstrip("/")
+    if not typed:
+        return True
+    own = "https://api.anthropic.com/v1" if provider == "anthropic" else _BASE_URLS.get(provider, "")
+    return bool(own) and typed == own.rstrip("/")
+
+
+def resolve_key(cfg: dict, provider: str, failover: bool, base_url: str = "") -> str:
+    """The key for this slot: the slot's stored key, the legacy Qwen slot, then
+    the provider's environment variable.
+
+    The environment key is the platform's own and is sent ONLY to the
+    provider's own address. With a typed Base URL that is some other host, a
+    test would otherwise hand the platform key to whatever address was typed
+    (security review 2026-11-23); such a slot is tested with its stored key or
+    not at all."""
     key = unwrap_key(cfg.get("failover_api_key" if failover else "api_key"))
     if not key and provider == "qwen":
         key = unwrap_key(cfg.get("qwen_api_key"))
-    if not key:
+    if not key and _own_endpoint(provider, base_url):
         for name in _ENV_KEYS.get(provider, ()):
             key = os.getenv(name, "")
             if key:
@@ -110,6 +126,8 @@ async def probe(provider: str, model: str, key: str, base_url: str = "",
         base = str(base_url or "").strip() or _BASE_URLS.get(provider, "")
         if not base:
             return {"ok": False, "message": f"{provider} needs a Base URL; nothing was called."}
+        if not base.lower().startswith(("https://", "http://")):
+            return {"ok": False, "message": "The Base URL must start with https:// or http://; nothing was called."}
         url = base.rstrip("/") + "/chat/completions"
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         # no token cap: providers disagree on its name (max_tokens vs
