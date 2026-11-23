@@ -118,7 +118,12 @@ def test_the_buttons_test_the_stored_slot(monkeypatch):
         seen.append((provider, model, key, base_url, tools))
         return {"ok": True, "message": "x"}
     monkeypatch.setattr(LP, "probe", _fake)
-    cfg = {"provider": "openrouter", "model": "a/b", "api_key": "k1", "base_url": "https://or/v1",
+
+    async def _stored():
+        return {"api_key": "k1", "failover_api_key": "k2"}
+    monkeypatch.setattr(LP, "stored_keys", _stored)
+    # what the panel draws from: the gateway masks the main key
+    cfg = {"provider": "openrouter", "model": "a/b", "api_key": "sk-or-\u2022\u2022\u2022abc", "base_url": "https://or/v1",
            "failover_provider": "openai", "failover_model": "gpt-x", "failover_api_key": "k2"}
     asyncio.run(PL._run_test(cfg, "main"))
     asyncio.run(PL._run_test(cfg, "failover_compat"))
@@ -141,6 +146,10 @@ def test_the_platform_env_key_goes_only_to_the_providers_own_address(monkeypatch
         seen.append((key, base_url))
         return {"ok": False, "message": "x"}
     monkeypatch.setattr(LP, "probe", _fake)
+
+    async def _none():
+        return {}
+    monkeypatch.setattr(LP, "stored_keys", _none)
     asyncio.run(PL._run_test({"provider": "openai", "model": "m", "base_url": "https://evil.example/v1"}, "main"))
     assert seen == [("", "https://evil.example/v1")]
 
@@ -149,3 +158,9 @@ def test_a_base_url_that_is_not_http_is_not_called(monkeypatch):
     calls = _http(monkeypatch, OK)
     out = _probe(provider="custom", model="m", key="k", base_url="file:///etc/passwd")
     assert not out["ok"] and "nothing was called" in out["message"] and calls == []
+
+
+def test_a_masked_key_is_never_sent_as_a_key():
+    """The gateway's config read masks api_key; the mask is not a key."""
+    assert LP.unwrap_key("sk-or-\u2022\u2022\u2022abc") == ""
+    assert LP.resolve_key({"api_key": "sk-or-\u2022\u2022\u2022abc"}, "openrouter", False) == ""

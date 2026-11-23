@@ -50,6 +50,10 @@ def unwrap_key(key: str) -> str:
     unwrapped with the same env keys the kernel uses; one that cannot be
     unwrapped is "" - a wrapped string must never be sent as a key."""
     key = str(key or "")
+    if "\u2022" in key:
+        # a MASK, not a key: the gateway's config read replaces the main key
+        # with its first and last characters around bullets (llm_crypto._mask_key)
+        return ""
     if not key.startswith("gAAAAA"):
         return key
     try:
@@ -58,6 +62,31 @@ def unwrap_key(key: str) -> str:
         return Fernet(fkey.encode()).decrypt(key.encode()).decode() if fkey else ""
     except Exception:
         return ""
+
+
+async def stored_keys() -> dict:
+    """The key fields of the LLM config as STORED, for a test call.
+
+    The config the panel draws from comes through the gateway's read door,
+    which masks ``api_key``; a test built on it would send the mask as the key
+    and report a false 401. The model catalogue already reads the store for
+    the same reason (panels_llm_models._store_key_for). {} when the store
+    cannot be read - the test then says there is no key, and calls nothing."""
+    import json
+    from panels_llm_models import _redis
+    r = await _redis()
+    if r is None:
+        return {}
+    try:
+        cfg = json.loads(await r.get("imperal:config:llm") or "{}")
+    except Exception:
+        return {}
+    finally:
+        try:
+            await r.aclose()
+        except Exception:
+            pass
+    return {k: v for k, v in cfg.items() if "api_key" in k} if isinstance(cfg, dict) else {}
 
 
 def _own_endpoint(provider: str, base_url: str) -> bool:

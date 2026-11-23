@@ -107,15 +107,17 @@ async def _run_test(cfg: dict, target: str) -> dict:
     target: "main" | "main_compat" | "failover" | "failover_compat". The slot's
     provider, model, base URL and key are the stored ones - what the kernel
     would use - so the test answers "does the saved configuration work"."""
-    from llm_probe import probe, resolve_key      # local: keeps the panel import light
+    from llm_probe import probe, resolve_key, stored_keys   # local: keeps the panel import light
     failover = "failover" in target
     prefix = "failover_" if failover else ""
     provider = str(cfg.get(f"{prefix}provider") or ("" if failover else "anthropic"))
     base_url = str(cfg.get(f"{prefix}base_url") or "")
     try:
+        # keys from the store itself: the drawn config carries a masked key
+        keys = await stored_keys()
         return await probe(
             provider, str(cfg.get(f"{prefix}model") or ""),
-            resolve_key(cfg, provider, failover, base_url),
+            resolve_key(keys, provider, failover, base_url),
             base_url,
             tools="compat" in target,
         )
