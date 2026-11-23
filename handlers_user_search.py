@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from pydantic import BaseModel, Field
 
+from app import _gw_users_all
 from app import chat, ActionResult, _gw_request, _registry_get, _resolve_user_flexible
 from models_user_search import (
     FindUsersParams,
@@ -225,7 +226,7 @@ def _matched_on(u: dict, p: FindUsersParams) -> str:
 
 
 async def _all_users() -> list[dict] | None:
-    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    raw = await _gw_users_all(_gw_request)
     if isinstance(raw, dict) and raw.get("error"):
         return None
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
@@ -342,7 +343,7 @@ async def fn_omnisearch(ctx, params: OmnisearchParams) -> ActionResult[Omnisearc
 
     # 1. Search Users
     try:
-        raw_users = await _gw_request("GET", "/v1/users?include_inactive=true")
+        raw_users = await _gw_users_all(_gw_request)
         users = raw_users.get("items", raw_users) if isinstance(raw_users, dict) else raw_users
         if isinstance(users, list):
             for u in users:

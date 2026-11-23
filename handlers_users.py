@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app import _gw_users_all
 from app import (
     chat, ActionResult, _gw_request, _verify_write_reflected, EmptyParams,
     _resolve_user_by_email, _invalidate_extension_caches, _signal_session_refresh,
@@ -95,7 +96,7 @@ class ResetConvParams(BaseModel):
                description="List all users with roles, scopes, status.")
 async def fn_list_users(ctx, params: EmptyParams) -> ActionResult:
     """List all users with roles, scopes, status."""
-    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    raw = await _gw_users_all(_gw_request)
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
         return ActionResult.error("Failed to fetch users")

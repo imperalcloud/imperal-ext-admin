@@ -4,6 +4,7 @@ from __future__ import annotations
 import httpx
 from imperal_sdk._shared_http import shared_http
 
+from app import _gw_users_all
 from app import ext, AUTH_GW, REGISTRY_URL, _gw_request, _registry_get
 
 
@@ -21,7 +22,7 @@ async def build_admin_stats(ctx) -> dict:
     """
     stats: dict = {}
     try:
-        raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+        raw = await _gw_users_all(_gw_request)
         users = raw.get("items", raw) if isinstance(raw, dict) else raw
         if isinstance(users, list):
             stats["users_total"] = len(users)

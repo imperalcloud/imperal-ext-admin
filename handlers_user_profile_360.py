@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from app import _gw_users_all
 from app import chat, ActionResult, _gw_request
 from models_user_search import (
     UserActivityParams,
@@ -45,7 +46,7 @@ async def _gw_safe(path: str) -> dict | None:
 
 async def _fetch_user(user_id: str) -> dict:
     """The gateway user record, by imperal_id."""
-    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    raw = await _gw_users_all(_gw_request)
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if isinstance(users, list):
         for u in users:

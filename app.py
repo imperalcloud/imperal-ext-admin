@@ -254,6 +254,35 @@ async def _resolve_app_id(app_id, include_all=False):
     return app_id
 
 
+# The gateway serves /v1/users in pages: 50 by default, 200 at most, with the
+# number of all matching users in "total". Every count and every search over
+# users must read ALL pages -- on 2026-11-23 the tenant had 58 users and the
+# Dashboard, the Users list and every name search worked on the first 50.
+USERS_PAGE = 200
+
+
+async def _gw_users_all(gw=None):
+    """Every user of the tenant (inactive included): a list, or the gateway's
+    ``{"error": ...}`` dict exactly as ``_gw_request`` gives it. *gw* is the
+    caller's own ``_gw_request`` name, so a test that replaces it on a handler
+    module also replaces it here."""
+    gw = gw or _gw_request
+    users: list = []
+    offset = 0
+    while True:
+        raw = await gw("GET", f"/v1/users?include_inactive=true&limit={USERS_PAGE}&offset={offset}")
+        if isinstance(raw, dict) and raw.get("error"):
+            return raw
+        page = raw.get("items", raw) if isinstance(raw, dict) else raw
+        if not isinstance(page, list):
+            return {"error": "user list unavailable: the gateway did not answer with a list"}
+        users.extend(page)
+        total = raw.get("total") if isinstance(raw, dict) else None
+        if len(page) < USERS_PAGE or (isinstance(total, int) and len(users) >= total):
+            return users
+        offset += len(page)
+
+
 async def _resolve_user_by_email(email):
     raw = await _gw_request("GET", f"/v1/users?search={email}")
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
@@ -291,7 +320,7 @@ async def _resolve_user_flexible(value: str) -> tuple[str | None, str | None]:
             return resolved, None
         return None, f"no user found for email {v!r}."
 
-    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    raw = await _gw_users_all()
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
         return None, f"could not resolve {v!r}: user list unavailable"
@@ -365,7 +394,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "admin",
-    version="5.21.0",
+    version="5.21.1",
     system=True,
     capabilities=[
         # User CRUD (create/update/deactivate/delete/limits/attributes)

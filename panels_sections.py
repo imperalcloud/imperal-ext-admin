@@ -15,6 +15,7 @@ import httpx
 from imperal_sdk._shared_http import shared_http
 from imperal_sdk import ui
 
+from app import _gw_users_all
 from app import _gw_request, _registry_get, AUTH_GW, REGISTRY_URL
 
 log = logging.getLogger("admin")
@@ -77,7 +78,7 @@ def _fmt_latency(ms) -> str:
 
 async def _fetch_users_raw() -> list[dict]:
     try:
-        raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+        raw = await _gw_users_all(_gw_request)
         users = raw.get("items", raw) if isinstance(raw, dict) else raw
         return users if isinstance(users, list) else []
     except Exception as e:

@@ -287,7 +287,7 @@ def _append_llm_today_card(children: list, llm: dict) -> None:
                     value=_fmt_tokens(llm.get("total_tokens_out"))),
             ui.Stat(label="Avg Latency",
                     value=_fmt_latency(llm.get("avg_latency_ms"))),
-            ui.Stat(label="BYOLLM Users",
+            ui.Stat(label="BYOLLM Calls",
                     value=str(llm.get("byollm_users", 0))),
             ui.Stat(label="Failover",
                     value=str(failover),

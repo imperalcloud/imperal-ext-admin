@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app import _gw_users_all
 from app import chat, ActionResult, _gw_request, _resolve_user_by_email, _resolve_role_by_name
 from models_records import (
     AuditLogResponse, BulkRoleAssignReceipt, CompareRolesResponse,
@@ -129,7 +130,7 @@ async def fn_bulk_assign_role(ctx, params: BulkAssignRoleParams) -> ActionResult
     target_role = await _resolve_role_by_name(params.role)
     if not target_role:
         return ActionResult.error(f"Role '{params.role}' not found")
-    raw = await _gw_request("GET", "/v1/users?include_inactive=true")
+    raw = await _gw_users_all(_gw_request)
     users = raw.get("items", raw) if isinstance(raw, dict) else raw
     if not isinstance(users, list):
         return ActionResult.error("Failed to fetch users")
