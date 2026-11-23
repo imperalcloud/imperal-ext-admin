@@ -1,18 +1,32 @@
-"""Dynamic LLM model catalogue — fetched live from the providers' APIs.
+"""The models an admin may pick - each provider's own list, read live.
 
-No hardcoded model list. The models offered in LLM Config come from the
-providers' own `/v1/models` endpoints (keys from env), filtered to
-chat-capable text models, cached in Redis (1h). A tiny static fallback is
-used ONLY if every live + cache path fails, so the form never breaks.
+The rule (owner, 2026-11-23: "Я хочу видеть все совместимые модели во всех
+списках, где ключ доступен ... Но я НЕ хочу видеть модели, которые я не могу
+использовать"):
+
+  * a provider is listed only when its key is typed (llm_keys.py: this
+    extension's secrets in Imperal Vault) and only from its OWN address;
+  * every model of that list that can do the job is offered - no "top N", no
+    favourite vendors, no hardcoded list;
+  * a model that cannot do the job is not offered. The job of every slot in
+    this extension is a chat call that may carry tools, so: text out, tools
+    accepted, served on the chat endpoint. OpenRouter says all three per
+    model. The other providers' /models answers carry ids only, so for them
+    the non-chat families are dropped by the family's name;
+  * a provider whose listing failed offers nothing and the page says why -
+    there is no stand-in list of models that may not exist.
+
+The answer is cached in Redis for an hour (two minutes when a provider failed).
 
 Public API:
-  - provider_for_model(model)        -> "anthropic" | "openai" | "qwen" | "google" | ""
-  - async fetch_model_catalog()      -> {provider: [model_id, ...]}
-  - catalog_to_options(catalog)      -> (all_models, provider_models)  # ui Select opts
-  - FALLBACK_CATALOG                 -> resilience-only minimal catalogue
+  - provider_for_model(model)         -> provider id, "" if unknown
+  - async fetch_model_listing(ctx)    -> ({provider: [model_id, ...]}, {provider: why it is not listed})
+  - async fetch_model_catalog(ctx)    -> the first half of the above
+  - catalog_to_options(catalog)       -> (all_models, provider_models)  # ui.Select options
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -23,12 +37,10 @@ from imperal_sdk._shared_http import shared_http
 
 log = logging.getLogger("admin")
 
-_CACHE_KEY = "imperal:config:llm:model_catalog"
+_CACHE_KEY = "imperal:config:llm:model_listing"
 _CACHE_TTL = 3600  # seconds (1h) — providers add models rarely
-# A catalogue missing a configured provider must NOT be cached for the full
-# hour: one transient network blip would erase that provider from the LLM
-# Config dropdowns until the TTL expired. Degraded results get a short TTL so
-# the next render retries the provider instead of serving a truncated form.
+# A listing in which a keyed provider failed is kept only briefly, so the next
+# render asks that provider again.
 _CACHE_TTL_DEGRADED = 120  # seconds (2m)
 
 # Provider inference by model-id prefix (rule-based, not an enumerated list).
@@ -76,46 +88,6 @@ _OPENAI_EXCLUDE = (
 _OPENAI_DATE_SUFFIX = re.compile(r"-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4})$")
 
 _OPENAI_EXPERIMENTAL_SUFFIXES = ("-luna", "-sol", "-terra", "-astra", "-live")
-
-# Resilience-only fallback (used iff BOTH live fetch and cache fail).
-FALLBACK_CATALOG: dict[str, list[str]] = {
-    "anthropic": ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-3-7-sonnet", "claude-haiku-4-5-20251001"],
-    "openai": ["gpt-5.6", "gpt-5.6-sol", "sol-1", "fable-5.1", "gpt-5", "gpt-5-mini", "gpt-4o", "o4", "o3", "o3-mini"],
-    "qwen": ["qwen3.8-max", "qwen3.8-flash", "qwen3.7-max", "qwen3-max", "qwen3-coder-plus", "qwen-max", "qwen-plus", "qwen-turbo", "qwen-flash"],
-    "deepseek": ["deepseek-v4", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-v3", "deepseek-r1"],
-    # Provider dropdown has always offered "google" (panels_llm.py) and the kernel
-    # fully resolves it (llm/provider.py _GOOGLE_BASE_URL + param-support
-    # set) -- but the catalogue had no fetcher and no fallback list, so
-    # picking Google always left the Model Select empty. Static ids here are
-    # the provider's own; _fetch_google below replaces this with the live
-    # list as soon as a key is configured.
-    "google": ["gemini-3.7-flash", "gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
-    # Kimi (Moonshot) and GLM (Zhipu z.ai) — first-class system providers
-    # (2026-08-30). Static ids are each vendor's own; the live fetchers below
-    # replace them with the key's real /models answer as soon as a key exists.
-    "kimi": ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"],
-    "zhipu": ["glm-5.3", "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5", "glm-4.5-air"],
-    # OpenRouter multi-vendor router (2026-09-02).
-    # Prioritizes Gemini, GLM, Qwen, DeepSeek first
-    "openrouter": [
-        "google/gemini-3.7-flash",
-        "google/gemini-3-pro",
-        "google/gemini-2.5-pro",
-        "google/gemini-2.5-flash",
-        "z-ai/glm-5.3",
-        "z-ai/glm-5.3-flash",
-        "qwen/qwen3.8-max",
-        "qwen/qwen3.8-flash",
-        "qwen/qwen-2.5-coder-32b-instruct",
-        "deepseek/deepseek-chat",
-        "deepseek/deepseek-r1",
-        "deepseek/deepseek-v3.2",
-        "anthropic/claude-3.7-sonnet",
-        "anthropic/claude-3.5-sonnet",
-        "openai/gpt-4o",
-        "openai/gpt-4o-mini",
-    ],
-}
 
 _QWEN_DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 # First-class provider endpoints (OpenAI-compatible). The kernel resolver
@@ -171,13 +143,11 @@ def _filter_openai(ids: list[str]) -> list[str]:
                 return (idx, m)
         return (len(priority), m)
 
-    sorted_models = sorted(out, key=sort_key)
-    # Keep up to 16 flagship models to preserve UI payload safety under the 256KB wire cap
-    return sorted_models[:16]
+    return sorted(out, key=sort_key)
 
 
 def _filter_anthropic(ids: list[str]) -> list[str]:
-    """All claude-* models are chat-capable. Keep top active flagship models."""
+    """All claude-* models are chat-capable; the newest families first."""
     out = {i for i in ids if i.startswith("claude-")}
     priority = ["claude-opus-5", "claude-sonnet-5", "claude-opus-4", "claude-sonnet-4", "claude-3-7-sonnet", "claude-haiku-4"]
 
@@ -187,8 +157,7 @@ def _filter_anthropic(ids: list[str]) -> list[str]:
                 return (idx, m)
         return (len(priority), m)
 
-    sorted_models = sorted(out, key=sort_key)
-    return sorted_models[:10]
+    return sorted(out, key=sort_key)
 
 
 # DashScope lists 160+ ids incl. vision/audio/embedding/rerank families.
@@ -237,7 +206,7 @@ def _filter_qwen(ids: list[str]) -> list[str]:
         if m and low[: m.start()] in {x.lower() for x in id_set}:
             continue
         out.add(i)
-    return sorted(out)[:20]
+    return sorted(out)
 
 
 # Google's OpenAI-compatible /models answer also lists embedding/imagen/veo/
@@ -280,9 +249,9 @@ async def _fetch_openai(key: str) -> list[str]:
         return _filter_openai([m.get("id", "") for m in r.json().get("data", [])])
 
 
-async def _fetch_qwen(key: str, base_url: str = "") -> list[str]:
-    """DashScope OpenAI-compatible /models (key admin-entered via the panel)."""
-    url = (base_url or _QWEN_DEFAULT_BASE_URL).rstrip("/") + "/models"
+async def _fetch_qwen(key: str) -> list[str]:
+    """DashScope OpenAI-compatible /models, at DashScope's own address."""
+    url = _QWEN_DEFAULT_BASE_URL.rstrip("/") + "/models"
     async with shared_http(timeout=12.0) as c:
         r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
         r.raise_for_status()
@@ -323,98 +292,45 @@ async def _fetch_zhipu(key: str) -> list[str]:
         return _filter_zhipu([m.get("id", "") for m in r.json().get("data", [])])
 
 
-async def _fetch_openrouter(key: str, base_url: str = "") -> list[str]:
-    """OpenRouter OpenAI-compatible /models (key admin-entered via the panel)."""
-    url = (base_url or _OPENROUTER_BASE_URL).rstrip("/") + "/models"
+async def _fetch_openrouter(key: str) -> list[str]:
+    """OpenRouter /models, read with the platform's key at OpenRouter's own address."""
+    url = _OPENROUTER_BASE_URL.rstrip("/") + "/models"
     async with shared_http(timeout=12.0) as c:
         r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
         r.raise_for_status()
-        data = r.json().get("data", [])
-        return _pick_openrouter(data)
+        return _pick_openrouter(r.json().get("data", []))
 
 
-_OPENROUTER_TOP_VENDORS = (
-    "google/", "z-ai/", "qwen/", "deepseek/",
-    "anthropic/", "openai/", "meta-llama/", "mistralai/", "x-ai/", "moonshotai/",
-    "minimax/", "bytedance-seed/", "cohere/",
-)
-
-_OPENROUTER_EXCLUDE = (
-    ":free", ":batch", ":extended", "embedding", "embed", "rerank",
-    "tts", "audio", "whisper", "vision-exp", "image", "wan", "flux",
-    "diffusion", "guard", "safety", "moderation", "live", "translat",
-    "base", "quantized",
-)
-
-_OPENROUTER_DATE_PAT = re.compile(r"-\d{8}$|-\d{4}-\d{2}-\d{2}$")
+# Measured on the public list 2026-11-23: 477 models. 19 of them answer with an
+# image, audio or video; 50 of the text ones accept no tools; 92 are ":batch"
+# variants served only on /api/v1/batches. 318 are left - all of them offered.
+_CHAT_ENDPOINT = "chat/completions"
 
 
-# Measured on the public list 2026-11-23: 477 models, 415 of them accept tools.
-# The name filter below keeps 219, of which 12 cannot use tools at all (music
-# and small instruct models) - and the old cut took the first 25 of an
-# alphabetical sort, so 194 models, whole vendors among them, were never
-# offered. The pick is now by what a model can DO, newest first, with a share
-# for every vendor.
-OPENROUTER_PER_VENDOR = 8
+def openrouter_usable(m: dict) -> bool:
+    """Whether an OpenRouter model can serve a slot of this extension: it
+    answers with text only, accepts tools and is served on the chat endpoint.
+    A field OpenRouter did not send is not held against the model."""
+    arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
+    out, params, endpoints = arch.get("output_modalities"), m.get("supported_parameters"), m.get("endpoints")
+    if isinstance(out, list) and [str(x) for x in out] != ["text"]:
+        return False
+    if isinstance(params, list) and "tools" not in params:
+        return False
+    if isinstance(endpoints, list) and not any(_CHAT_ENDPOINT in str(e) for e in endpoints):
+        return False
+    return True
 
 
 def _pick_openrouter(models: list[dict]) -> list[str]:
-    """The OpenRouter models offered for system use: chat models that accept
-    tools (the kernel drives every purpose through tool calls), named by the
-    rules of ``_filter_openrouter``, the newest OPENROUTER_PER_VENDOR of each
-    vendor, vendors in priority order."""
-    def _capable(m: dict) -> bool:
-        arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
-        out, params = arch.get("output_modalities"), m.get("supported_parameters")
-        # a field the provider did not send is not held against the model
-        return (not isinstance(out, list) or "text" in out) and (
-            not isinstance(params, list) or "tools" in params)
+    """Every usable OpenRouter model: vendors in alphabetical order, the newest
+    model of a vendor first."""
+    usable = [m for m in models if isinstance(m, dict) and str(m.get("id") or "").strip() and openrouter_usable(m)]
 
-    by_id = {str(m.get("id") or ""): m for m in models if isinstance(m, dict)}
-    named = _filter_openrouter(list(by_id), cut=False)
-    per_vendor: dict[str, list[str]] = {}
-    for mid in named:
-        if _capable(by_id[mid]):
-            per_vendor.setdefault(mid.split("/", 1)[0], []).append(mid)
-    picked: list[str] = []
-    for vendor in dict.fromkeys(mid.split("/", 1)[0] for mid in named):   # priority order
-        newest = sorted(per_vendor.get(vendor, []),
-                        key=lambda i: -(by_id[i].get("created") or 0))
-        picked += newest[:OPENROUTER_PER_VENDOR]
-    return picked
-
-
-def _filter_openrouter(ids: list[str], cut: bool = True) -> list[str]:
-    """Filter OpenRouter's 400+ models down to clean, chat/coding flagships (~25).
-
-    Prioritizes Google Gemini, Z-AI GLM, Qwen, and DeepSeek at the top of the dropdown!
-    """
-    out: list[str] = []
-    for i in ids:
-        if not i or not isinstance(i, str):
-            continue
-        i_clean = i.strip()
-        if i_clean.startswith("~"):
-            continue
-        if not i_clean.startswith(_OPENROUTER_TOP_VENDORS):
-            continue
-        if any(tok in i_clean.lower() for tok in _OPENROUTER_EXCLUDE):
-            continue
-        if _OPENROUTER_DATE_PAT.search(i_clean):
-            continue
-        out.append(i_clean)
-
-    # Sort with custom priority: google/, z-ai/, qwen/, deepseek/ first
-    priority_prefixes = ["google/", "z-ai/", "qwen/", "deepseek/", "anthropic/", "openai/"]
-    def sort_key(model_id: str):
-        low = model_id.lower()
-        for idx, pref in enumerate(priority_prefixes):
-            if low.startswith(pref):
-                return (idx, low)
-        return (len(priority_prefixes), low)
-
-    sorted_unique = sorted(set(out), key=sort_key)
-    return sorted_unique[:25] if cut else sorted_unique
+    def order(m: dict):
+        mid = str(m["id"]).strip()
+        return (mid.lstrip("~").split("/", 1)[0].lower(), -(m.get("created") or 0), mid.lower())
+    return list(dict.fromkeys(str(m["id"]).strip() for m in sorted(usable, key=order)))
 
 
 def _filter_kimi(ids: list[str]) -> list[str]:
@@ -429,23 +345,6 @@ def _filter_zhipu(ids: list[str]) -> list[str]:
     return sorted({i for i in ids if i.lower().startswith("glm")})
 
 
-async def _provider_keys(ctx) -> dict[str, str]:
-    """provider -> key, for a live model listing. Keys come only from this
-    extension's secrets (llm_keys.py: Imperal Vault); a provider whose key is
-    not typed, or cannot be read right now, has none and is listed from the
-    static fallback."""
-    from llm_keys import PROVIDERS, key_for
-    keys: dict[str, str] = {}
-    if ctx is None:
-        return keys
-    for prov in PROVIDERS:
-        try:
-            keys[prov] = await key_for(ctx, prov)
-        except Exception as e:
-            log.warning("model_catalog: %s key not read: %s: %s", prov, type(e).__name__, e)
-    return keys
-
-
 async def _redis():
     url = os.getenv("REDIS_URL", "")
     if not url:
@@ -458,136 +357,82 @@ async def _redis():
         return None
 
 
-async def fetch_model_catalog(ctx=None) -> dict[str, list[str]]:
-    """Return {provider: [model_id, ...]}.  cache → live → static fallback.
+# The providers that can be listed; each has a ``_fetch_<provider>(key)`` above.
+LISTED = ("anthropic", "openai", "google", "openrouter", "qwen", "kimi", "zhipu")
+STORE_NOTE = "*"        # the key of a note about the secret store itself
 
-    ``ctx`` gives the provider keys (this extension's secrets). Every provider
-    is listed from its OWN address and from no other: a key never follows a
-    Base URL saved in the config (security review 2026-11-23)."""
+
+def _why(e: Exception) -> str:
+    """One line a person can act on. httpx timeouts stringify to ""."""
+    if isinstance(e, httpx.HTTPStatusError):
+        code = e.response.status_code
+        return f"the provider answered HTTP {code}" + (" - it does not accept the key" if code in (401, 403) else "")
+    return f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+
+
+async def fetch_model_listing(ctx=None, keyed: dict | None = None) -> tuple[dict[str, list[str]], dict[str, str]]:
+    """(catalogue, notes): {provider: [model_id, ...]} for every provider that
+    has a key and answered, and {provider: why} for a keyed provider that is
+    not listed. ``keyed`` is llm_keys.keys_set(ctx) when the caller has it.
+
+    Every provider is asked at its OWN address and at no other: a key never
+    follows a Base URL saved in the config (security review 2026-11-23)."""
+    from llm_keys import key_for, keys_set
+    if keyed is None:
+        keyed = await keys_set(ctx)
+    if keyed is None:
+        return {}, {STORE_NOTE: "the secret store did not answer, so no provider key could be read"}
+    wanted = sorted(p for p in LISTED if keyed.get(p))
+    if not wanted:
+        return {}, {}
+
+    cache_key = f"{_CACHE_KEY}:{'+'.join(wanted)}"       # a key typed or removed is a new listing
     r = await _redis()
-    # 1. Cache hit
     if r is not None:
         try:
-            cached = await r.get(_CACHE_KEY)
+            cached = await r.get(cache_key)
             if cached:
+                got = json.loads(cached)
                 await r.aclose()
-                return json.loads(cached)
+                return got.get("catalog") or {}, got.get("notes") or {}
         except Exception as e:
-            log.warning("model_catalog: cache read failed: %s", e)
+            log.warning("model listing: cache read failed: %s", e)
 
-    # 2. Live fetch per provider (each best-effort, isolated failure)
+    async def one(prov: str):
+        try:
+            key = await key_for(ctx, prov)
+        except Exception as e:
+            return prov, [], f"its key could not be read ({_why(e)})"
+        if not key:
+            return prov, [], "its key is empty"
+        try:
+            models = await globals()[f"_fetch_{prov}"](key)
+        except Exception as e:
+            log.warning("model listing: %s failed: %s", prov, _why(e))
+            return prov, [], _why(e)
+        return prov, models, "" if models else "the provider listed no model this page can use"
+
     catalog: dict[str, list[str]] = {}
-    keys = await _provider_keys(ctx)
-    ak, ok = keys.get("anthropic", ""), keys.get("openai", "")
-    if ak:
-        try:
-            catalog["anthropic"] = await _fetch_anthropic(ak)
-        except Exception as e:
-            # Include the exception TYPE: httpx timeouts stringify to "", which
-            # produced log lines with no cause at all ("fetch failed: ").
-            log.warning(
-                "model_catalog: anthropic fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
-    if ok:
-        try:
-            catalog["openai"] = await _fetch_openai(ok)
-        except Exception as e:
-            log.warning(
-                "model_catalog: openai fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
-    qk = keys.get("qwen", "")
-    if qk:
-        try:
-            catalog["qwen"] = await _fetch_qwen(qk)
-        except Exception as e:
-            log.warning(
-                "model_catalog: qwen fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
-    # Kimi (Moonshot) + GLM (Zhipu z.ai): each fetcher hits the vendor's OWN
-    # endpoint, so the catalogue can only ever list that vendor's models.
-    kk = keys.get("kimi", "")
-    if kk:
-        try:
-            catalog["kimi"] = await _fetch_kimi(kk)
-        except Exception as e:
-            log.warning(
-                "model_catalog: kimi fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
-    zk = keys.get("zhipu", "")
-    if zk:
-        try:
-            catalog["zhipu"] = await _fetch_zhipu(zk)
-        except Exception as e:
-            log.warning(
-                "model_catalog: zhipu fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
-    gk = keys.get("google", "")
-    if gk:
-        try:
-            catalog["google"] = await _fetch_google(gk)
-        except Exception as e:
-            log.warning(
-                "model_catalog: google fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
-    ork = keys.get("openrouter", "")
-    if ork:
-        try:
-            catalog["openrouter"] = await _fetch_openrouter(ork)
-        except Exception as e:
-            log.warning(
-                "model_catalog: openrouter fetch failed: %s: %s",
-                type(e).__name__, e or "(no detail)",
-            )
+    notes: dict[str, str] = {}
+    for prov, models, why in await asyncio.gather(*[one(p) for p in wanted]):
+        if models:
+            catalog[prov] = models
+        if why:
+            notes[prov] = why
 
-    catalog = {p: m for p, m in catalog.items() if m}
-    if not catalog:
-        if r is not None:
-            try:
-                await r.aclose()
-            except Exception:
-                pass
-        log.warning("model_catalog: all live fetches empty — using fallback")
-        return {p: list(v) for p, v in FALLBACK_CATALOG.items()}
-
-    # 2b. Partial failure: a provider IS configured (key present) but its fetch
-    # failed or returned nothing. Without this, a single blip drops that whole
-    # provider from the LLM Config dropdowns — the admin sees e.g. only
-    # Anthropic and cannot pick a GPT model at all. Backfill from the static
-    # fallback so every configured provider stays selectable, and mark the
-    # result degraded so it is cached briefly instead of for an hour.
-    expected = {p for p, key in (("anthropic", ak), ("openai", ok), ("qwen", qk), ("google", gk), ("kimi", kk), ("zhipu", zk), ("openrouter", ork)) if key}
-    missing = sorted(expected - set(catalog))
-    for prov in missing:
-        fb = FALLBACK_CATALOG.get(prov)
-        if fb:
-            catalog[prov] = list(fb)
-            log.warning(
-                "model_catalog: %s unavailable — serving fallback list (%d models)",
-                prov, len(fb),
-            )
-
-    # 2c. qwen, kimi, zhipu and openrouter are offered with unconditional
-    # fallback lists, so the admin can pick them and their models before their
-    # key is typed in Secrets.
-    for _p in ("qwen", "kimi", "zhipu", "openrouter"):
-        if _p not in catalog:
-            catalog[_p] = list(FALLBACK_CATALOG.get(_p, []))
-
-    # 3. Cache the live result (short TTL when degraded, so we retry soon)
     if r is not None:
         try:
-            ttl = _CACHE_TTL_DEGRADED if missing else _CACHE_TTL
-            await r.set(_CACHE_KEY, json.dumps(catalog), ex=ttl)
+            await r.set(cache_key, json.dumps({"catalog": catalog, "notes": notes}),
+                        ex=_CACHE_TTL_DEGRADED if notes else _CACHE_TTL)
             await r.aclose()
         except Exception as e:
-            log.warning("model_catalog: cache write failed: %s", e)
-    return catalog
+            log.warning("model listing: cache write failed: %s", e)
+    return catalog, notes
+
+
+async def fetch_model_catalog(ctx=None, keyed: dict | None = None) -> dict[str, list[str]]:
+    """{provider: [model_id, ...]} - see fetch_model_listing."""
+    return (await fetch_model_listing(ctx, keyed))[0]
 
 
 def catalog_to_options(catalog: dict[str, list[str]]) -> tuple[list[dict], list[dict]]:

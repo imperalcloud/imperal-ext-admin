@@ -179,7 +179,7 @@ def _build_monitoring(data: dict) -> list:
 # ── Main builder ──────────────────────────────────────────────────────
 
 async def build_ext_settings(ctx: Any, app_id: str = "",
-                             tab: str = "general", **kwargs) -> ui.Stack:
+                             tab: str = "general", model_slot: str = "", **kwargs) -> ui.Stack:
     if not app_id:
         return ui.Alert(title="No extension selected", message="app_id required", type="error")
 
@@ -207,8 +207,19 @@ async def build_ext_settings(ctx: Any, app_id: str = "",
         # Only the AI Models tab needs the unresolved view, so only it pays for
         # the extra read.
         own_models = await _fetch_own_models(app_id) if tab == "models" else None
+        model_options: list = []
+        model_notes: dict = {}
+        if tab == "models":
+            # the same live list as LLM Config: usable models of providers that have a key
+            from panels_llm_models import fetch_model_listing, catalog_to_options
+            _catalog, model_notes = await fetch_model_listing(ctx)
+            model_options = catalog_to_options(_catalog)[1]
         tab_map = {
-            "models": lambda: build_models_tab(app_id, settings, own_models),
+            "models": lambda: [
+                *[ui.Alert(title=f"{_p}: its models are not in the lists" if _p != "*" else "Provider keys could not be read",
+                           message=str(_w), type="warning") for _p, _w in sorted(model_notes.items())],
+                *build_models_tab(app_id, settings, own_models, model_options, str(model_slot or "")),
+            ],
             "persona": lambda: build_persona_tab(app_id, settings),
             "skeleton": lambda: build_skeleton_tab(app_id, settings),
             "alerts": lambda: build_alerts_tab(app_id, settings),

@@ -36,13 +36,25 @@ EFFORT_OPTIONS: list[dict[str, str]] = [
 ]
 
 
-def build_tiers_section(defaults: dict, all_models: list[dict]) -> object:
-    """Return the Model Tiers ui.Section, pre-populated from defaults."""
+TIERS_VIEW = "webbee-code-model-tiers"       # _view_id of this section's title
+
+
+def build_tiers_section(defaults: dict, all_models: list[dict], slot: str = "*") -> object:
+    """Return the Model Tiers ui.Section, pre-populated from defaults.
+    ``slot``: the model slot drawn as the list ("*" = all, panels_llm_slot.py)."""
+    from panels_llm_slot import model_slot, opened
+    slots = [f"{k}{suffix}" for k, _l, _d in _TIERS for suffix in ("_model", "_fallback_model")]
+    open_slot = opened(slots, slot)
+
+    def _pick(param_name: str, placeholder: str) -> list:
+        return model_slot(param_name, defaults.get(param_name, ""), all_models, placeholder, TIERS_VIEW, open_slot)
+
     children: list = [
         ui.Text(
             "Configure the primary + fallback model behind each Webbee Code "
             "quality tier and tune the reasoning effort (hardness) and token budgets "
-            "per tier with zero hardcoded defaults.",
+            "per tier. One model list is open at a time: “Choose model” opens "
+            "another one, and Save stores the open one.",
             variant="caption",
         ),
     ]
@@ -54,23 +66,13 @@ def build_tiers_section(defaults: dict, all_models: list[dict]) -> object:
                 ui.Text(desc, variant="caption"),
             ], gap=0),
             ui.Text("Primary model", variant="caption"),
-            ui.Select(
-                options=all_models,
-                value=defaults.get(f"{key}_model", ""),
-                param_name=f"{key}_model",
-                placeholder="Same as Webbee Code model",
-            ),
+            *_pick(f"{key}_model", "Same as Webbee Code model"),
             ui.Text(
                 "Fallback model — used only when this tier's primary errors "
                 "(one retry). Blank = no fallback.",
                 variant="caption",
             ),
-            ui.Select(
-                options=all_models,
-                value=defaults.get(f"{key}_fallback_model", ""),
-                param_name=f"{key}_fallback_model",
-                placeholder="No fallback",
-            ),
+            *_pick(f"{key}_fallback_model", "No fallback"),
             ui.Text("Tier Reasoning Effort (hardness)", variant="caption"),
             ui.Select(
                 options=EFFORT_OPTIONS,

@@ -109,7 +109,7 @@ def test_the_catalogue_takes_its_keys_from_the_secrets(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-from-env")
     seen = {}
 
-    async def _openrouter(key, base_url=""):
+    async def _openrouter(key):
         seen["openrouter"] = key
         return ["a/b"]
 
@@ -119,16 +119,15 @@ def test_the_catalogue_takes_its_keys_from_the_secrets(monkeypatch):
     for name in ("_fetch_openai", "_fetch_anthropic", "_fetch_google", "_fetch_qwen", "_fetch_kimi", "_fetch_zhipu"):
         monkeypatch.setattr(plm, name, _explode)
     catalog = asyncio.run(plm.fetch_model_catalog(_Ctx({"llm_openrouter_api_key": "k-or"})))
-    assert seen == {"openrouter": "k-or"} and catalog["openrouter"] == ["a/b"]
-    assert "openai" not in catalog
+    assert seen == {"openrouter": "k-or"} and catalog == {"openrouter": ["a/b"]}
 
 
-def test_a_store_failure_leaves_the_catalogue_on_its_fallback(monkeypatch):
+def test_a_store_failure_lists_nothing_and_says_so(monkeypatch):
     async def _none():
         return None
     monkeypatch.setattr(plm, "_redis", _none)
-    catalog = asyncio.run(plm.fetch_model_catalog(_Ctx(fail=True)))
-    assert catalog == {p: list(v) for p, v in plm.FALLBACK_CATALOG.items()}
+    catalog, notes = asyncio.run(plm.fetch_model_listing(_Ctx(fail=True)))
+    assert catalog == {} and list(notes) == [plm.STORE_NOTE]
 
 
 def test_no_extension_code_reads_an_llm_key_from_env_or_the_config_store():
@@ -143,25 +142,12 @@ def test_no_extension_code_reads_an_llm_key_from_env_or_the_config_store():
     assert not bad, bad
 
 
-def test_a_key_never_follows_a_saved_base_url_in_the_catalogue(monkeypatch):
-    """Every fetcher that takes a key is called for the provider's own address:
-    the catalogue takes no address from the config (security review 2026-11-23)."""
+def test_a_key_never_follows_a_saved_base_url_in_the_catalogue():
+    """A fetcher takes a key and nothing else: no address reaches it, so a key
+    can only go to the provider's own address (security review 2026-11-23)."""
     import inspect
-    assert list(inspect.signature(plm.fetch_model_catalog).parameters) == ["ctx"]
-
-    async def _none():
-        return None
-    monkeypatch.setattr(plm, "_redis", _none)
-    seen = []
-
-    async def _qwen(key, base_url=""):
-        seen.append(("qwen", base_url))
-        return ["qwen3-max"]
-
-    async def _openrouter(key, base_url=""):
-        seen.append(("openrouter", base_url))
-        return ["a/b"]
-    monkeypatch.setattr(plm, "_fetch_qwen", _qwen)
-    monkeypatch.setattr(plm, "_fetch_openrouter", _openrouter)
-    asyncio.run(plm.fetch_model_catalog(_Ctx({"llm_qwen_api_key": "kq", "llm_openrouter_api_key": "ko"})))
-    assert sorted(seen) == [("openrouter", ""), ("qwen", "")]
+    assert list(inspect.signature(plm.fetch_model_listing).parameters) == ["ctx", "keyed"]
+    for prov in plm.LISTED:
+        fetch = getattr(plm, f"_fetch_{prov}")
+        assert list(inspect.signature(fetch).parameters) == ["key"], prov
+        assert "base_url" not in inspect.getsource(fetch), prov

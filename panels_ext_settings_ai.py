@@ -6,23 +6,6 @@ from __future__ import annotations
 from imperal_sdk import ui
 
 
-_MODEL_OPTIONS = [
-    {"value": "", "label": "— Default —"},
-    {"value": "claude-opus-4-7", "label": "Claude Opus 4.7"},
-    {"value": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
-    {"value": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
-    {"value": "gpt-5", "label": "GPT-5"},
-    {"value": "gpt-5-mini", "label": "GPT-5 Mini"},
-    {"value": "gpt-5-nano", "label": "GPT-5 Nano"},
-    {"value": "o3", "label": "OpenAI o3 (reasoning)"},
-    {"value": "gpt-4.1", "label": "GPT-4.1"},
-    {"value": "gpt-4.1-mini", "label": "GPT-4.1 Mini"},
-    {"value": "gpt-4.1-nano", "label": "GPT-4.1 Nano"},
-    {"value": "gpt-4o", "label": "GPT-4o"},
-    {"value": "gpt-4o-mini", "label": "GPT-4o Mini"},
-    {"value": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4 (legacy)"},
-    {"value": "claude-opus-4-20250514", "label": "Claude Opus 4 (legacy)"},
-]
 
 _LANGUAGE_OPTIONS = [
     {"value": "auto", "label": "Auto-detect"},
@@ -52,14 +35,19 @@ _MODEL_SLOT_FIELDS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _model_options(inherited: str) -> list[dict]:
+def _inherit_label(inherited: str) -> str:
+    return f"— Inherit platform default ({inherited}) —" if inherited else "— Inherit platform default —"
+
+
+def _model_options(inherited: str, models: list[dict] | None = None) -> list[dict]:
     """Model options whose blank entry names what blank actually resolves to.
 
     "— Default —" alone gave no clue which model the platform would pick, so an
     admin could not tell what they were opting into by leaving it blank.
+    ``models`` is the live list (panels_llm_models.fetch_model_listing): every
+    usable model of every provider that has a key. There is no built-in list.
     """
-    label = f"— Inherit platform default ({inherited}) —" if inherited else "— Inherit platform default —"
-    return [{"value": "", "label": label}] + _MODEL_OPTIONS[1:]
+    return [{"value": "", "label": _inherit_label(inherited)}] + [dict(o) for o in (models or []) if o.get("value")]
 
 
 def _thinking_options(inherited: str) -> list[dict]:
@@ -75,8 +63,14 @@ def _thinking_options(inherited: str) -> list[dict]:
 
 # ── AI Models tab ─────────────────────────────────────────────────────
 
-def build_models_tab(app_id: str, settings: dict, own_models: dict | None = None) -> list:
+def build_models_tab(app_id: str, settings: dict, own_models: dict | None = None,
+                     models: list[dict] | None = None, slot: str = "*") -> list:
     """AI Models tab.
+
+    ``models``: the live model options; ``slot``: the model slot drawn as the
+    list ("*" = all four) - one list at a time keeps the page under the reply
+    cap whatever the list's length (panels_llm_slot.py). The closed slots are
+    still sent by a save: the form's defaults hold all four.
 
     `settings` is the RESOLVED view (platform defaults already merged in);
     `own_models` is what this app actually stored, or None when that could not
@@ -104,6 +98,15 @@ def build_models_tab(app_id: str, settings: dict, own_models: dict | None = None
     def _hint(key: str, fallback: str = "inherit") -> str:
         inherited = _inherited(key)
         return f"Inherited: {inherited}" if inherited else fallback
+
+    from panels_llm_slot import model_slot, opened
+    _open = opened([k for k, _ in _MODEL_SLOT_FIELDS], slot)
+
+    def _slot(key: str) -> list:
+        return model_slot(
+            key, _own(key), _model_options(_inherited(key), models), _inherit_label(_inherited(key)), "", _open,
+            on_open=lambda name: ui.Call("__panel__tools", section="ext_settings", app_id=app_id,
+                                         tab="models", model_slot=name))
 
     pinned_slots = [s for s, _ in _MODEL_SLOT_FIELDS if _own(s)]
     legacy_params = [k for k in ("temperature", "max_tokens", "thinking_mode") if _own(k)]
@@ -164,29 +167,13 @@ def build_models_tab(app_id: str, settings: dict, own_models: dict | None = None
             },
             children=[
                 ui.Text("Primary Model", variant="caption"),
-                ui.Select(
-                    param_name="primary_model",
-                    value=_own("primary_model"),
-                    options=_model_options(_inherited("primary_model")),
-                ),
+                *_slot("primary_model"),
                 ui.Text("Intake Model", variant="caption"),
-                ui.Select(
-                    param_name="intake_model",
-                    value=_own("intake_model"),
-                    options=_model_options(_inherited("intake_model")),
-                ),
+                *_slot("intake_model"),
                 ui.Text("Analysis Model", variant="caption"),
-                ui.Select(
-                    param_name="analysis_model",
-                    value=_own("analysis_model"),
-                    options=_model_options(_inherited("analysis_model")),
-                ),
+                *_slot("analysis_model"),
                 ui.Text("Router Model", variant="caption"),
-                ui.Select(
-                    param_name="router_model",
-                    value=_own("router_model"),
-                    options=_model_options(_inherited("router_model")),
-                ),
+                *_slot("router_model"),
                 ui.Text("Temperature (0 — 2; blank to inherit)", variant="caption"),
                 ui.Input(
                     param_name="temperature",

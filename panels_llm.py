@@ -15,7 +15,7 @@ from panels_sections import (
     _cached, _fetch_llm_usage, _fetch_extensions, _fmt_tokens, _fmt_latency,
 )
 from panels_llm_form import build_llm_form
-from panels_llm_models import fetch_model_catalog, catalog_to_options
+from panels_llm_models import fetch_model_listing, catalog_to_options, STORE_NOTE
 
 log = logging.getLogger("admin")
 
@@ -246,16 +246,17 @@ EXTRA_VIEWS = (("provider-keys", "Provider keys"), ("extension-overrides", "Exte
                ("usage-today", "Usage today"))
 
 
-async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
-    """Build LLM Config panel. run_test='main'|'failover' triggers inline test."""
-    from llm_keys import keys_set
-    cfg, usage, extensions, tenant_defaults, model_catalog, llm_keys_set = await asyncio.gather(
+async def build_llm(ctx, run_test: str = "", llm_view: str = "", llm_slot: str = "", **kwargs):
+    """Build LLM Config panel. run_test='main'|'failover' triggers inline test.
+    llm_slot: the model slot drawn as the list in a many-slot section."""
+    from llm_keys import PROVIDERS, keys_set
+    llm_keys_set = await keys_set(ctx)
+    cfg, usage, extensions, tenant_defaults, (model_catalog, model_notes) = await asyncio.gather(
         _fetch_llm_config(),
         _fetch_llm_usage(),
         _fetch_extensions(),
         _fetch_tenant_defaults(),
-        fetch_model_catalog(ctx),
-        keys_set(ctx),
+        fetch_model_listing(ctx, llm_keys_set),
     )
 
     provider = cfg.get("provider", "anthropic")
@@ -313,6 +314,15 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
             title=f"Test {label} · {test_type}",
             message=result["message"],
             type="success" if result["ok"] else "error",
+        ))
+
+    # A provider that has a key and is not in the lists: say which and why.
+    for _prov, _why in sorted(model_notes.items()):
+        children.append(ui.Alert(
+            title=("Provider keys could not be read" if _prov == STORE_NOTE
+                   else f"{PROVIDERS.get(_prov, _prov)}: its models are not in the lists"),
+            message=f"{_why}. The model lists below hold only models of providers that answered.",
+            type="warning",
         ))
 
     children.extend([
@@ -379,6 +389,7 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", **kwargs):
             purpose_max_tokens_config=cfg,
             view=str(llm_view or ""),
             extra_views=EXTRA_VIEWS,
+            slot=str(llm_slot or ""),
             keys_set=llm_keys_set,
         ),
     ])

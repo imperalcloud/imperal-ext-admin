@@ -154,7 +154,46 @@ def test_the_page_draws_one_section_and_a_way_to_every_other():
         tree = _call_form(view=vid, extra_views=PL.EXTRA_VIEWS).to_dict()
         assert len(_forms(tree)) <= 1, vid
         reached |= _inputs(tree)
+        for slot in _slot_buttons(tree):                 # a section with many model lists opens one at a time
+            opened = _call_form(view=vid, extra_views=PL.EXTRA_VIEWS, slot=slot).to_dict()
+            assert slot in _inputs(opened), (vid, slot)
+            reached |= _inputs(opened)
     assert reached == everything          # no setting became unreachable
+
+
+def _slot_buttons(tree) -> list[str]:
+    return [b["on_click"]["params"]["llm_slot"] for b in _buttons(tree)
+            if ((b.get("on_click") or {}).get("params") or {}).get("llm_slot")]
+
+
+def test_a_many_slot_section_draws_one_model_list_and_names_the_others():
+    tree = _call_form(view="per-purpose-models", model_catalog={"openrouter": ["a/b"]},
+                      code_model="a/b").to_dict()
+    selects = [n for n in _nodes(tree) if n.get("type") == "Select"]
+    assert [n["props"]["param_name"] for n in selects] == ["resolve_model"]
+    closed = _slot_buttons(tree)
+    assert "code_model" in closed and "routing_fallback_model" in closed and "resolve_model" not in closed
+    assert all(b["on_click"]["params"]["llm_view"] == "per-purpose-models" for b in _buttons(tree)
+               if ((b.get("on_click") or {}).get("params") or {}).get("llm_slot"))
+    assert "a/b" in json.dumps(tree), "a closed slot shows the model it holds"
+
+    opened = _call_form(view="per-purpose-models", slot="code_model").to_dict()
+    assert [n["props"]["param_name"] for n in _nodes(opened) if n.get("type") == "Select"] == ["code_model"]
+    # the open slot is the only model field the form sends: the others stay as saved
+    sent = _forms(opened)[0]["defaults"]
+    assert "code_model" in sent and "resolve_model" not in sent
+
+    tiers = _call_form(view="webbee-code-model-tiers").to_dict()
+    tier_selects = [n["props"]["param_name"] for n in _nodes(tiers) if n.get("type") == "Select"]
+    assert [x for x in tier_selects if x.endswith("_model")] == ["webbeesmart_model"]
+
+
+def test_a_saved_model_the_lists_do_not_hold_is_still_shown():
+    tree = _call_form(view="per-purpose-models", model_catalog={"openrouter": ["a/b"]},
+                      resolve_model="gone/model").to_dict()
+    select = next(n for n in _nodes(tree) if n.get("type") == "Select")
+    assert select["props"]["value"] == "gone/model"
+    assert any(o["value"] == "gone/model" and "saved" in o["label"] for o in select["props"]["options"])
 
 
 def test_a_view_button_does_not_repeat_a_provider_test():
@@ -164,46 +203,57 @@ def test_a_view_button_does_not_repeat_a_provider_test():
             assert params.get("run_test") == ""
 
 
-def test_the_heaviest_view_fits_the_reply_cap_with_the_real_list_length():
-    """13 vendors x OPENROUTER_PER_VENDOR models, in every select of a view."""
-    n = 13 * PM.OPENROUTER_PER_VENDOR
-    catalog = {"anthropic": [f"claude-x-{i}" for i in range(8)],
-               "openai": [f"gpt-x-{i}" for i in range(12)],
-               "openrouter": [f"vendor{i % 13}/some-model-name-{i}" for i in range(n)]}
+def test_every_view_fits_the_reply_cap_with_the_whole_list():
+    """Measured 2026-11-23: 318 usable OpenRouter models. Twice that, plus the
+    other providers, in every view and with every slot of it opened in turn."""
+    catalog = {"anthropic": [f"claude-x-{i}" for i in range(30)],
+               "openai": [f"gpt-x-{i}" for i in range(60)],
+               "qwen": [f"qwen-x-{i}" for i in range(60)],
+               "openrouter": [f"vendor{i % 53}/some-model-name-{i}" for i in range(640)]}
     sizes = {}
     for vid in _view_ids(_call_form(view="").to_dict()):
         tree = _call_form(view=vid, model_catalog=catalog).to_dict()
         sizes[vid] = len(json.dumps(tree))
+        for slot in _slot_buttons(tree):
+            sizes[f"{vid}/{slot}"] = len(json.dumps(_call_form(view=vid, model_catalog=catalog, slot=slot).to_dict()))
     heaviest = max(sizes, key=sizes.get)
     assert sizes[heaviest] < KERNEL_REPLY_CAP * 0.75, (heaviest, sizes[heaviest])
 
 
 # ── the OpenRouter list ───────────────────────────────────────────────────
 
-def _m(mid, created, tools=True, out=("text",)):
+def _m(mid, created, tools=True, out=("text",), endpoints=("/api/v1/chat/completions", "/api/v1/responses")):
     return {"id": mid, "created": created,
             "architecture": {"output_modalities": list(out)},
-            "supported_parameters": ["tools", "temperature"] if tools else ["temperature"]}
+            "supported_parameters": ["tools", "temperature"] if tools else ["temperature"],
+            "endpoints": list(endpoints)}
 
 
 def test_openrouter_models_are_picked_by_what_they_can_do():
+    """Owner 2026-11-23: every model that can be used, none that cannot ("типа
+    модели видеогенерации"). What a model can do is what OpenRouter says of it,
+    never its name or its vendor."""
     picked = PM._pick_openrouter([
         _m("google/gemini-new", 300), _m("google/gemini-old", 100),
-        _m("google/lyria-music", 400, tools=False),          # passes the name rules, cannot use tools
-        _m("google/gemini-new:batch", 500),                  # cannot answer live requests
+        _m("google/lyria-music", 400, tools=False),                       # accepts no tools
+        _m("google/gemini-new:batch", 500, endpoints=("/api/v1/batches",)),   # not served on the chat endpoint
+        _m("google/veo-video", 600, out=("text", "video")),               # answers with a video
+        _m("openai/gpt-image", 700, out=("image", "text")),               # answers with an image
         _m("x-ai/grok-new", 200),
-        _m("unknown-vendor/model", 900),
+        _m("unknown-vendor/model", 900),                                  # no list of favourite vendors
+        _m("~deepseek/deepseek-latest", 50),                              # an alias is a usable model
+        _m("meta-llama/llama:free", 10),
     ])
-    assert picked == ["google/gemini-new", "google/gemini-old", "x-ai/grok-new"]
+    assert picked == ["~deepseek/deepseek-latest", "google/gemini-new", "google/gemini-old",
+                      "meta-llama/llama:free", "unknown-vendor/model", "x-ai/grok-new"]
 
 
-def test_every_vendor_keeps_its_newest_models():
-    """The old cut took the first 25 of an alphabetical sort: whole vendors vanished."""
+def test_no_openrouter_model_is_cut():
+    """The cuts that were: the first 25 of an alphabetical sort, then 8 per vendor."""
     many = [_m(f"google/gemini-{i:02d}", i) for i in range(40)] + [_m("mistralai/mistral-large", 5)]
     picked = PM._pick_openrouter(many)
-    google = [p for p in picked if p.startswith("google/")]
-    assert len(google) == PM.OPENROUTER_PER_VENDOR and google[0] == "google/gemini-39"
-    assert "mistralai/mistral-large" in picked
+    assert len(picked) == 41 and picked[0] == "google/gemini-39" and picked[-1] == "mistralai/mistral-large"
+    assert not hasattr(PM, "OPENROUTER_PER_VENDOR") and not hasattr(PM, "_filter_openrouter")
 
 
 def test_a_model_without_capability_fields_is_not_dropped_for_that():

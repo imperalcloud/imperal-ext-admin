@@ -226,3 +226,57 @@ def test_thinking_mode_offers_an_explicit_inherit_option():
     assert any("inherit" in lb for lb in labels)
     # 'auto' must remain available as a DELIBERATE choice, distinct from inherit.
     assert "auto" in values
+
+
+# ── the model lists are the live ones (2026-11-23) ────────────────────────
+
+def _tree(x):
+    x = x.to_dict() if hasattr(x, "to_dict") else x
+    if isinstance(x, dict):
+        yield x
+        for v in x.values():
+            yield from _tree(v)
+    elif isinstance(x, (list, tuple)):
+        for v in x:
+            yield from _tree(v)
+
+
+def _model_selects(tab):
+    return [n["props"] for n in _tree(tab) if n.get("type") == "Select"
+            and str(n["props"].get("param_name", "")).endswith("_model")]
+
+
+def test_the_tab_has_no_built_in_model_list():
+    """It offered 15 hardcoded Claude and GPT ids, whatever keys existed."""
+    import panels_ext_settings_ai as tab
+    assert not hasattr(tab, "_MODEL_OPTIONS")
+    selects = _model_selects(build_models_tab("app", RESOLVED, {}, models=None, slot="*"))
+    assert len(selects) == 4
+    assert all([o["value"] for o in s["options"]] == [""] for s in selects), "no key, no model to pick"
+
+
+def test_the_tab_offers_the_live_list_one_slot_at_a_time():
+    live = [{"value": "vendor/model-a", "label": "vendor/model-a (openrouter)"},
+            {"value": "qwen-plus", "label": "qwen-plus (qwen)"}]
+    tab = build_models_tab("app", RESOLVED, {"intake_model": "vendor/model-a"}, models=live, slot="")
+    selects = _model_selects(tab)
+    assert [s["param_name"] for s in selects] == ["primary_model"]
+    assert [o["value"] for o in selects[0]["options"]] == ["", "vendor/model-a", "qwen-plus"]
+    opens = [n["props"]["on_click"]["params"] for n in _tree(tab)
+             if n.get("type") == "Button" and "model_slot" in ((n["props"].get("on_click") or {}).get("params") or {})]
+    assert [p["model_slot"] for p in opens] == ["intake_model", "analysis_model", "router_model"]
+    assert all(p["section"] == "ext_settings" and p["app_id"] == "app" and p["tab"] == "models" for p in opens)
+    # a save still sends all four: the closed slots travel in the form's defaults
+    form = next(n["props"] for n in _tree(tab) if n.get("type") == "Form")
+    assert form["defaults"]["intake_model"] == "vendor/model-a" and "router_model" in form["defaults"]
+
+    opened = _model_selects(build_models_tab("app", RESOLVED, {"intake_model": "vendor/model-a"},
+                                             models=live, slot="intake_model"))
+    assert [s["param_name"] for s in opened] == ["intake_model"] and opened[0]["value"] == "vendor/model-a"
+
+
+def test_a_pinned_model_the_lists_do_not_hold_is_still_shown():
+    selects = _model_selects(build_models_tab("app", RESOLVED, {"primary_model": "claude-opus-4-7"},
+                                              models=[], slot=""))
+    assert selects[0]["value"] == "claude-opus-4-7"
+    assert any(o["value"] == "claude-opus-4-7" and "saved" in o["label"] for o in selects[0]["options"])

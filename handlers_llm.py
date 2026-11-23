@@ -246,10 +246,6 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                 current.pop(_pk, None)
 
         await r.set("imperal:config:llm", json.dumps(current))
-        # The live model catalogue is derived from the keys in THIS store (a
-        # Qwen key is panel-entered, not env), so a saved key must not wait out
-        # the cache TTL before its provider's models appear in the dropdowns.
-        await r.delete("imperal:config:llm:model_catalog")
         # Flush every worker process's in-memory config cache NOW (2026-08-30).
         # Each worker holds `_config_cache` for _CONFIG_CACHE_TTL=60s and only
         # clears it on `imperal:config:invalidate:__system__` — without this

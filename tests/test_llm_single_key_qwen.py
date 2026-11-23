@@ -116,61 +116,14 @@ def test_the_catalogue_reads_no_key_from_the_config_store():
     assert "_API_KEY\"" not in src, "no provider key from the environment either"
 
 
-# ── 3. Qwen is selectable BEFORE its key exists (single-save setup) ────────
+# ── 3. A provider is listed only once its key exists ──────────────────────
+# Until 2026-11-23 qwen was offered from a built-in list before its key was
+# typed, and a save dropped the catalogue cache. Both are gone: the listing is
+# keyed by the set of providers that have a key (tests/test_llm_model_catalog.py).
 
-@pytest.fixture
-def no_redis_catalog(monkeypatch):
-    """No cache, no store, no env keys -- a fresh install's view of the world."""
-    async def _none():
-        return None
-    monkeypatch.setattr(plm, "_redis", _none)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-
-@pytest.mark.asyncio
-async def test_qwen_offered_without_any_key(monkeypatch, no_redis_catalog):
-    """A provisioned deployment with NO qwen key still lists qwen; openai, with
-    no env key, stays out. That asymmetry is the whole point: qwen's key is
-    panel-entered, so the admin must be able to pick provider AND model in the
-    same save that types the key in -- the only way qwen ever gets configured.
-    (When NOTHING can be fetched the pre-existing total-failure path serves the
-    entire static catalogue, which is a different, older guarantee.)
-    """
-    async def _keys(ctx):
-        return {"anthropic": "ak-test"}
-    monkeypatch.setattr(plm, "_provider_keys", _keys)
-
-    async def fake_anthropic(key):
-        return ["claude-opus-4-6"]
-    monkeypatch.setattr(plm, "_fetch_anthropic", fake_anthropic)
-
-    async def explode(*a, **kw):
-        raise AssertionError("no live fetch may run without a key")
-    monkeypatch.setattr(plm, "_fetch_openai", explode)
-    monkeypatch.setattr(plm, "_fetch_qwen", explode)
-
-    catalog = await plm.fetch_model_catalog()
-    assert catalog["anthropic"] == ["claude-opus-4-6"]
-    assert catalog["qwen"] == plm.FALLBACK_CATALOG["qwen"]
-    assert "openai" not in catalog and "google" not in catalog
-
-
-# ── 4. Saving must not leave a stale catalogue behind ─────────────────────
-
-def test_save_drops_the_model_catalogue_cache():
-    """A saved key must surface its provider's models on the NEXT render.
-
-    The catalogue is derived from the keys in the store it reads, so caching
-    it for an hour across a save would show the admin the old dropdowns.
-    """
+def test_save_no_longer_touches_the_model_listing_cache():
     src = inspect.getsource(handlers_llm)
-    assert f'delete("{plm._CACHE_KEY}")' in src, (
-        f"fn_save_llm_config must delete {plm._CACHE_KEY} after writing "
-        "imperal:config:llm"
-    )
+    assert "model_catalog" not in src and "model_listing" not in src
 
 
 # ── 5. The failover pair's provider follows its model ─────────────────────

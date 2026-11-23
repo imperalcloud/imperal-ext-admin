@@ -47,6 +47,8 @@ def _rendered_param_names() -> set[str]:
         import importlib
         src = inspect.getsource(importlib.import_module(mod))
         names.update(re.findall(r'param_name="([a-z0-9_]+)"', src))
+        # a model slot of a many-slot section is drawn by _pick("<param>", ...)
+        names.update(re.findall(r'_pick\("([a-z0-9_]+)"', src))
 
     # loop-built rows: per-purpose models + per-purpose AI params
     for key, *_ in form._PURPOSE_MODELS:

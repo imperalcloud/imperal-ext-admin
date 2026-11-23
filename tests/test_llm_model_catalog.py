@@ -1,9 +1,10 @@
 """Tests for the live LLM model catalogue (panels_llm_models).
 
-Regression cover for the incident where LLM Config showed ONLY Anthropic
-models: a single transient OpenAI fetch failure produced a partial catalogue
-that was then cached for a full hour, so GPT models silently vanished from
-every model dropdown until the TTL expired.
+The rule since 2026-11-23 (owner): every usable model of every provider that
+has a key, and nothing else - no top-N cut, no built-in stand-in list. A
+provider that failed offers nothing, the page says why, and that answer is
+cached only briefly (the older incident: one failed OpenAI fetch was cached
+for an hour).
 """
 from __future__ import annotations
 
@@ -19,8 +20,6 @@ class _FakeRedis:
 
     def __init__(self, initial: str | None = None):
         self.store: dict[str, str] = {}
-        if initial is not None:
-            self.store[plm._CACHE_KEY] = initial
         self.set_calls: list[tuple[str, str, int]] = []
         self.closed = False
 
@@ -42,135 +41,187 @@ def no_redis(monkeypatch):
     monkeypatch.setattr(plm, "_redis", _none)
 
 
-def _set_keys(monkeypatch, *, anthropic="ak-test", openai="ok-test", **more):
-    """The provider keys the catalogue gets. They come from this extension's
-    secrets (llm_keys.py), never from the environment or the config store."""
-    keys = {p: k for p, k in {"anthropic": anthropic, "openai": openai, **more}.items() if k}
+class _Secrets:
+    def __init__(self, values):
+        self.values = dict(values)
 
-    async def _keys(ctx):
-        return dict(keys)
-    monkeypatch.setattr(plm, "_provider_keys", _keys)
+    async def get(self, name):
+        return self.values.get(name)
 
-
-def _stub_fetches(monkeypatch, *, anthropic=None, openai=None):
-    async def fake_anthropic(key):
-        if isinstance(anthropic, Exception):
-            raise anthropic
-        return list(anthropic or [])
-
-    async def fake_openai(key):
-        if isinstance(openai, Exception):
-            raise openai
-        return list(openai or [])
-
-    monkeypatch.setattr(plm, "_fetch_anthropic", fake_anthropic)
-    monkeypatch.setattr(plm, "_fetch_openai", fake_openai)
+    async def is_set(self, name):
+        return bool(self.values.get(name))
 
 
-# --------------------------------------------------------------- the incident
+class _Ctx:
+    """A ctx whose secrets hold the given provider keys. They are the ONLY
+    source of a key: never the environment, never the config store."""
 
-@pytest.mark.asyncio
-async def test_openai_failure_keeps_openai_selectable(monkeypatch, no_redis):
-    """THE BUG: anthropic ok + openai down must NOT erase openai."""
-    _set_keys(monkeypatch)
-    _stub_fetches(
-        monkeypatch,
-        anthropic=["claude-opus-4-6", "claude-sonnet-4-6"],
-        openai=TimeoutError(),
-    )
-
-    catalog = await plm.fetch_model_catalog()
-
-    assert "openai" in catalog, "openai vanished from the catalogue"
-    assert catalog["openai"], "openai present but empty"
-    assert catalog["anthropic"] == ["claude-opus-4-6", "claude-sonnet-4-6"]
+    def __init__(self, anthropic="ak-test", openai="ok-test", **more):
+        keys = {"anthropic": anthropic, "openai": openai, **more}
+        self.secrets = _Secrets({f"llm_{p}_api_key": k for p, k in keys.items() if k})
 
 
-@pytest.mark.asyncio
-async def test_anthropic_failure_keeps_anthropic_selectable(monkeypatch, no_redis):
-    """Symmetric case — the same protection must work the other way round."""
-    _set_keys(monkeypatch)
-    _stub_fetches(monkeypatch, anthropic=RuntimeError("boom"), openai=["gpt-5"])
+def _stub_fetches(monkeypatch, **by_provider):
+    """Every provider's fetch: a list answers, an exception raises, and a
+    provider not named here must not be asked at all."""
+    for prov in plm.LISTED:
+        answer = by_provider.get(prov, AssertionError(f"{prov} has no key and must not be asked"))
 
-    catalog = await plm.fetch_model_catalog()
+        async def fake(key, _answer=answer, _prov=prov):
+            if isinstance(_answer, Exception):
+                raise _answer
+            assert key == by_provider.get(f"{_prov}_key", key)
+            return list(_answer)
+        monkeypatch.setattr(plm, f"_fetch_{prov}", fake)
 
-    assert catalog["openai"] == ["gpt-5"]
-    assert catalog["anthropic"] == plm.FALLBACK_CATALOG["anthropic"]
 
-
-@pytest.mark.asyncio
-async def test_degraded_catalogue_is_cached_only_briefly(monkeypatch):
-    """A partial result must not be pinned for the full hour."""
-    fake = _FakeRedis()
-
+def _with_redis(monkeypatch, fake):
     async def _fake_redis():
         return fake
     monkeypatch.setattr(plm, "_redis", _fake_redis)
-    _set_keys(monkeypatch)
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=TimeoutError())
 
-    await plm.fetch_model_catalog()
 
-    assert fake.set_calls, "nothing was cached"
-    _, _, ttl = fake.set_calls[-1]
-    assert ttl == plm._CACHE_TTL_DEGRADED
-    assert ttl < plm._CACHE_TTL
+# ------------------------------------------------- a provider that fails
+
+@pytest.mark.asyncio
+async def test_a_failed_provider_offers_nothing_and_says_why(monkeypatch, no_redis):
+    """Owner 2026-11-23: no model in a list that cannot be used. A provider
+    that did not answer has no stand-in list; the page gets the reason."""
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6", "claude-sonnet-4-6"], openai=TimeoutError())
+
+    catalog, notes = await plm.fetch_model_listing(_Ctx())
+
+    assert catalog == {"anthropic": ["claude-opus-4-6", "claude-sonnet-4-6"]}
+    assert list(notes) == ["openai"] and "TimeoutError" in notes["openai"]
 
 
 @pytest.mark.asyncio
-async def test_healthy_catalogue_keeps_full_ttl(monkeypatch):
-    fake = _FakeRedis()
+async def test_a_rejected_key_is_named_as_such(monkeypatch, no_redis):
+    import httpx
+    req = httpx.Request("GET", "https://api.openai.com/v1/models")
+    rejected = httpx.HTTPStatusError("401", request=req, response=httpx.Response(401, request=req))
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=rejected)
 
-    async def _fake_redis():
-        return fake
-    monkeypatch.setattr(plm, "_redis", _fake_redis)
-    _set_keys(monkeypatch)
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    await plm.fetch_model_catalog()
-
-    _, _, ttl = fake.set_calls[-1]
-    assert ttl == plm._CACHE_TTL
-
-
-@pytest.mark.asyncio
-async def test_unconfigured_provider_is_not_backfilled(monkeypatch, no_redis):
-    """No key => provider is deliberately off; do not invent models for it."""
-    _set_keys(monkeypatch, openai=None)
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"])
-
-    catalog = await plm.fetch_model_catalog()
+    catalog, notes = await plm.fetch_model_listing(_Ctx())
 
     assert "openai" not in catalog
-    assert catalog["anthropic"] == ["claude-opus-4-6"]
+    assert notes["openai"] == "the provider answered HTTP 401 - it does not accept the key"
 
 
 @pytest.mark.asyncio
-async def test_total_failure_falls_back_to_both_providers(monkeypatch, no_redis):
-    _set_keys(monkeypatch)
-    _stub_fetches(monkeypatch, anthropic=RuntimeError(), openai=RuntimeError())
+async def test_every_provider_failing_leaves_no_models(monkeypatch, no_redis):
+    _stub_fetches(monkeypatch, anthropic=RuntimeError("boom"), openai=RuntimeError("boom"))
 
-    catalog = await plm.fetch_model_catalog()
+    catalog, notes = await plm.fetch_model_listing(_Ctx())
 
-    assert set(catalog) == set(plm.FALLBACK_CATALOG)
+    assert catalog == {} and sorted(notes) == ["anthropic", "openai"]
+    assert not hasattr(plm, "FALLBACK_CATALOG"), "there is no built-in list of models"
 
+
+@pytest.mark.asyncio
+async def test_a_failed_listing_is_cached_only_briefly(monkeypatch):
+    fake = _FakeRedis()
+    _with_redis(monkeypatch, fake)
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=TimeoutError())
+
+    await plm.fetch_model_listing(_Ctx())
+
+    key, _, ttl = fake.set_calls[-1]
+    assert key == f"{plm._CACHE_KEY}:anthropic+openai"
+    assert ttl == plm._CACHE_TTL_DEGRADED < plm._CACHE_TTL
+
+
+@pytest.mark.asyncio
+async def test_a_whole_listing_keeps_the_full_ttl(monkeypatch):
+    fake = _FakeRedis()
+    _with_redis(monkeypatch, fake)
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
+
+    await plm.fetch_model_listing(_Ctx())
+
+    assert fake.set_calls[-1][2] == plm._CACHE_TTL
+
+
+# ------------------------------------------------- only where a key is
+
+@pytest.mark.asyncio
+async def test_a_provider_without_a_key_is_neither_asked_nor_listed(monkeypatch, no_redis):
+    """Every provider alike: qwen, kimi, zhipu and openrouter used to be
+    offered from a built-in list before their key existed."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "goog-from-env")        # not a source of keys
+    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"])
+
+    catalog, notes = await plm.fetch_model_listing(_Ctx(openai=None))
+
+    assert catalog == {"anthropic": ["claude-opus-4-6"]} and notes == {}
+
+
+@pytest.mark.asyncio
+async def test_no_key_at_all_is_an_empty_listing(monkeypatch, no_redis):
+    _stub_fetches(monkeypatch)
+    assert await plm.fetch_model_listing(_Ctx(anthropic=None, openai=None)) == ({}, {})
+
+
+@pytest.mark.asyncio
+async def test_each_provider_is_asked_with_its_own_secret(monkeypatch, no_redis):
+    _stub_fetches(monkeypatch, qwen=["qwen3-max"], google=["gemini-3-pro"], openrouter=["a/b"],
+                  qwen_key="sk-qw", google_key="goog", openrouter_key="sk-or")
+    ctx = _Ctx(anthropic=None, openai=None, qwen="sk-qw", google="goog", openrouter="sk-or")
+
+    assert await plm.fetch_model_catalog(ctx) == {
+        "qwen": ["qwen3-max"], "google": ["gemini-3-pro"], "openrouter": ["a/b"]}
+
+
+@pytest.mark.asyncio
+async def test_a_store_that_does_not_answer_is_said_so(monkeypatch, no_redis):
+    class _Away:
+        async def get(self, name):
+            raise RuntimeError("store away")
+        is_set = get
+    ctx = _Ctx()
+    ctx.secrets = _Away()
+    _stub_fetches(monkeypatch)
+
+    catalog, notes = await plm.fetch_model_listing(ctx)
+
+    assert catalog == {} and list(notes) == [plm.STORE_NOTE]
+
+
+# ------------------------------------------------- the cache
 
 @pytest.mark.asyncio
 async def test_cache_hit_short_circuits(monkeypatch):
-    cached = json.dumps({"anthropic": ["claude-x"], "openai": ["gpt-x"]})
-    fake = _FakeRedis(initial=cached)
+    fake = _FakeRedis()
+    fake.store[f"{plm._CACHE_KEY}:anthropic+openai"] = json.dumps(
+        {"catalog": {"anthropic": ["claude-x"], "openai": ["gpt-x"]}, "notes": {}})
+    _with_redis(monkeypatch, fake)
+    _stub_fetches(monkeypatch)                                   # any live fetch fails the test
 
-    async def _fake_redis():
-        return fake
-    monkeypatch.setattr(plm, "_redis", _fake_redis)
+    assert await plm.fetch_model_catalog(_Ctx()) == {"anthropic": ["claude-x"], "openai": ["gpt-x"]}
 
-    async def explode(key):
-        raise AssertionError("live fetch must not run on a cache hit")
-    monkeypatch.setattr(plm, "_fetch_anthropic", explode)
-    monkeypatch.setattr(plm, "_fetch_openai", explode)
 
-    catalog = await plm.fetch_model_catalog()
-    assert catalog == {"anthropic": ["claude-x"], "openai": ["gpt-x"]}
+@pytest.mark.asyncio
+async def test_a_key_typed_or_removed_is_a_new_listing(monkeypatch):
+    """The cached answer belongs to the set of providers that had a key: a new
+    key shows its models on the next render, not an hour later."""
+    fake = _FakeRedis()
+    fake.store[f"{plm._CACHE_KEY}:anthropic+openai"] = json.dumps(
+        {"catalog": {"anthropic": ["claude-x"], "openai": ["gpt-x"]}, "notes": {}})
+    _with_redis(monkeypatch, fake)
+    _stub_fetches(monkeypatch, anthropic=["claude-y"], openai=["gpt-y"], kimi=["kimi-k3"])
+
+    catalog = await plm.fetch_model_catalog(_Ctx(kimi="sk-kimi"))
+
+    assert catalog["kimi"] == ["kimi-k3"] and catalog["openai"] == ["gpt-y"]
+
+
+# ------------------------------------------------- nothing is cut
+
+def test_no_provider_list_is_cut_to_a_top_n():
+    """Until 2026-11-23: 16 OpenAI, 10 Anthropic and 20 Qwen models at most."""
+    assert len(plm._filter_openai([f"gpt-5.{i}" for i in range(40)])) == 40
+    assert len(plm._filter_anthropic([f"claude-opus-5-{i}" for i in range(30)])) == 30
+    assert len(plm._filter_qwen([f"qwen-new-{i}" for i in range(50)])) == 50
 
 
 # ------------------------------------------------------------- option lists
@@ -284,70 +335,6 @@ def test_kimi_and_zhipu_filters_keep_only_their_own_family():
     assert plm._filter_zhipu(zhipu_ids) == ["glm-4.5", "glm-4.5-air", "glm-5.3", "glm-5.3-flash"]
 
 
-@pytest.mark.asyncio
-async def test_qwen_catalogue_from_its_secret(monkeypatch):
-    """Qwen's key is its secret; a key slot left in the config store is not read."""
-    store = json.dumps({"provider": "openai", "qwen_api_key": "sk-old-slot"})
-    fake = _FakeRedis()
-    fake.store["imperal:config:llm"] = store
-
-    async def _fake_redis():
-        return fake
-    monkeypatch.setattr(plm, "_redis", _fake_redis)
-    _set_keys(monkeypatch, qwen="sk-qw-test")
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def fake_qwen(key, base_url=""):
-        assert key == "sk-qw-test"
-        return ["qwen3-max", "qwen-plus"]
-    monkeypatch.setattr(plm, "_fetch_qwen", fake_qwen)
-
-    catalog = await plm.fetch_model_catalog()
-    assert catalog["qwen"] == ["qwen3-max", "qwen-plus"]
-
-
-@pytest.mark.asyncio
-async def test_qwen_offered_without_key_but_never_fetched(monkeypatch):
-    """Qwen is SELECTABLE before its key exists, but no live call is made.
-
-    Its key is panel-entered, so the admin must be able to choose provider AND
-    model in the same save that types the key in -- the dropdowns therefore
-    carry the static qwen ids. "Never invented" still holds for the FETCH:
-    without a key the provider API is not contacted (the explode() stub), and
-    the kernel refuses to build a config with no key, so the early pick is
-    inert until the key lands.
-    """
-    fake = _FakeRedis()
-    fake.store["imperal:config:llm"] = json.dumps({"provider": "openai"})
-
-    async def _fake_redis():
-        return fake
-    monkeypatch.setattr(plm, "_redis", _fake_redis)
-    _set_keys(monkeypatch)
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def explode(key, base_url=""):
-        raise AssertionError("qwen fetch must not run without a key")
-    monkeypatch.setattr(plm, "_fetch_qwen", explode)
-
-    catalog = await plm.fetch_model_catalog()
-    assert catalog["qwen"] == plm.FALLBACK_CATALOG["qwen"]
-
-
-@pytest.mark.asyncio
-async def test_qwen_fetch_failure_backfills_fallback(monkeypatch, no_redis):
-    """Same degraded-backfill protection as anthropic/openai."""
-    _set_keys(monkeypatch, qwen="sk-qw-test")
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def boom(key, base_url=""):
-        raise TimeoutError()
-    monkeypatch.setattr(plm, "_fetch_qwen", boom)
-
-    catalog = await plm.fetch_model_catalog()
-    assert catalog["qwen"] == plm.FALLBACK_CATALOG["qwen"]
-
-
 # ------------------------------------------------------------------- google
 
 def test_google_filter_keeps_chat_gemini_only():
@@ -373,54 +360,3 @@ def test_google_filter_strips_models_prefix():
     """Google's API returns ids as 'models/gemini-x' -- the prefix must not leak."""
     kept = plm._filter_google(["models/gemini-2.5-pro"])
     assert kept == ["gemini-2.5-pro"]
-
-
-@pytest.mark.asyncio
-async def test_google_catalogue_from_its_secret(monkeypatch, no_redis):
-    """Google is listed live with its secret; an environment key is not read."""
-    _set_keys(monkeypatch, google="goog-test")
-    monkeypatch.setenv("GOOGLE_API_KEY", "goog-from-env")
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def fake_google(key):
-        assert key == "goog-test"
-        return ["gemini-3-pro", "gemini-3-flash"]
-    monkeypatch.setattr(plm, "_fetch_google", fake_google)
-
-    catalog = await plm.fetch_model_catalog()
-    assert catalog["google"] == ["gemini-3-pro", "gemini-3-flash"]
-
-
-@pytest.mark.asyncio
-async def test_google_absent_without_key(monkeypatch, no_redis):
-    """No GOOGLE_API_KEY/GEMINI_API_KEY set -- google must not appear at all.
-
-    Unlike Qwen (panel-entered key, always offered so the admin can pick
-    provider+model before typing the key), Google is env-gated: no key means
-    the deployment deliberately did not turn Google on, so it must not be
-    fetched NOR silently backfilled from the static fallback.
-    """
-    _set_keys(monkeypatch)
-    monkeypatch.setenv("GOOGLE_API_KEY", "goog-from-env")   # not a source of keys
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def explode(key):
-        raise AssertionError("google fetch must not run without a key")
-    monkeypatch.setattr(plm, "_fetch_google", explode)
-
-    catalog = await plm.fetch_model_catalog()
-    assert "google" not in catalog
-
-
-@pytest.mark.asyncio
-async def test_google_fetch_failure_backfills_fallback(monkeypatch, no_redis):
-    """Same degraded-backfill protection as anthropic/openai/qwen."""
-    _set_keys(monkeypatch, google="goog-test")
-    _stub_fetches(monkeypatch, anthropic=["claude-opus-4-6"], openai=["gpt-5"])
-
-    async def boom(key):
-        raise TimeoutError()
-    monkeypatch.setattr(plm, "_fetch_google", boom)
-
-    catalog = await plm.fetch_model_catalog()
-    assert catalog["google"] == plm.FALLBACK_CATALOG["google"]

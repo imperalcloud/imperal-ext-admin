@@ -25,7 +25,8 @@ from panels_llm_form_coding_thread import build_coding_thread_section
 from panels_llm_form_tiers import build_tiers_section
 from panels_llm_form_sampling import build_purpose_ai_params_section, build_thinking_governance_section
 from panels_llm_form_automation import build_automation_section
-from panels_llm_models import catalog_to_options, FALLBACK_CATALOG
+from panels_llm_models import catalog_to_options
+from panels_llm_slot import ALL as ALL_SLOTS, model_slot, opened
 
 _PROVIDERS = [
     {"value": "anthropic", "label": "Anthropic"},
@@ -200,6 +201,8 @@ def build_llm_form(
     # asks for one. extra_views = (id, label) pairs the page itself draws.
     view: str = "*",
     extra_views: tuple = (),
+    # the model slot drawn as the list in a section that has many (panels_llm_slot.py)
+    slot: str = "",
     # provider -> whether its key is typed in Secrets (llm_keys.keys_set);
     # None = the secret store did not answer.
     keys_set: dict | None = None,
@@ -242,8 +245,8 @@ def build_llm_form(
     else:
         provider_opts = _PROVIDERS
 
-    # Model dropdown options from the live catalogue (fallback iff none supplied).
-    _all_models, _provider_models = catalog_to_options(model_catalog or FALLBACK_CATALOG)
+    # Model options: every usable model of every provider that has a key.
+    _all_models, _provider_models = catalog_to_options(model_catalog or {})
 
     # Ensure custom/saved models that are not in catalog are included in dropdown options
     # so ui.Select doesn't render empty or drop the selection on client reload.
@@ -435,10 +438,24 @@ def build_llm_form(
             defaults[f"purpose_{_p}_{_k}"] = "" if _v is None else str(_v)
 
     # ── Category 3: Per-Purpose Models ───────────────────────────
+    # One list at a time in this section (panels_llm_slot.py says why).
+    _pp_slots: list[str] = []
+    for _key, _l, _d in _PURPOSE_MODELS:
+        _pp_slots.append(f"{_key}_model")
+        if _key in ("resolve", "code", "routing"):
+            _pp_slots.append(f"{_key}_fallback_model")
+    _pp_open = opened(_pp_slots, ALL_SLOTS if view == "*" else slot)
+
+    def _pick(param_name: str, placeholder: str) -> list:
+        return model_slot(param_name, defaults.get(param_name, ""), _all_models, placeholder,
+                          PURPOSE_VIEW, _pp_open)
+
     model_children: list = [
         ui.Text(
             "Override the model used for each kernel LLM purpose. Leave on "
-            "“Same as default” to inherit the provider/model above.",
+            "“Same as default” to inherit the provider/model above. "
+            "One model list is open at a time: “Choose model” opens another "
+            "one, and Save stores the open one.",
             variant="caption",
         ),
     ]
@@ -448,12 +465,7 @@ def build_llm_form(
                 ui.Text(label, variant="body"),
                 ui.Text(desc, variant="caption"),
             ], gap=0),
-            ui.Select(
-                options=_all_models,
-                value=defaults.get(f"{key}_model", ""),
-                param_name=f"{key}_model",
-                placeholder="Same as default",
-            ),
+            *_pick(f"{key}_model", "Same as default"),
         ])
         if key == "resolve":
             # Brain failover (2026-08-08): the retry target for chat AND every
@@ -466,12 +478,7 @@ def build_llm_form(
                     "Blank = platform reasoning default.",
                     variant="caption",
                 ),
-                ui.Select(
-                    options=_all_models,
-                    value=defaults.get("resolve_fallback_model", ""),
-                    param_name="resolve_fallback_model",
-                    placeholder="Platform default",
-                ),
+                *_pick("resolve_fallback_model", "Platform default"),
             ])
         if key == "code":
             # G2 (2026-07-16): Webbee Code fallback model — one retry on this
@@ -484,12 +491,7 @@ def build_llm_form(
                     "(one retry). Blank = no fallback.",
                     variant="caption",
                 ),
-                ui.Select(
-                    options=_all_models,
-                    value=defaults.get("code_fallback_model", ""),
-                    param_name="code_fallback_model",
-                    placeholder="No fallback",
-                ),
+                *_pick("code_fallback_model", "No fallback"),
             ])
         if key == "routing":
             # Routing fallback model — one retry on this model when routing errors.
@@ -499,12 +501,7 @@ def build_llm_form(
                     "(one retry). Blank = no fallback.",
                     variant="caption",
                 ),
-                ui.Select(
-                    options=_all_models,
-                    value=defaults.get("routing_fallback_model", ""),
-                    param_name="routing_fallback_model",
-                    placeholder="No fallback",
-                ),
+                *_pick("routing_fallback_model", "No fallback"),
             ])
         model_children.append(ui.Divider())
 
@@ -754,7 +751,7 @@ def build_llm_form(
                        children=model_children),
 
             # ── 3b · Webbee Code Model Tiers (2026-07-30) ─────────
-            build_tiers_section(defaults, _all_models),
+            build_tiers_section(defaults, _all_models, ALL_SLOTS if view == "*" else slot),
 
             # ── 4 · Per-Purpose AI Parameters ─────────────────────
             ui.Section(title="\U0001f39b Per-Purpose AI Parameters",
@@ -940,6 +937,7 @@ def _view_id(title: str) -> str:
 
 
 MAP_VIEW = "automations-map"
+PURPOSE_VIEW = "per-purpose-models"        # _view_id of the Per-Purpose Models section
 
 
 def _sections_as_forms(defaults: dict, nodes: list, view: str = "*", extra_views: tuple = ()):
