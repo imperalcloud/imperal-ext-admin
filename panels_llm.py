@@ -270,6 +270,7 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", llm_slot: str =
     navigate = cfg.get("navigate_model", "")
     chain_narrative = cfg.get("chain_narrative_model", "")
     judge = cfg.get("judge_model", "")
+    entry = cfg.get("entry_model", "")     # the judge on entry (purpose=entry): blank = the judge's model
     # Federalization 2026-05-19 — new per-purpose model overrides
     conversational = cfg.get("conversational_model", "")
     step_reclassify = cfg.get("step_reclassify_model", "")
@@ -346,6 +347,7 @@ async def build_llm(ctx, run_test: str = "", llm_view: str = "", llm_slot: str =
             purpose_ai_params=cfg.get("purpose") if isinstance(cfg.get("purpose"), dict) else None,
             # Federalization 2026-05-19 — new per-purpose model overrides
             conversational_model=conversational,
+            entry_model=entry,
             step_reclassify_model=step_reclassify,
             tool_picker_model=tool_picker,
             action_narrator_model=action_narrator,

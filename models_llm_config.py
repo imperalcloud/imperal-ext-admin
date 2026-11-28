@@ -106,6 +106,8 @@ class SaveLlmConfigParams(BaseModel):
     chain_narrative_provider: str = Field(default="", description="Chain narrator provider override (Sprint 2)")
     judge_model: str = Field(default="", description="Judge model override (Sprint 2)")
     judge_provider: str = Field(default="", description="Judge provider override (Sprint 2)")
+    entry_model: str = Field(default="", description="Entry judge model (purpose=entry): reads every message of a person before the turn starts and says what the turn needs. Blank = the judge model.")
+    entry_provider: str = Field(default="", description="Entry judge provider (inferred from the model id when left blank)")
     # ── Federalization 2026-05-19 (Sprint 2 fixes #26+) — every kernel LLM
     # purpose now has an admin-tunable model + provider field. Empty string
     # = inherit global default (model + provider). Resolver cascade reads
@@ -782,6 +784,10 @@ class SaveLlmConfigParams(BaseModel):
     purpose_judge_top_p: str = Field(default="", description="Per-purpose top_p for judge")
     purpose_judge_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for judge")
     purpose_judge_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for judge")
+    purpose_entry_temperature: str = Field(default="", description="Per-purpose temperature for the entry judge")
+    purpose_entry_top_p: str = Field(default="", description="Per-purpose top_p for the entry judge")
+    purpose_entry_presence_penalty: str = Field(default="", description="Per-purpose presence_penalty for the entry judge")
+    purpose_entry_frequency_penalty: str = Field(default="", description="Per-purpose frequency_penalty for the entry judge")
     # Federalization 2026-05-19 — per-purpose AI params for new purposes
     purpose_conversational_temperature: str = Field(default="", description="Per-purpose temperature for conversational (chitchat)")
     purpose_conversational_top_p: str = Field(default="", description="Per-purpose top_p for conversational")

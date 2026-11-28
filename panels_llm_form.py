@@ -76,6 +76,11 @@ _PURPOSE_MODELS: list[tuple[str, str, str]] = [
      "The kernel's judges (purpose=judge), always on: the truth door reads each claim of an answer beside the "
      "task's facts, and the step review reads how a marathon's work is going. The optional Gate-6 prose judge "
      "(Feature Flags toggle) uses this model too; the toggle switches only Gate 6."),
+    ("entry", "Entry Judge · Reads Every Message",
+     "Reads each message of a person before the turn starts (purpose=entry) and says what the turn needs: "
+     "talk or work, which apps and tools, what it is about -- the frame is then built of that alone. It runs on "
+     "EVERY message and its answer is short and structured: pick a fast, cheap, accurate model. Blank = the "
+     "Judge model above."),
     ("conversational", "Conversational · Chitchat",
      "Free-form chat and the empty-apps fallback reply (purpose=conversational)."),
     ("step_reclassify", "Step Reclassify · Two-Phase",
@@ -169,6 +174,7 @@ def build_llm_form(
     # Empty default = inherit global `model`. Caller fetches from
     # imperal:config:llm flat-keys (cfg.get("conversational_model"), etc.).
     conversational_model: str = "",
+    entry_model: str = "",
     step_reclassify_model: str = "",
     tool_picker_model: str = "",
     code_model: str = "",
@@ -300,6 +306,7 @@ def build_llm_form(
         "navigate_model": navigate_model if navigate_model != model else "",
         "chain_narrative_model": chain_narrative_model if chain_narrative_model != model else "",
         "judge_model": judge_model if judge_model != model else "",
+        "entry_model": entry_model if entry_model != model else "",
         # Federalization 2026-05-19 — new per-purpose model overrides
         "conversational_model": conversational_model if conversational_model != model else "",
         "step_reclassify_model": step_reclassify_model if step_reclassify_model != model else "",

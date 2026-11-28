@@ -91,6 +91,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
             "purpose_navigate_temperature", "purpose_navigate_top_p", "purpose_navigate_presence_penalty", "purpose_navigate_frequency_penalty",
             "purpose_chain_narrative_temperature", "purpose_chain_narrative_top_p", "purpose_chain_narrative_presence_penalty", "purpose_chain_narrative_frequency_penalty",
             "purpose_judge_temperature", "purpose_judge_top_p", "purpose_judge_presence_penalty", "purpose_judge_frequency_penalty",
+            "purpose_entry_temperature", "purpose_entry_top_p", "purpose_entry_presence_penalty", "purpose_entry_frequency_penalty",
             # Federalization 2026-05-19 — new per-purpose AI params (handled below)
             "purpose_conversational_temperature", "purpose_conversational_top_p", "purpose_conversational_presence_penalty", "purpose_conversational_frequency_penalty",
             "purpose_step_reclassify_temperature", "purpose_step_reclassify_top_p", "purpose_step_reclassify_presence_penalty", "purpose_step_reclassify_frequency_penalty",
@@ -155,6 +156,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
                          # pairs an openai provider with a qwen model -> 404.
                          "failover",
                          "routing", "routing_fallback", "execution", "navigate", "chain_narrative", "judge",
+                         "entry",     # the judge on entry: reads every message before the turn starts
                          # Federalization 3.1 -- new per-purpose models
                          "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _model_key = f"{_purpose}_model"
@@ -185,7 +187,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         # entries (e.g. ones written by earlier saves) survive.
         _purpose_map: dict = current.get("purpose") if isinstance(current.get("purpose"), dict) else {}
         for _p in ("resolve", "code",
-                   "routing", "execution", "navigate", "chain_narrative", "judge",
+                   "routing", "execution", "navigate", "chain_narrative", "judge", "entry",
                    # Federalization 2026-05-19 — new per-purpose AI params
                    "conversational", "step_reclassify", "tool_picker", "action_narrator"):
             _slot = dict(_purpose_map.get(_p) or {})
@@ -236,7 +238,7 @@ async def fn_save_llm_config(ctx, params: SaveLlmConfigParams) -> ActionResult:
         _global_prov = current.get("provider") or ""
         _global_mod = current.get("model") or ""
         for _purp in ("resolve", "resolve_fallback", "failover", "routing", "execution",
-                      "navigate", "chain_narrative", "judge", "conversational",
+                      "navigate", "chain_narrative", "judge", "entry", "conversational",
                       "step_reclassify", "tool_picker", "action_narrator"):
             _mk = f"{_purp}_model"
             _pk = f"{_purp}_provider"

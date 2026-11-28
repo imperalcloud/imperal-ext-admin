@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "6.9.0",
+  "sdk_version": "6.14.0",
   "app_id": "admin",
-  "version": "5.27.0",
+  "version": "5.28.0",
   "name": "Admin",
   "description": "Administrative control plane — manage users, roles, RBAC scopes, billing limits, payment plans, extension installs, LLM model configuration, and tenant-wide settings.",
   "icon": "icon.svg",
@@ -14033,6 +14033,18 @@
             "title": "Judge Provider",
             "type": "string"
           },
+          "entry_model": {
+            "default": "",
+            "description": "Entry judge model (purpose=entry): reads every message of a person before the turn starts and says what the turn needs. Blank = the judge model.",
+            "title": "Entry Model",
+            "type": "string"
+          },
+          "entry_provider": {
+            "default": "",
+            "description": "Entry judge provider (inferred from the model id when left blank)",
+            "title": "Entry Provider",
+            "type": "string"
+          },
           "conversational_model": {
             "default": "",
             "description": "Conversational (chitchat fall-through) model override",
@@ -15287,6 +15299,30 @@
             "default": "",
             "description": "Per-purpose frequency_penalty for judge",
             "title": "Purpose Judge Frequency Penalty",
+            "type": "string"
+          },
+          "purpose_entry_temperature": {
+            "default": "",
+            "description": "Per-purpose temperature for the entry judge",
+            "title": "Purpose Entry Temperature",
+            "type": "string"
+          },
+          "purpose_entry_top_p": {
+            "default": "",
+            "description": "Per-purpose top_p for the entry judge",
+            "title": "Purpose Entry Top P",
+            "type": "string"
+          },
+          "purpose_entry_presence_penalty": {
+            "default": "",
+            "description": "Per-purpose presence_penalty for the entry judge",
+            "title": "Purpose Entry Presence Penalty",
+            "type": "string"
+          },
+          "purpose_entry_frequency_penalty": {
+            "default": "",
+            "description": "Per-purpose frequency_penalty for the entry judge",
+            "title": "Purpose Entry Frequency Penalty",
             "type": "string"
           },
           "purpose_conversational_temperature": {
