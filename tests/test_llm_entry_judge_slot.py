@@ -28,3 +28,18 @@ def test_the_handler_infers_the_provider_and_clears_a_blank_slot_like_every_othe
 def test_the_page_reads_the_stored_model_into_the_form():
     assert 'cfg.get("entry_model"' in inspect.getsource(panels_llm)
     assert "entry_model" in inspect.signature(form.build_llm_form).parameters
+
+
+def test_the_routing_report_shows_the_slot_and_what_a_blank_one_runs_on():
+    from models_llm_routing import PURPOSE_SLOTS, resolve_slot
+    assert "entry" in [p for p, _ in PURPOSE_SLOTS]
+    cfg = {"model": "base/one", "provider": "openrouter", "judge_model": "big/judge", "judge_provider": "openrouter"}
+    blank = resolve_slot("entry", "Entry", cfg, {}, {})
+    assert (blank.effective_model, blank.source, blank.provider) == ("big/judge", "inherited_judge", "openrouter")
+    named = resolve_slot("entry", "Entry", {**cfg, "entry_model": "fast/one", "entry_provider": "deepseek"}, {}, {})
+    assert (named.effective_model, named.source, named.provider) == ("fast/one", "explicit", "deepseek")
+    bare = resolve_slot("entry", "Entry", {"model": "base/one", "provider": "openrouter"}, {}, {})
+    assert (bare.effective_model, bare.source) == ("base/one", "inherited_default")
+    # every other slot resolves as before
+    other = resolve_slot("execution", "Execution", cfg, {}, {})
+    assert (other.effective_model, other.source, other.provider) == ("base/one", "inherited_default", "openrouter")

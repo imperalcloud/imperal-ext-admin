@@ -34,6 +34,7 @@ PURPOSE_SLOTS: tuple[tuple[str, str], ...] = (
     ("navigate",        "Navigate · clarifying questions and offers"),
     ("chain_narrative", "Chain Narrator · final multi-step reply"),
     ("judge",           "Judge · truth door, step review, Gate 6"),
+    ("entry",           "Entry Judge · reads every message before the turn starts"),
     ("conversational",  "Conversational · chitchat fall-through"),
     ("step_reclassify", "Step Reclassify · binds args before write steps"),
     ("tool_picker",     "Tool Picker · chain disambiguation"),
@@ -127,7 +128,7 @@ class ResolvedSlot(BaseModel):
     configured_model: str = Field(default="", description="What the slot itself holds ('' = inherits)")
     effective_model: str = Field(default="", description="The model that will ACTUALLY run")
     provider: str = ""
-    source: str = Field(default="", description="explicit | inherited_default | unset")
+    source: str = Field(default="", description="explicit | inherited_default | inherited_<slot> (a blank slot the kernel routes to another slot) | unset")
     tier: str = Field(default="", description="Billing tier of the effective model")
     platform_fee: int = Field(default=0, description="Credits charged per action at this tier")
     is_available: bool = True
@@ -158,6 +159,11 @@ def normalise_rates(raw: list[dict] | None) -> dict[str, ModelRate]:
     return out
 
 
+# A blank slot inherits the global default -- except a slot the kernel routes to ANOTHER slot when blank: the entry
+# judge with no model of its own runs on the judge's (kernel core.work_intent.reader_purpose).
+SLOT_FALLBACK: dict[str, str] = {"entry": "judge"}
+
+
 def resolve_slot(
     purpose: str,
     label: str,
@@ -178,8 +184,13 @@ def resolve_slot(
     configured = str(cfg.get(f"{purpose}_model") or "").strip()
     global_default = str(cfg.get("model") or "").strip()
 
+    parent = SLOT_FALLBACK.get(purpose, "")
+    parent_model = str(cfg.get(f"{parent}_model") or "").strip() if parent else ""
+
     if configured:
         effective, source = configured, "explicit"
+    elif parent_model:
+        effective, source = parent_model, f"inherited_{parent}"
     elif global_default:
         effective, source = global_default, "inherited_default"
     else:
@@ -187,7 +198,8 @@ def resolve_slot(
 
     provider = str(
         cfg.get(f"{purpose}_provider")
-        or (cfg.get("provider") if source != "explicit" else "")
+        or (cfg.get(f"{parent}_provider") if source == f"inherited_{parent}" else "")
+        or (cfg.get("provider") if source in ("inherited_default", "unset") else "")
         or ""
     ).strip()
     # Every provider field in the config is documented as "auto-inferred from
